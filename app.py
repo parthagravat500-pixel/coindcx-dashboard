@@ -16,6 +16,7 @@ import streamlit as st
 
 from data_fetcher import get_candles, data_quality_report
 from indicators import compute_all_indicators, detect_regime
+from db import is_configured, storage_summary, load_candles
 
 st.set_page_config(page_title="Crypto F&O Dashboard — Phase 1", layout="wide")
 
@@ -126,3 +127,46 @@ st.caption(
     f"Interval: {interval} · Pair: {pair} · "
     "Source: CoinDCX public API (LIVE DATA) · Model version: N/A — Phase 1 has no predictive model yet."
 )
+
+st.divider()
+st.subheader("📦 Historical Data Storage — Phase 2")
+
+if not is_configured():
+    st.info(
+        "Historical storage isn't connected yet. Once the `DATABASE_URL` secret is added "
+        "(see Phase 2 setup), every candle collected by the background job every 15 minutes "
+        "will show up here — building up a real history for backtesting later."
+    )
+else:
+    try:
+        summary = storage_summary()
+        if summary.empty:
+            st.info(
+                "Database is connected, but no candles are stored yet. "
+                "The background collector runs every 15 minutes — check back shortly, "
+                "or trigger it manually from the GitHub Actions tab."
+            )
+        else:
+            st.caption("What's currently stored, across all coins/timeframes being collected:")
+            st.dataframe(summary, use_container_width=True, hide_index=True)
+
+            stored = load_candles(pair, interval, limit=5000)
+            if not stored.empty:
+                st.caption(
+                    f"{len(stored)} stored candles for {coin} {interval} "
+                    f"({stored['time'].min()} → {stored['time'].max()})"
+                )
+                hist_fig = go.Figure()
+                hist_fig.add_trace(go.Candlestick(
+                    x=stored["time"], open=stored["open"], high=stored["high"],
+                    low=stored["low"], close=stored["close"], name=coin,
+                ))
+                hist_fig.update_layout(
+                    height=400, xaxis_rangeslider_visible=False, template="plotly_dark",
+                    margin=dict(l=10, r=10, t=30, b=10),
+                )
+                st.plotly_chart(hist_fig, use_container_width=True)
+            else:
+                st.caption(f"No stored history yet specifically for {coin} {interval}.")
+    except Exception as e:
+        st.error(f"Could not read historical data: {e}")
