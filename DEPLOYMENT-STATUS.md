@@ -1,18 +1,22 @@
 # Deployment status — 23 September 2026
 
-Prepared a Render Blueprint for one paid web service in Singapore with 1 GB persistent storage, a generated admin password, health checks, and the test suite as a build gate. It is not deployed. No live targets have been configured or tested, and no charge was incurred.
+## Source upload complete
 
-Estimated recurring base cost: USD 7.25/month (USD 7 service + USD 0.25 for 1 GB storage), excluding tax and usage overages. Approval is needed before provisioning. Pricing reference: https://render.com/pricing
+The ScopeGuard-Bug-Bounty-Assistant.zip source is uploaded at the repository root on the dedicated `scopeguard-app` branch in `parthagravat500-pixel/coindcx-dashboard`. The previous GitHub write-access blocker is resolved. The existing `main` branch was not changed by this setup.
 
-## Confirmed access blocker
+All 10 local tests passed using synthetic responses and mocked target networking. New installations start paused. No target database is included and no live scanning was performed. Keep scanning paused until explicitly authorized.
 
-The GitHub connection can read repository metadata but rejected a branch-creation request with HTTP 403, `Resource not accessible by integration`. No branch was created and no existing app was changed. Browser GitHub sign-in also reported that the account does not support password sign-in. An account owner must authorize an appropriate GitHub write connection, or complete a supported browser sign-in, before the assistant can upload the source.
+## Hosting approval pending
 
-The Render connection can list the user's workspace and existing services. The Blueprint is prepared but has not been validated by the Render CLI/API. A successful paid deployment still requires repository access and cost approval.
+A Render Blueprint is prepared for one paid web service in Singapore with 1 GB persistent storage, a generated admin password, health checks, and the test suite as a build gate. No paid hosting was provisioned during this upload. Automatic deployment is set to off. Do not apply the Blueprint before explicit cost approval.
+
+The prior estimate was USD 7.25/month (USD 7 service + USD 0.25 for 1 GB storage), excluding tax and usage overages. Recheck current pricing before requesting approval: https://render.com/pricing
+
+The Blueprint has not been validated by the Render CLI/API. Deployment and live scanning remain separate pending steps.
 
 ## Program review
 
-Evernote's public HackerOne policy was read in the browser. It requires a HackerOne username in automated scan User-Agent strings and excludes raw automated scan reports, missing security headers and cookie flags, among other categories. Consequently, Evernote has NOT been configured as a target for the current basic observation engine.
+Evernote's public HackerOne policy was read during the earlier setup. It requires a HackerOne username in automated scan User-Agent strings and excludes raw automated scan reports, missing security headers and cookie flags, among other categories. Consequently, Evernote has NOT been configured as a target for the current basic observation engine. Recheck current policy before any future activation.
 
 Source: https://hackerone.com/evernote
 
