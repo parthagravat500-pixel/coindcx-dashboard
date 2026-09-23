@@ -1,23 +1,28 @@
-# Deployment status — 23 September 2026
+# ScopeGuard deployment status — 23 September 2026
 
-## Source upload complete
+## Hosting approved and service live
 
-The ScopeGuard-Bug-Bounty-Assistant.zip source is uploaded at the repository root on the dedicated `scopeguard-app` branch in `parthagravat500-pixel/coindcx-dashboard`. The previous GitHub write-access blocker is resolved. The existing `main` branch was not changed by this setup.
+The user approved Render hosting up to USD 8/month and confirmed My Workspace (`tea-da4b2am417fc73cdvin0`). A single Starter Python web service was created in Singapore with automatic deployments off.
 
-All 10 local tests passed using synthetic responses and mocked target networking. New installations start paused. No target database is included and no live scanning was performed. Keep scanning paused until explicitly authorized.
+- Service: `scopeguard-research` (`srv-daq6cvgjo6nc73d9bf50`)
+- Dashboard: https://dashboard.render.com/web/srv-daq6cvgjo6nc73d9bf50
+- App: https://scopeguard-research.onrender.com
+- Repository: `parthagravat500-pixel/coindcx-dashboard`, branch `scopeguard-app`
+- Deployed commit: `c2d6d82df8fc56376aee9be24612d96f6071871a`
+- Initial deploy: `dep-daq6d08jo6nc73d9bh9g`, confirmed live
+- Build command: `DATA_DIR=/tmp/scopeguard-build-test python -m unittest -v`
+- Start command: `python app.py`
+- All 10 build tests passed; public `/healthz` returned HTTP 200.
+- A randomly generated ADMIN_PASSWORD is configured in Render environment variables. No credential is committed to source.
 
-## Hosting approval pending
+Keep scanning paused. No live targets were configured or scanned by the assistant. The original main branch remains unchanged.
 
-A Render Blueprint is prepared for one paid web service in Singapore with 1 GB persistent storage, a generated admin password, health checks, and the test suite as a build gate. No paid hosting was provisioned during this upload. Automatic deployment is set to off. Do not apply the Blueprint before explicit cost approval.
+## Persistent storage still required
 
-The prior estimate was USD 7.25/month (USD 7 service + USD 0.25 for 1 GB storage), excluding tax and usage overages. Recheck current pricing before requesting approval: https://render.com/pricing
+The connected Render creation tool cannot attach disks. Dashboard access in the assistant browser remains unauthenticated; the user's phone browser session is separate. No persistent disk is attached yet. Settings and reports can be lost across restarts or redeployments until this is completed.
 
-The Blueprint has not been validated by the Render CLI/API. Deployment and live scanning remain separate pending steps.
+Attach a 1 GB disk to this existing service at `/opt/render/project/src/data`, matching its DATA_DIR. Do not create a duplicate service or apply the original Blueprint as a second deployment. The original render.yaml is a proposal using a different data mount, not the current service configuration.
 
-## Program review
+Published base estimate: USD 7/month for the service, plus USD 0.25/month for a 1 GB disk when attached, excluding tax and metered overages. Do not expand resources beyond the user's approved limit without approval. Pricing: https://render.com/pricing
 
-Evernote's public HackerOne policy was read during the earlier setup. It requires a HackerOne username in automated scan User-Agent strings and excludes raw automated scan reports, missing security headers and cookie flags, among other categories. Consequently, Evernote has NOT been configured as a target for the current basic observation engine. Recheck current policy before any future activation.
-
-Source: https://hackerone.com/evernote
-
-The application is an initial research assistant, not yet a capable autonomous bounty-earning system. Deployment alone will not change that. A future testing plan must match an eligible program, identify concrete impact, and meet its account/identity and scope requirements before activation.
+The application is an initial observation and report-triage assistant, not an autonomous bounty-earning system. Target authorization and scanning activation remain separate from hosting approval.
