@@ -1,172 +1,250 @@
-"""
-app.py
-------
-PHASE 1 dashboard: live prices, candlestick charts, and technical indicators
-for CoinDCX-listed coins. No predictions, no signals, no trading — just clean,
-trustworthy data. That's deliberate: everything later (ML models, signals,
-backtesting) needs to sit on top of a data layer you already trust.
+import base64
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import sqlite3
+import threading
+import time
+from contextlib import contextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from engine import validate_url, observe, findings
 
-Run with:
-    streamlit run app.py
-"""
+ROOT = Path(__file__).parent
+DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
+DATA.mkdir(parents=True, exist_ok=True)
+TOKEN = os.environ.get('ADMIN_PASSWORD', '')
+CSRF = secrets.token_urlsafe(32)
+LOCK = threading.Lock()
+WAKE = threading.Event()
 
-import pandas as pd
-import plotly.graph_objects as go
-import streamlit as st
 
-from data_fetcher import get_candles, data_quality_report
-from indicators import compute_all_indicators, detect_regime
-from db import is_configured, storage_summary, load_candles
-
-st.set_page_config(page_title="Crypto F&O Dashboard — Phase 1", layout="wide")
-
-st.warning(
-    "**PHASE 1 — LIVE DATA + INDICATORS ONLY.** "
-    "No LONG/SHORT signals, no ML predictions, no trade setups yet. "
-    "Everything below is real, live market data pulled from CoinDCX's public API — "
-    "but nothing on this page is a trade recommendation."
-)
-
-st.title("Crypto F&O Analytics — Phase 1")
-st.caption("Live Data · Indicators · Foundation for later phases (signals, backtesting, ML)")
-
-COINS = {
-    "BTC": "B-BTC_USDT",
-    "ETH": "B-ETH_USDT",
-    "SOL": "B-SOL_USDT",
-    "XRP": "B-XRP_USDT",
-    "DOGE": "B-DOGE_USDT",
-    "BNB": "B-BNB_USDT",
-    "ADA": "B-ADA_USDT",
-    "AVAX": "B-AVAX_USDT",
-    "LINK": "B-LINK_USDT",
-}
-
-INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"]
-
-col1, col2, col3 = st.columns([1, 1, 2])
-with col1:
-    coin = st.selectbox("Coin", list(COINS.keys()))
-with col2:
-    interval = st.selectbox("Timeframe", INTERVALS, index=1)
-with col3:
-    st.write("")
-    refresh = st.button("🔄 Refresh live data")
-
-pair = COINS[coin]
-
-with st.spinner(f"Fetching {coin} {interval} candles from CoinDCX..."):
-    df = get_candles(pair, interval=interval, limit=300)
-
-warnings = data_quality_report(df, interval)
-for w in warnings:
-    st.warning(f"⚠️ Data quality: {w}")
-
-if df.empty:
-    st.error(
-        "No usable data returned for this pair/timeframe. "
-        "CoinDCX may not support this combination, the market may be inactive, "
-        "or there's a temporary connection issue. Try a different coin/timeframe."
-    )
-    st.stop()
-
-df = compute_all_indicators(df)
-regime = detect_regime(df)
-
-last = df.iloc[-1]
-prev = df.iloc[-2]
-pct_change = (last["close"] - prev["close"]) / prev["close"] * 100 if prev["close"] else 0.0
-
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Price (USDT)", f"${last['close']:,.4f}", f"{pct_change:+.2f}%")
-m2.metric("RSI (14)", f"{last['rsi_14']:.1f}" if pd.notna(last["rsi_14"]) else "N/A")
-m3.metric("ATR (14)", f"{last['atr_14']:.4f}" if pd.notna(last["atr_14"]) else "N/A")
-m4.metric("Market Regime (rule-based, placeholder)", regime)
-
-fig = go.Figure()
-fig.add_trace(go.Candlestick(
-    x=df["time"], open=df["open"], high=df["high"], low=df["low"], close=df["close"],
-    name=coin,
-))
-fig.add_trace(go.Scatter(x=df["time"], y=df["ema_20"], line=dict(width=1), name="EMA 20"))
-fig.add_trace(go.Scatter(x=df["time"], y=df["ema_50"], line=dict(width=1), name="EMA 50"))
-fig.add_trace(go.Scatter(x=df["time"], y=df["bb_upper"], line=dict(width=1, dash="dot"), name="BB Upper"))
-fig.add_trace(go.Scatter(x=df["time"], y=df["bb_lower"], line=dict(width=1, dash="dot"), name="BB Lower"))
-fig.update_layout(
-    height=600,
-    xaxis_rangeslider_visible=False,
-    template="plotly_dark",
-    margin=dict(l=10, r=10, t=30, b=10),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02),
-)
-st.plotly_chart(fig, use_container_width=True)
-
-st.subheader("Indicator snapshot — latest candle")
-snapshot = {
-    "EMA 9": last["ema_9"], "EMA 20": last["ema_20"], "EMA 50": last["ema_50"],
-    "EMA 100": last["ema_100"], "EMA 200": last["ema_200"],
-    "SMA 20": last["sma_20"], "SMA 50": last["sma_50"], "SMA 100": last["sma_100"], "SMA 200": last["sma_200"],
-    "RSI 14": last["rsi_14"], "Stoch RSI": last["stoch_rsi"],
-    "MACD": last["macd"], "MACD Signal": last["macd_signal"], "MACD Hist": last["macd_hist"],
-    "ADX 14": last.get("adx_14"),
-    "ATR 14": last["atr_14"],
-    "Bollinger Upper": last["bb_upper"], "Bollinger Mid": last["bb_mid"], "Bollinger Lower": last["bb_lower"],
-    "VWAP (session)": last["vwap"],
-}
-snap_df = pd.DataFrame(
-    [(k, f"{v:,.5f}" if pd.notna(v) else "N/A") for k, v in snapshot.items()],
-    columns=["Indicator", "Value"],
-)
-st.dataframe(snap_df, use_container_width=True, hide_index=True)
-
-st.subheader("Recent candles")
-st.dataframe(df.tail(20).sort_values("time", ascending=False), use_container_width=True, hide_index=True)
-
-st.caption(
-    f"Data timestamp (last candle): {last['time']} · "
-    f"Interval: {interval} · Pair: {pair} · "
-    "Source: CoinDCX public API (LIVE DATA) · Model version: N/A — Phase 1 has no predictive model yet."
-)
-
-st.divider()
-st.subheader("📦 Historical Data Storage — Phase 2")
-
-if not is_configured():
-    st.info(
-        "Historical storage isn't connected yet. Once the `DATABASE_URL` secret is added "
-        "(see Phase 2 setup), every candle collected by the background job every 15 minutes "
-        "will show up here — building up a real history for backtesting later."
-    )
-else:
+@contextmanager
+def db():
+    c = sqlite3.connect(DATA / 'bounty.db', timeout=30)
+    c.row_factory = sqlite3.Row
     try:
-        summary = storage_summary()
-        if summary.empty:
-            st.info(
-                "Database is connected, but no candles are stored yet. "
-                "The background collector runs every 15 minutes — check back shortly, "
-                "or trigger it manually from the GitHub Actions tab."
-            )
-        else:
-            st.caption("What's currently stored, across all coins/timeframes being collected:")
-            st.dataframe(summary, use_container_width=True, hide_index=True)
+        yield c
+        c.commit()
+    finally:
+        c.close()
 
-            stored = load_candles(pair, interval, limit=5000)
-            if not stored.empty:
-                st.caption(
-                    f"{len(stored)} stored candles for {coin} {interval} "
-                    f"({stored['time'].min()} → {stored['time'].max()})"
-                )
-                hist_fig = go.Figure()
-                hist_fig.add_trace(go.Candlestick(
-                    x=stored["time"], open=stored["open"], high=stored["high"],
-                    low=stored["low"], close=stored["close"], name=coin,
-                ))
-                hist_fig.update_layout(
-                    height=400, xaxis_rangeslider_visible=False, template="plotly_dark",
-                    margin=dict(l=10, r=10, t=30, b=10),
-                )
-                st.plotly_chart(hist_fig, use_container_width=True)
-            else:
-                st.caption(f"No stored history yet specifically for {coin} {interval}.")
+
+def init():
+    with db() as c:
+        c.executescript('''
+        PRAGMA journal_mode=WAL;
+        CREATE TABLE IF NOT EXISTS settings (id INTEGER PRIMARY KEY, paused INTEGER);
+        INSERT OR IGNORE INTO settings VALUES (1,1);
+        CREATE TABLE IF NOT EXISTS targets (id INTEGER PRIMARY KEY, name TEXT, url TEXT UNIQUE,
+        policy TEXT, rules TEXT, expires INTEGER, interval INTEGER, cors INTEGER,
+        enabled INTEGER DEFAULT 1, due INTEGER DEFAULT 0, state TEXT DEFAULT 'Waiting', failures INTEGER DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS findings (id TEXT PRIMARY KEY, target INTEGER, rule TEXT, title TEXT,
+        evidence TEXT, severity TEXT, impact TEXT, first_seen INTEGER, last_seen INTEGER,
+        feedback TEXT DEFAULT 'unreviewed');
+        CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER, message TEXT);
+        ''')
+        # Initial install is paused. Explicit operator state survives restarts;
+        # expired target authorizations remain blocked independently.
+
+
+def log(c, message):
+    c.execute('INSERT INTO events(at,message) VALUES (?,?)', (int(time.time()), message))
+    c.execute('DELETE FROM events WHERE id NOT IN (SELECT id FROM events ORDER BY id DESC LIMIT 500)')
+
+
+def allowed(target_id):
+    with db() as c:
+        t = c.execute('SELECT * FROM targets WHERE id=?', (target_id,)).fetchone()
+        return bool(t and t['enabled'] and t['expires'] > time.time() and not c.execute('SELECT paused FROM settings').fetchone()[0])
+
+
+def tick():
+    with db() as c:
+        if c.execute('SELECT paused FROM settings').fetchone()[0]:
+            return
+        t = c.execute('SELECT * FROM targets WHERE enabled=1 AND expires>? AND due<=? ORDER BY due,id LIMIT 1', (time.time(), time.time())).fetchone()
+    if not t:
+        return
+    # Lock serializes operator pause/revoke with dispatch; a request already sent may finish.
+    try:
+        with LOCK:
+            if not allowed(t['id']):
+                return
+            with db() as c:
+                c.execute('UPDATE targets SET due=?,state=? WHERE id=?', (int(time.time()) + t['interval'], 'Checking', t['id']))
+                log(c, 'HEAD check started for target ' + str(t['id']))
+            observation = observe(t['url'])
+        cors = None
+        if t['cors'] and 200 <= observation['status'] < 300:
+            WAKE.wait(10)
+            with LOCK:
+                if allowed(t['id']):
+                    cors = observe(t['url'], 'https://scopeguard.invalid')
+        status = max(observation['status'], cors['status'] if cors else 0)
+        now = int(time.time())
+        with db() as c:
+            if status in (401, 403, 429) or status >= 500:
+                c.execute('UPDATE targets SET enabled=0,state=? WHERE id=?', ('Stopped: HTTP ' + str(status) + '; review program rules before enabling', t['id']))
+                log(c, 'Automatic stop for target ' + str(t['id']) + ': HTTP ' + str(status))
+                return
+            for f in findings(observation, cors):
+                key = hashlib.sha256((str(t['id']) + ':' + f['rule']).encode()).hexdigest()[:24]
+                evidence = json.dumps({'observation': observation, 'cors_observation': cors, 'note': f['evidence']})
+                c.execute('''INSERT INTO findings(id,target,rule,title,evidence,severity,impact,first_seen,last_seen)
+                VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,evidence=excluded.evidence''',
+                          (key, t['id'], f['rule'], f['title'], evidence, f['severity'], f['impact'], now, now))
+            c.execute('UPDATE targets SET state=?,failures=0 WHERE id=?', ('Checked HTTP ' + str(status) + ' at ' + time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(now)), t['id']))
+            log(c, 'Check completed for target ' + str(t['id']))
     except Exception as e:
-        st.error(f"Could not read historical data: {e}")
+        with db() as c:
+            count = t['failures'] + 1
+            c.execute('UPDATE targets SET failures=?,due=?,enabled=CASE WHEN ?>=3 THEN 0 ELSE enabled END,state=? WHERE id=?',
+                      (count, int(time.time()) + min(86400, t['interval'] * 2 ** count), count, 'Check failed (' + type(e).__name__ + '). Review URL, network and TLS; stopped after 3 failures.', t['id']))
+            log(c, 'Target ' + str(t['id']) + ' failed: ' + type(e).__name__)
+
+
+def worker():
+    while True:
+        try:
+            tick()
+        except Exception:
+            # Preserve scheduler availability without exposing exception contents.
+            pass
+        WAKE.wait(10)
+
+
+def snapshot():
+    with db() as c:
+        targets = [dict(r) for r in c.execute('SELECT * FROM targets')]
+        items = [dict(r) for r in c.execute('SELECT * FROM findings ORDER BY last_seen DESC')]
+        # Feedback updates ranking only, never scope, techniques, rate or executable code.
+        counts = {}
+        for f in items:
+            pos, neg = counts.get(f['rule'], (0, 0))
+            counts[f['rule']] = (pos + (f['feedback'] == 'accepted'), neg + (f['feedback'] in ('false_positive', 'ineligible')))
+        for f in items:
+            p, n = counts[f['rule']]
+            f['review_priority'] = round((p + 1) / (p + n + 2), 3)
+        return {'paused': bool(c.execute('SELECT paused FROM settings').fetchone()[0]), 'targets': targets,
+                'findings': sorted(items, key=lambda f: f['review_priority'], reverse=True),
+                'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
+
+
+def mutate(path, data):
+    with LOCK, db() as c:
+        if path == '/api/pause':
+            c.execute('UPDATE settings SET paused=?', (int(bool(data['paused'])),))
+            log(c, 'Scheduler paused' if data['paused'] else 'Scheduler resumed')
+        elif path == '/api/targets':
+            validate_url(data['url'])
+            validate_url(data['policy'])
+            if not data.get('authorized') or not data.get('automation_allowed'):
+                raise ValueError('Confirm written authorization and permission for these automated checks.')
+            if len(data.get('rules', '').strip()) < 30:
+                raise ValueError('Record the applicable scope, exclusions and rate limits (at least 30 characters).')
+            expires = int(data['expires'])
+            if not time.time() < expires <= time.time() + 7 * 86400:
+                raise ValueError('Authorization review must expire within seven days.')
+            interval = int(data['interval'])
+            if interval < 3600 or interval > 604800:
+                raise ValueError('Check interval must be 1–168 hours.')
+            c.execute('INSERT INTO targets(name,url,policy,rules,expires,interval,cors) VALUES (?,?,?,?,?,?,?)',
+                      (data['name'][:100], data['url'], data['policy'], data['rules'][:8000], expires, interval, int(bool(data.get('cors')))))
+            log(c, 'Added exact URL with authorization attestation: ' + data['url'])
+        elif path == '/api/target-state':
+            c.execute('UPDATE targets SET enabled=? WHERE id=?', (int(bool(data['enabled'])), int(data['id'])))
+            log(c, 'Target ' + str(int(data['id'])) + ' enabled=' + str(bool(data['enabled'])))
+        elif path == '/api/renew':
+            if not data.get('reviewed'):
+                raise ValueError('Re-read program policy before renewing.')
+            c.execute('UPDATE targets SET expires=? WHERE id=?', (int(time.time()) + 86400, int(data['id'])))
+            log(c, 'Authorization reviewed and renewed for target ' + str(int(data['id'])) + ' for 24 hours')
+        elif path == '/api/feedback':
+            if data['feedback'] not in ('unreviewed', 'validated', 'accepted', 'duplicate', 'false_positive', 'ineligible'):
+                raise ValueError('Invalid feedback')
+            c.execute('UPDATE findings SET feedback=? WHERE id=?', (data['feedback'], data['id']))
+            log(c, 'Finding feedback updated: ' + data['feedback'])
+        else:
+            raise ValueError('Unknown action')
+
+
+class Handler(BaseHTTPRequestHandler):
+    def log_message(self, *args):
+        pass
+
+    def reply(self, status, content, mime='application/json'):
+        raw = content.encode()
+        self.send_response(status)
+        self.send_header('Content-Type', mime + '; charset=utf-8')
+        self.send_header('Content-Length', str(len(raw)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def authenticate(self):
+        try:
+            supplied = base64.b64decode(self.headers.get('Authorization', '').split(' ', 1)[1]).decode()
+            okay = hmac.compare_digest(supplied.encode(), ('admin:' + TOKEN).encode())
+        except Exception:
+            okay = False
+        if not okay:
+            self.send_response(401)
+            self.send_header('WWW-Authenticate', 'Basic realm="ScopeGuard"')
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+        return okay
+
+    def do_GET(self):
+        if self.path == '/healthz':
+            return self.reply(200, '{"ok":true}')
+        if not self.authenticate():
+            return
+        if self.path == '/api/state':
+            return self.reply(200, json.dumps(snapshot()))
+        assets = {'/': ('index.html', 'text/html'), '/ui.js': ('ui.js', 'text/javascript'), '/style.css': ('style.css', 'text/css')}
+        if self.path in assets:
+            filename, mime = assets[self.path]
+            return self.reply(200, (ROOT / filename).read_text(), mime)
+        if self.path.startswith('/report/'):
+            key = self.path.removeprefix('/report/')
+            with db() as c:
+                f = c.execute('SELECT f.*,t.url,t.policy,t.rules FROM findings f JOIN targets t ON t.id=f.target WHERE f.id=?', (key,)).fetchone()
+            if f:
+                report = '\n'.join(['# DRAFT — manual review required', '', f['title'], 'URL: ' + f['url'], 'Policy: ' + f['policy'],
+                    'Recorded scope/rules: ' + f['rules'], 'Status: ' + f['feedback'], 'Severity: Informational; no impact established',
+                    '', '## Reproduction', 'Only if current authorization permits: send HEAD to the exact URL above.',
+                    'For CORS observations only, include Origin: https://scopeguard.invalid.', 'Redirects are not followed.',
+                    '', '## Evidence (cookie values and response bodies are not retained)', f['evidence'], '',
+                    '## Impact', f['impact'], '', '## Before submission',
+                    'Confirm current scope and eligibility. Establish reproducible security impact. Check duplicates. Add remediation. Submit privately through the program channel.'])
+                return self.reply(200, report, 'text/plain')
+        self.reply(404, '{"error":"Not found"}')
+
+    def do_POST(self):
+        if not self.authenticate():
+            return
+        if not hmac.compare_digest(self.headers.get('X-CSRF-Token', ''), CSRF):
+            return self.reply(403, '{"error":"Refresh the dashboard and try again"}')
+        try:
+            size = int(self.headers.get('Content-Length', '0'))
+            if size < 1 or size > 16000:
+                raise ValueError('Invalid request size')
+            mutate(self.path, json.loads(self.rfile.read(size)))
+            self.reply(200, '{"ok":true}')
+        except (ValueError, KeyError, TypeError, sqlite3.IntegrityError) as e:
+            self.reply(400, json.dumps({'error': str(e)}))
+
+
+if __name__ == '__main__':
+    if len(TOKEN) < 24:
+        raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
+    init()
+    threading.Thread(target=worker, daemon=True).start()
+    server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
+    print('ScopeGuard dashboard ready. New installations start paused.', flush=True)
+    server.serve_forever()

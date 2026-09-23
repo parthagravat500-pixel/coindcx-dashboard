@@ -1,100 +1,69 @@
-# Crypto F&O Dashboard — Phase 1
+# ScopeGuard — authorized research assistant
 
-This is the **first working piece** of the larger platform you spec'd out. It does one job well:
-show live prices, candlestick charts, and technical indicators for CoinDCX-listed coins.
-No predictions, no signals, no ML yet — that comes in later phases, on top of this foundation.
+This is a working first version of a conservative security observation and report-triage tool. It is not an autonomous penetration tester or a guaranteed income system. No target is preapproved. No external scanning has been performed during development.
 
-No CoinDCX API key is needed for this phase — it only uses CoinDCX's public market data.
+## What works
 
----
+- Password-protected mobile-friendly dashboard, exact-URL authorization register and global pause.
+- Persistent SQLite scheduler, deduplicated observations, event log and private Markdown report downloads.
+- HTTPS HEAD observations of security headers and redacted cookie attributes. Optional second HEAD with a test Origin, requiring separate policy permission.
+- Feedback-based ranking: accepted versus false-positive/ineligible outcomes update review priority with a smoothed ratio. This is simple adaptive ranking, not an AI model training itself, not exploit generation, and not an earnings prediction.
+- Continuous scheduling with automatic restart under Docker Compose and a persistent data volume. Paused/running state survives restarts. Each target's approval expires after at most seven days and must be reviewed again.
 
-## 1. Install Python (skip if you already have it)
+## Easiest next step
 
-1. Go to https://www.python.org/downloads/
-2. Download and install the latest version (3.10 or newer).
-3. **Windows only:** on the first install screen, check the box that says
-   "Add Python to PATH" before clicking Install.
+Give your assistant the link to ONE bug bounty program you have joined, plus access to the hosting account you want to use. The current package has not been deployed. A persistent always-on host and current written program authorization are required before live use. Hosting may cost money. A free sleeping host does not provide continuous operation.
 
-To check it worked, open:
-- **Windows:** Command Prompt (search "cmd" in the Start menu)
-- **Mac:** Terminal (search "Terminal" in Spotlight)
+## Start on a computer or server
 
-and type:
-```
-python --version
-```
-You should see something like `Python 3.11.5`. (On Mac, if that doesn't work, try `python3 --version`.)
+Python 3.12+, no pip packages required:
 
-## 2. Get the project files onto your computer
-
-Unzip the file you downloaded from this chat into a folder, e.g. `Documents/coindcx-dashboard`.
-
-## 3. Open a terminal in that folder
-
-- **Windows:** open the folder in File Explorer, click the address bar, type `cmd`, press Enter.
-- **Mac:** right-click the folder → "New Terminal at Folder" (or open Terminal and type `cd ` then drag the folder in, then press Enter).
-
-## 4. Install the required packages
-
-```
-pip install -r requirements.txt
-```
-(On Mac, if `pip` isn't found, try `pip3 install -r requirements.txt`.)
-
-This installs Streamlit (the dashboard framework), pandas/numpy (data handling),
-plotly (charts), and requests (to talk to CoinDCX).
-
-## 5. Run the dashboard
-
-```
-streamlit run app.py
+```bash
+export ADMIN_PASSWORD='replace-with-a-unique-long-password-at-least-24-characters'
+python app.py
 ```
 
-Your browser should open automatically to `http://localhost:8501` with the dashboard running.
-If it doesn't open automatically, copy that address into your browser manually.
+Open http://127.0.0.1:8080 and sign in as `admin` with the password you set. The first installation starts paused. Add only exact URLs covered by written authorization, record the current policy restrictions, and resume.
 
-Pick a coin and timeframe from the dropdowns — you're now looking at live CoinDCX market data.
+For continuous operation on a server with Docker Compose, create a `.env` file containing `ADMIN_PASSWORD=` followed by your own unique password, then:
 
----
+```bash
+docker compose up -d --build
+```
 
-## What this does NOT do (on purpose)
+The port binds to loopback only. For access from your iPhone, use a TLS reverse proxy or private VPN. Do not expose plain HTTP password authentication to the internet. Run one application instance against the database. Back up the `scopeguard-data` volume. Docker restart handles process/server restarts; host/network outages can still interrupt service. This package does not provision a cloud server or guarantee uptime.
 
-- ❌ No LONG/SHORT/NO TRADE signals
-- ❌ No entry/stop-loss/take-profit levels
-- ❌ No machine learning
-- ❌ No order book / open interest / funding rate data yet
-- ❌ No connection to your CoinDCX account (no API key used at all)
-- ❌ No trading of any kind
+## Workflow
 
-The "Market Regime" label you'll see is a simple rule-based placeholder
-(based on EMA order and volatility), clearly not the trained regime model
-described in the full spec — it's there so the dashboard isn't empty while
-we build the real thing.
+1. Join a program and read its current policy, scope, exclusions, rate limits, and automation requirements. Public accessibility is not authorization.
+2. Add an exact HTTPS URL and policy reference. URLs with queries, credentials, fragments, alternate ports, wildcards, and non-ASCII characters are rejected in this version. No URL discovery occurs.
+3. Confirm that HEAD checks and the requested interval are permitted. If special researcher headers, registered source IPs, authentication, or other unsupported controls are required, do not enable that target. Optional CORS checks add one request and must also be explicitly permitted.
+4. Resume checks. The worker considers targets every ten seconds and handles one at a time. The minimum per-target interval is one hour. Shared-host traffic limits must account for every configured URL; the app does not infer organization-wide limits from policy text. Use conservative intervals and few targets.
+5. Review leads. HEAD behavior can differ from GET. Missing headers or cookie flags alone usually do not establish security impact. CORS reflection alone is not proof of sensitive data disclosure. Report titles and severity do not claim otherwise.
+6. Validate within program rules, check eligibility and duplicates, and add real impact before submitting privately through the platform. Report sending is manual. Feedback comes from your review or the program's actual response, not an invented acceptance signal.
+7. Use Pause or Disable immediately if authorization is withdrawn. An in-flight request may finish. Re-read policies before renewing authorization; the app does not automatically monitor policy changes. Expiration is checked before each scheduled request.
 
-## Roadmap — what comes next
+## Boundaries and limits
 
-This maps to the phases in your original spec, done in an order that lets you
-see and test something working at every step, rather than waiting months for
-one giant system:
+- HTTPS only, certificate verification enabled, all DNS answers must be public; connections are pinned to a validated address. Private/reserved destinations and redirects are blocked.
+- No crawling, payload injection, exploitation, login attempts, credential harvesting, file extraction, brute force, denial of service, evasion, account creation, or message sending.
+- Requests are HEAD only and do not collect response bodies. Cookie values and redirect destinations are not stored. Security headers can still contain sensitive metadata; protect the database and reports.
+- HTTP 401, 403, 429 or 5xx disables the target for review. Transport failures back off and disable it after three failures. Redirects and unsupported HEAD responses generate no findings.
+- Observation evidence persists until you remove the application database; events are capped at 500. Findings retain first/last observation, not a full response history, and are not automatically marked resolved when absent later.
+- Scope approval is an operator attestation. The software cannot determine legality, prove the policy authorizes you, or guarantee that policies have not changed. It does not treat a policy link as permission by itself.
+- The dashboard uses a small standard-library HTTP server intended behind a TLS reverse proxy or private network; it is a single-user MVP, without MFA, multi-tenant isolation or distributed workers.
+- Basic findings are commonly excluded from bounty rewards. Finding valuable business-logic or authorization flaws generally needs deeper, carefully authorized human work. Do not submit raw scanner output as a proven vulnerability.
 
-| Phase | What gets added |
-|---|---|
-| **1 (done)** | Live prices, candles, core indicators |
-| **2** | Historical data storage (so we can backtest instead of only looking at "now") |
-| **3** | Order book / open interest / funding rate data (CoinDCX futures-specific data) |
-| **4** | Rule-based backtesting engine (fees, slippage, no look-ahead bias) |
-| **5** | First ML models (direction/return prediction) + walk-forward validation |
-| **6** | Confidence calibration + prediction journal (so confidence numbers are honest) |
-| **7** | Paper trading mode (simulated money, real prices) |
-| **8** | Live execution — **only after Phase 5–7 show real, validated statistical edge** |
+## Verification
 
-Live auto-trading (Phase 8) is intentionally last. Everything in your original
-spec about kill switches, drawdown limits, and "no trade is a valid answer" only
-means something once there's a track record to check it against.
+```bash
+python -m unittest -v
+```
 
-## A quick honest note
+Tests use synthetic responses and mocked networking. They check scope validation, DNS restrictions, scheduler gates, stopping behavior, deduplication, feedback and report access. They do not attack any live target.
 
-I'm not a financial advisor, and this tool — even once fully built — doesn't
-guarantee profitable trades. Its real value is in Phase 4–7: it forces every
-signal to prove itself against history and real costs *before* you risk money
-on it. Treat low win rates or "NO TRADE" results as useful information, not failures.
+Reference policies (reviewed during development):
+- https://docs.hackerone.com/en/articles/8494488-core-ineligible-findings
+- https://docs.hackerone.com/en/articles/8494552-defining-scope
+
+This project is a starting point for authorized research, not a substitute for a program's written rules.

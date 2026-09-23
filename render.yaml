@@ -1,0 +1,27 @@
+# Proposed paid deployment. Do not apply before approving the recurring cost.
+# Approximately USD 7.25/month: smallest paid service + 1 GB disk,
+# excluding tax and usage overages. Recheck Render's current pricing.
+services:
+  - type: web
+    name: scopeguard-research
+    runtime: python
+    plan: starter
+    region: singapore
+    buildCommand: DATA_DIR=/tmp/scopeguard-build-test python -m unittest -v
+    startCommand: python app.py
+    healthCheckPath: /healthz
+    numInstances: 1
+    autoDeployTrigger: "off"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: BIND
+        value: 0.0.0.0
+      - key: DATA_DIR
+        value: /var/data/scopeguard
+      - key: ADMIN_PASSWORD
+        generateValue: true
+    disk:
+      name: scopeguard-data
+      mountPath: /var/data
+      sizeGB: 1
