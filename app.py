@@ -14,6 +14,7 @@ from engine import validate_url, observe, findings
 import supervisor
 import workflow
 import sourceaudit
+import dependencies
 import workqueue
 import casework
 import connections
@@ -54,6 +55,7 @@ def init():
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER, message TEXT);
         ''')
         sourceaudit.init(c)
+        dependencies.init(c)
         casework.init(c)
         supervisor.init(c)
         workflow.init(c)
@@ -159,6 +161,15 @@ def supervisor_worker():
         WAKE.wait(30)
 
 
+def dependency_worker():
+    while True:
+        try:
+            dependencies.tick(db, log)
+        except Exception:
+            pass
+        WAKE.wait(30)
+
+
 def queue_worker():
     while True:
         try:
@@ -198,6 +209,7 @@ def snapshot():
                 'connection': connections.status(),
                 'background': workqueue.snapshot(c),
                 'source_audits': sourceaudit.snapshot(c),
+                'dependency_projects': dependencies.snapshot(c),
                 'reporting': reporting.snapshot(c, DATA),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
@@ -220,6 +232,11 @@ def mutate(path, data):
     with LOCK, db() as c:
         if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
+        elif path == '/api/dependencies':
+            dependencies.upload(c, data)
+            log(c, 'Dependency inventory queued; original file not retained.')
+        elif path == '/api/dependencies/delete':
+            c.execute('DELETE FROM dependency_projects WHERE name=?',(data.get('project'),))
         elif path == '/api/source-audit':
             sourceaudit.upload(c, data)
             log(c, 'Uploaded Python source audited; code was not stored or executed.')
@@ -355,7 +372,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, '{"error":"Refresh the dashboard and try again"}')
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            limit=800000 if self.path == '/api/source-audit' else 16000
+            limit=3000000 if self.path == '/api/dependencies' else 800000 if self.path == '/api/source-audit' else 16000
             if size < 1 or size > limit:
                 raise ValueError('Invalid request size')
             mutate(self.path, json.loads(self.rfile.read(size)))
@@ -369,6 +386,7 @@ if __name__ == '__main__':
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
     connections.load(DATA)
     init()
+    threading.Thread(target=dependency_worker, daemon=True).start()
     threading.Thread(target=queue_worker, daemon=True).start()
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()

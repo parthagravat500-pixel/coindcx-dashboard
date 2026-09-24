@@ -155,3 +155,11 @@ At most one delivery attempt per UTC day is allowed. An attempt is persisted bef
 Official API reference: https://api.hackerone.com/hacker-resources/ (Get Reports / Create Report). Policy checks for GitHub, GitLab and Cloudflare are included in listing details, dated 2026-09-24. Reporting-route confirmation does not grant scanning permission. Program policies must be rechecked before new testing.
 
 All 36 tests pass with mocked delivery and credentials. No real HackerOne account has been connected or real report submitted during implementation. Paid AI still requires the user's private API key and opt-in.
+
+### Deeper review modules
+
+Python audits now include conservative, within-function traces from selected input sources to SQL, shell, deserialization and dynamic-code operations. Trace line numbers prioritize review; they are not executable proofs. Cross-function behavior and aliases can be missed, branches are combined conservatively, and runtime impact remains unverified.
+
+The Known vulnerability monitor accepts owned/authorized `requirements.txt` exact pins or npm `package-lock.json` v2/v3. With explicit package-sharing consent it submits only normalized package names and exact versions to OSV, never installs packages, and checks daily. Original files are discarded. Unsupported entries are counted. Maximum 10 inventories of 500 versions each; update the uploaded inventory when dependencies change. Pausing everything stops new batches. Failures retain prior results with an outdated-results warning and retry backoff. Removing an inventory stops monitoring it.
+
+These modules do not turn the existing HEAD checks into autonomous exploit discovery. They do not establish exploitability, eligibility, severity, or a payable bug, and cannot unlock report submission. Real account and business-logic testing still needs specific scope, test cases and controlled test data.

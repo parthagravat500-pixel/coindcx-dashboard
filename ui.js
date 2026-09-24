@@ -172,10 +172,10 @@ function reportSetup(){
 
 function openCodeAudits(){
  const root=modal('Your code security');
- root.append(el('p','Python only. Seven pattern checks run locally. Findings need human review; a clean result does not prove security. ScopeGuard files are rechecked automatically when code changes.','muted'));
+ root.append(el('p','Python only. Seven pattern checks and limited input-flow tracing run locally. Findings need human review; a clean result does not prove security. ScopeGuard files are rechecked automatically when code changes.','muted'));
  for(const audit of state.source_audits||[]){const box=el('details');box.append(el('summary',audit.name+' · '+audit.result.total_findings+' patterns to review'),el('small','Checked '+date(audit.checked)));
  if(!audit.result.total_findings)box.append(el('p','No covered patterns detected. Other vulnerabilities may still exist.'));
- for(const finding of audit.result.findings)box.append(el('h3','Line '+finding.line+': '+finding.title),el('p',finding.remediation));
+ for(const finding of audit.result.findings){box.append(el('h3','Line '+finding.line+': '+finding.title),el('p',finding.remediation));if(finding.trace_lines)box.append(el('p','Possible input path: lines '+finding.trace_lines.join(' → ')),el('p',finding.flow_status));}
  box.append(el('p',audit.result.limitation,'muted'));root.append(box);}
  const form=el('form'),label=el('label','Audit a Python file you own'),file=el('input');file.type='file';file.accept='.py';file.required=true;label.append(file);
  const permission=el('label',undefined,'check'),owned=el('input');owned.type='checkbox';owned.required=true;permission.append(owned,document.createTextNode('I own this code or have permission to audit it.'));
@@ -183,3 +183,20 @@ function openCodeAudits(){
  form.append(label,permission,help,submit,status);form.onsubmit=async e=>{e.preventDefault();const chosen=file.files[0];if(!chosen||chosen.size>128000){status.textContent='Choose a Python file up to 128 KB.';return;}submit.disabled=true;try{await change('/api/source-audit',{name:chosen.name,source:await chosen.text(),owned:owned.checked});openCodeAudits();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openCodeAudit').onclick=openCodeAudits;
+
+function openDependencies(){
+ const root=modal('Known vulnerability monitor');
+ root.append(el('p','Checks exact software package versions against OSV advisories every day. No software is installed or executed. An advisory match does not prove that your app is exploitable or eligible for a bounty.','muted'));
+ for(const p of state.dependency_projects||[]){const box=el('details');box.append(el('summary',p.name+' · '+p.result.length+' packages with matches'),el('p',p.status),el('p',p.package_count+' exact versions · '+p.skipped+' unsupported entries skipped'),el('small','Last completed: '+date(p.checked)+' · Next check: '+date(p.due)));
+ if(p.checked&&!p.result.length)box.append(el('p','No advisory matches in the covered versions at the last completed check. This is not a security guarantee.'));
+ for(const match of p.result){box.append(el('h3',match.name+' '+match.version+' ('+match.ecosystem+')'));for(const id of match.advisories)box.append(safeLink(id+' ↗','https://osv.dev/vulnerability/'+encodeURIComponent(id)),el('br'));}
+ const remove=el('button','Stop and remove project','secondary');remove.onclick=async()=>{try{await change('/api/dependencies/delete',{project:p.name});openDependencies();}catch(e){remove.textContent=e.message;}};box.append(remove);root.append(box);}
+ if(!(state.dependency_projects||[]).length)root.append(el('p','No dependency projects connected yet. Add a file below to start daily monitoring.'));
+ const form=el('form'),nameLabel=el('label','Project name'),name=el('input');name.required=true;name.maxLength=80;nameLabel.append(name);
+ const label=el('label','Dependency file'),file=el('input');file.type='file';file.accept='.txt,.json';file.required=true;label.append(file);
+ const consent=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;consent.append(check,document.createTextNode('I own this project or have permission. Send its package names and versions to OSV for daily checks.'));
+ const status=el('p');status.setAttribute('role','status');const submit=el('button','Start daily checks');submit.type='submit';
+ form.append(nameLabel,label,el('p','Supported: requirements.txt with exact versions, or package-lock.json version 2/3. Maximum 500 KB and 500 versions. Private packages may reveal their names to OSV; remove them first. Original file contents are not retained. Upload the new file when versions change.','muted'),consent,submit,status);
+ form.onsubmit=async e=>{e.preventDefault();const f=file.files[0];if(!f||f.size>500000){status.textContent='Choose a supported file up to 500 KB.';return;}submit.disabled=true;try{await change('/api/dependencies',{project:name.value,filename:f.name,source:await f.text(),owned:check.checked,share_packages:check.checked});openDependencies();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+}
+$('openDependencies').onclick=openDependencies;

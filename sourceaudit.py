@@ -1,5 +1,6 @@
 """Bounded Python AST checks. Never imports, executes or uploads inspected code."""
 import ast
+import codeflow
 import hashlib
 import json
 import time
@@ -13,7 +14,7 @@ RULES = {
  'dynamic-sql': ('Dynamically constructed SQL', 'Bind untrusted values through query parameters; allowlist identifiers.'),
  'weak-random': ('Non-cryptographic random generator', 'Use secrets for tokens. Ordinary simulation randomness is not a security bug.'),
 }
-FILES = ('app.py','engine.py','supervisor.py','workflow.py','workqueue.py','casework.py','connections.py','reporting.py','sourceaudit.py')
+FILES = ('app.py','engine.py','supervisor.py','workflow.py','workqueue.py','casework.py','connections.py','reporting.py','sourceaudit.py','codeflow.py','dependencies.py','rewards.py')
 MAX_BYTES=128000
 
 
@@ -57,13 +58,21 @@ def analyze(source):
         if rule:
             title,fix=RULES[rule]
             results.append({'rule':rule,'line':n.lineno,'title':title,'remediation':fix,'status':'Needs human review','confirmed':False})
+    for flow in codeflow.traces(tree):
+        existing=next((f for f in results if f['line']==flow['line'] and f['rule']==flow['rule']),None)
+        if existing is None:
+            title,fix=RULES[flow['rule']]
+            existing={'rule':flow['rule'],'line':flow['line'],'title':title,'remediation':fix,'status':'Needs human review','confirmed':False}
+            results.append(existing)
+        existing.update(flow)
+    results.sort(key=lambda f:(not bool(f.get('trace_lines')),f['line']))
     return {'language':'Python','rules_checked':len(RULES),'findings':results[:200],
             'total_findings':len(results),'truncated':len(results)>200,
-            'limitation':'Pattern checks only. No data-flow analysis or exploit validation. Aliases, wrappers and runtime behavior may be missed. No findings does not prove the code is secure.'}
+            'limitation':'Pattern checks plus limited input-flow tracing within functions. Branches are conservatively combined; aliases, wrappers, cross-function flows and runtime behavior may be missed. No exploit validation. No findings does not prove the code is secure.'}
 
 
 def record(c,name,source):
-    digest=hashlib.sha256(source.encode()).hexdigest()
+    digest=hashlib.sha256(('flow-v1\n'+source).encode()).hexdigest()
     old=c.execute('SELECT digest FROM source_audits WHERE name=?',(name,)).fetchone()
     if old and old[0]==digest:return False
     result=analyze(source)
