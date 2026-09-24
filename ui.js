@@ -58,7 +58,7 @@ refresh().catch(e=>$('message').textContent=e.message);
 
 let currentStage='queue', visibleLimit=40;
 const stages=[
-  ['queue','Found websites','Highest published rewards first, compared in US dollars. These are possible maximum rewards, not expected earnings. New websites still need permission checks.'],
+  ['queue','Found websites','Your priority shortlist first, then highest published rewards compared in US dollars. These are possible maximum rewards, not expected earnings. New websites still need permission checks.'],
   ['review','Checking','Websites with permission and a scheduled check. They are checked at set times, not all at once.'],
   ['supervisor','Double-checking','Possible issues being checked again. They are not confirmed bugs yet.'],
   ['results','Results','Completed reviews. Open a result to see whether it still needs more proof.'],
@@ -68,7 +68,7 @@ function safeLink(text,url){const a=el('a',text);try{const u=new URL(url);if(u.p
 function money(p){if(p.maximum===null||!p.currency)return 'Reward not shown';return new Intl.NumberFormat('en-US',{style:'currency',currency:p.currency,maximumFractionDigits:0}).format(p.maximum)+' '+p.currency+' possible';}
 function date(at){return at?new Date(at*1000).toLocaleString():'Not yet';}
 function workflowRows(stage){const w=state.workflow||{programs:[],submissions:[]};const p=w.programs.filter(p=>p.stage!=='dismissed');
- if(stage==='queue')return p.map(p=>({kind:'program',data:p}));
+ if(stage==='queue')return p.sort((a,b)=>Number(b.stage==='review'&&b.available)-Number(a.stage==='review'&&a.available)).map(p=>({kind:'program',data:p}));
  if(stage==='review')return state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now()).map(t=>({kind:'target',data:t}));
  if(stage==='supervisor')return state.findings.filter(f=>f.feedback==='unreviewed'&&(f.supervisor?.repeat_count||0)<3).map(f=>({kind:'finding',data:f}));
  if(stage==='results')return state.findings.filter(f=>f.feedback!=='unreviewed'||(f.supervisor?.repeat_count||0)>=3).map(f=>({kind:'finding',data:f}));
@@ -110,15 +110,15 @@ function renderCasework(root,f){
  c.sources.forEach(u=>root.append(safeLink('Report guidance ↗',u),el('br')));
 }
 function openSubmission(s){const f=state.findings.find(f=>f.id===s.finding),root=modal(f?.title||'Submission record');facts(root,[['Channel',s.channel],['Receipt / reference',s.receipt],['Recorded at',date(s.at)],['Evidence source',s.origin==='hackerone_receipt'?'HackerOne returned this report ID. Acceptance and payment are not yet confirmed.':'User-recorded receipt; delivery and bounty acceptance are not independently verified']]);}
-function renderWorklist(){const stage=stages.find(s=>s[0]===currentStage);$('stageTitle').textContent=stage[1];$('stageHelp').textContent=stage[2];$('stageEyebrow').textContent='YOUR PROGRESS';$('currencyLabel').hidden=!['queue','review'].includes(currentStage);const query=$('search').value.toLowerCase();let rows=workflowRows(currentStage).filter(r=>JSON.stringify(r.data).toLowerCase().includes(query));const currency=$('currency').value;
+function renderWorklist(){const stage=stages.find(s=>s[0]===currentStage);$('stageTitle').textContent=stage[1];$('stageHelp').textContent=stage[2];$('stageEyebrow').textContent='YOUR PROGRESS';$('currencyLabel').hidden=currentStage!=='queue';const query=$('search').value.toLowerCase();let rows=workflowRows(currentStage).filter(r=>JSON.stringify(r.data).toLowerCase().includes(query));const currency=$('currency').value;
  if(['queue','review'].includes(currentStage)&&currency!=='all')rows=rows.filter(r=>r.kind!=='program'||(currency==='unknown'?r.data.maximum===null:r.data.currency===currency));
  $('listCount').textContent=rows.length+(rows.length===1?' item':' items');$('worklist').replaceChildren();let group='';
  if(currentStage==='queue')$('worklist').append(el('p',state.workflow.reward_exchange?.date?'Currency comparison uses ECB rates dated '+state.workflow.reward_exchange.date+'. Original rewards are shown below.':'Exchange rates are loading. USD rewards appear first; other currencies are listed separately until rates are available.','muted'));
  if(!rows.length)$('worklist').append(el('p',currentStage==='sent'?'No reports have been sent.':currentStage==='results'?'No completed reviews yet. Possible issues are in Double-checking.':'No matching items in this stage.','empty'));
- rows.slice(0,visibleLimit).forEach(row=>{const p=row.data;if(row.kind==='program'&&group!==p.reward_group){group=p.reward_group;$('worklist').append(el('h3',group,'group-title'));}
+ rows.slice(0,visibleLimit).forEach(row=>{const p=row.data;const heading=p.stage==='review'&&p.available?'Priority shortlist · setup needed':p.reward_group;if(row.kind==='program'&&group!==heading){group=heading;$('worklist').append(el('h3',group,'group-title'));}
  const card=el('button',undefined,'work-card');card.type='button';const left=el('div'),right=el('div',undefined,'work-meta');
- if(row.kind==='program'){left.append(el('strong',p.name),el('small',p.source+' · '+(!p.available?'Unavailable — do not test':p.stale?'Cached listing — verify':'Permission not checked')));right.append(el('span',money(p),'reward'));if(p.reward_usd!=null&&p.currency!=='USD')right.append(el('small','≈ '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(p.reward_usd)+' USD'));card.onclick=()=>openProgram(p);}
- else if(row.kind==='target'){left.append(el('strong',p.name),el('small',p.url));right.append(el('span',!p.enabled?'Disabled':p.expires*1000<Date.now()?'Scope expired':'Checks scheduled','tag'));card.onclick=()=>openTarget(p);}
+ if(row.kind==='program'){left.append(el('strong',p.name),el('small',p.source+' · '+(!p.available?'Unavailable — do not test':p.stale?'Cached listing — verify':'Permission not checked')));if(p.stage==='review')left.append(el('small','Priority · setup needed before testing'));right.append(el('span',money(p),'reward'));if(p.reward_usd!=null&&p.currency!=='USD')right.append(el('small','≈ '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(p.reward_usd)+' USD'));card.onclick=()=>openProgram(p);}
+ else if(row.kind==='target'){left.append(el('strong',p.name),el('small',p.url));right.append(el('span',!p.enabled?'Disabled':p.expires*1000<Date.now()?'Scope expired':state.paused?'Paused':p.state||'Waiting','tag'),el('small','Next check: '+date(p.due)));card.onclick=()=>openTarget(p);}
  else if(row.kind==='finding'){left.append(el('strong',p.title),el('small',state.targets.find(t=>t.id===p.target)?.name||''));right.append(el('span',(p.supervisor?.repeat_count||0)+'/3 checks','tag'),el('small',p.casework?.label||'Not a confirmed bug'));card.onclick=()=>openFinding(p);}
  else {left.append(el('strong',state.findings.find(f=>f.id===p.finding)?.title||'Submitted report'),el('small',p.receipt));right.append(el('span',p.channel==='email'?'Email · recorded':'Portal · recorded','tag'));card.onclick=()=>openSubmission(p);}
  card.append(left,right,el('span','↗','arrow'));$('worklist').append(card);});$('showMore').hidden=rows.length<=visibleLimit;
