@@ -18,6 +18,7 @@ import dependencies
 import validation
 import accesscheck
 import capitaldemo
+import gitlabcheck
 import workqueue
 import casework
 import connections
@@ -62,6 +63,7 @@ def init():
         validation.init(c)
         accesscheck.init(c)
         capitaldemo.init(c)
+        gitlabcheck.init(c)
         casework.init(c)
         supervisor.init(c)
         workflow.init(c)
@@ -185,6 +187,15 @@ def validation_worker(port):
         WAKE.wait(30)
 
 
+def gitlab_worker():
+    while True:
+        try:
+            gitlabcheck.tick(db, DATA, log)
+        except Exception:
+            pass
+        WAKE.wait(30)
+
+
 def capital_worker():
     while True:
         try:
@@ -246,6 +257,7 @@ def snapshot():
                 'validation': validation.snapshot(c),
                 'access_checks': accesscheck.snapshot(c),
                 'capital_demo': capitaldemo.snapshot(c),
+                'gitlab': gitlabcheck.snapshot(c),
                 'reporting': reporting.snapshot(c, DATA),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
@@ -268,6 +280,11 @@ def mutate(path, data):
     with LOCK, db() as c:
         if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
+        elif path == '/api/gitlab/connect':
+            gitlabcheck.configure(c,DATA,data)
+            log(c,'GitLab project configured; connection verification queued.')
+        elif path == '/api/gitlab/disconnect':
+            gitlabcheck.disconnect(c,DATA)
         elif path == '/api/capital-demo/connect':
             capitaldemo.configure(c,DATA,data)
             log(c,'Capital.com demo test configured; awaiting worker.')
@@ -434,6 +451,7 @@ if __name__ == '__main__':
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
     connections.load(DATA)
     init()
+    threading.Thread(target=gitlab_worker, daemon=True).start()
     threading.Thread(target=capital_worker, daemon=True).start()
     threading.Thread(target=access_worker, daemon=True).start()
     threading.Thread(target=dependency_worker, daemon=True).start()

@@ -186,3 +186,29 @@ The dashboard offers a demo-only watchlist login-boundary test. Personal account
 Each scheduled run starts a new session, checks the owner's synthetic watchlist name with valid credentials, then compares anonymous access. A suspected exposure requires two anonymous observations and a final authenticated control. Results contain response hashes and booleans, never account data or tokens. The program's privacy rules and actual impact still need manual review; no automatic bounty submission is enabled. Scope permission expires after seven days. Checks run every 15 minutes while the service is running, resume after a restart, respect global pause, and stop on rate limits, setup failure, inconclusive responses or reproduced exposure. An ambiguous watchlist-creation request is not automatically repeated. Reconnection preserves the marker for the same account. Disconnect removes locally stored credentials; the synthetic watchlist can be deleted manually in Capital.com.
 
 Local tests use mocked Capital.com responses. Live integration cannot be verified before an eligible owner connects their demo account. Official documentation: https://open-api.capital.com/ ; program: https://app.intigriti.com/programs/capitalcom/capitalcom/detail .
+
+### GitLab private project connector
+The dashboard now has **Finish GitLab setup**. No repository files are required.
+Use a dedicated test account, your own private project, and a short-lived personal
+access token with only `read_api`. This scope can read other projects the account
+can access, although this connector only requests the configured project and the
+token's own scope metadata. The token is stored with mode 0600 on the persistent disk.
+Generate a synthetic marker in the setup form and save it in the project's description.
+Record current program permission before enabling any production comparison.
+GitLab recommends local GDK research for most testing; a directory listing is not permission.
+
+The worker verifies the token's scope and Maintainer/Owner role, checks private
+visibility and marker presence, then compares anonymous access. A suspected
+exposure requires a second anonymous response and a final authenticated control
+with the same project ID and private visibility. At most five GET requests per
+15-minute run, one second apart. It follows no redirects, caps bodies at 64 KB,
+pins public IPs with TLS hostname verification, and stops on errors, uncertain
+responses, pause, expiry, disconnect or suspected exposure. No writes, ID guessing,
+crawling, code execution or report submission occur. Permission expires after seven days.
+
+UI evidence contains status codes and hashes, not tokens or project response bodies.
+A pass only means this single check passed. A reproduced marker is not an automatic
+severity rating or bounty claim; confidential impact and eligibility require review.
+Tests use mocked GitLab responses; the user's live connection needs their token and
+synthetic description before it can be verified. The unused Capital.com connector
+card is hidden unless already configured; Capital.com is unavailable in India.
