@@ -103,6 +103,12 @@ class ResearchTests(unittest.TestCase):
         self.assertFalse(research.receive(self.c,{**self.claims,'run_id':'124'},{'stage':'start','revision':'a'*40})['accepted'])
         self.c.execute('UPDATE settings SET paused=1');self.assertFalse(self.send('result',result=self.result())['accepted'])
 
+    def test_disable_cancels_lease_and_late_result_cannot_replace_it(self):
+        self.enable();self.send('start');research.configure(self.c,{'enabled':False})
+        self.assertEqual(research.snapshot(self.c)['ai_reviews'][0]['state'],'cancelled')
+        self.enable();self.send('result',result=self.result())
+        self.assertEqual(research.snapshot(self.c)['ai_reviews'][0]['state'],'cancelled')
+
     def test_model_cannot_promote_its_own_claim(self):
         r=research.clean_result({**self.result(),'confirmed_bugs':100,'submission_ready':True})
         self.assertEqual(r['confirmed_bugs'],0);self.assertFalse(r['submission_ready'])

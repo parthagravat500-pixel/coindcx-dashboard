@@ -123,6 +123,8 @@ def configure(c, data):
     if type(data.get('enabled')) is not bool:
         raise ValueError('Choose whether to enable private AI reviews')
     c.execute('UPDATE research_status SET ai_enabled=? WHERE id=1', (int(data['enabled']),))
+    if not data['enabled']:
+        c.execute("UPDATE private_ai_reviews SET state='cancelled',updated=? WHERE state='running'",(int(time.time()),))
 
 
 def clean_result(data):
