@@ -1,4 +1,5 @@
 """Evidence review; neither the rules nor optional AI can authorize submissions."""
+import connections
 import hashlib
 import json
 import os
@@ -52,7 +53,7 @@ def review(c, finding, target):
         reason = 'Cookie purpose is unknown. A missing flag can be intentional; no account or data exposure has been demonstrated.'
     current = not target['state'].startswith('Checked ') or finding['last_seen'] >= target['due'] - target['interval']
     active = bool(target['enabled'] and target['expires'] > time.time())
-    return {'repeat_count': count, 'repeat_goal': 3, 'current_observation': current,
+    return {'method': 'Local rules', 'repeat_count': count, 'repeat_goal': 3, 'current_observation': current,
             'status': 'Held — impact unproven', 'submission_ready': False,
             'reason': reason, 'scope_active': active,
             'steps': [f'Repeat observations: {count}/3 at the approved interval.', reason,
@@ -62,6 +63,7 @@ def review(c, finding, target):
 
 
 def ai_enabled():
+    if connections.LOCAL_ONLY: return False
     return (os.getenv('SUPERVISOR_AI_ENABLED') == 'true' and bool(os.getenv('OPENAI_API_KEY'))
             and bool(os.getenv('SUPERVISOR_AI_MODEL')))
 
@@ -125,7 +127,7 @@ def ai_tick(db):
 
 def summary():
     return {'rules_status': 'Active — three-stage evidence review',
-            'ai_status': 'Connected — advisory reviews enabled' if ai_enabled() else 'Not connected — AI API configuration required',
+            'ai_status': 'Connected — advisory reviews enabled' if ai_enabled() else 'Off — free local evidence rules are active',
             'delivery_status': 'Delivery requires independently validated evidence and the program’s approved reporting channel. See Sent reports for receipts.',
             'repeat_policy': 'Up to three observations at the existing interval. No extra scanning requests.',
             'limitation': 'The current checks cannot prove exploitability. Repeating a warning or an AI opinion does not validate it.'}

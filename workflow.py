@@ -1,4 +1,5 @@
 """Passive program intake. Directory entries never grant scan authorization."""
+import connections
 import hashlib
 import json
 import math
@@ -136,6 +137,7 @@ def tick(db):
 
 
 def ai_enabled():
+    if connections.LOCAL_ONLY: return False
     return (os.getenv('DISCOVERY_AI_ENABLED') == 'true' and bool(os.getenv('OPENAI_API_KEY'))
             and bool(os.getenv('SUPERVISOR_AI_MODEL')))
 
@@ -173,6 +175,20 @@ def ai_tick(db):
         c.execute('UPDATE programs SET ai_note=? WHERE id=?',(note,p['id']))
 
 
+def local_review(program):
+    """Deterministic intake assessment; never authorizes scanning or predicts a payout."""
+    notes = []
+    if not program['available'] or program['stale']:
+        notes.append('Directory information is unavailable or out of date. Verify the program first.')
+    if program['maximum'] is None:
+        notes.append('Reward amount is unknown.')
+    else:
+        notes.append('The listed maximum reward is a ceiling, not an expected payment.')
+    notes.append('Exact website scope, automated testing permission and reward eligibility still need verification.')
+    return {'method': 'Local rules', 'status': 'Needs permission review',
+            'note': ' '.join(notes), 'scan_authorized': False}
+
+
 def snapshot(c):
     now=int(time.time())
     sources=[dict(r) for r in c.execute('SELECT * FROM discovery_sources ORDER BY id')]
@@ -186,10 +202,11 @@ def snapshot(c):
         p['source_url']=SOURCES[p['source']][0]
         p['scan_authorized']=False
         p['policy_review']=POLICY_REVIEWS.get(p['url'].rstrip('/'))
+        p['local_review']=local_review(p)
         programs.append(p)
     return {'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
             'sources':sources,'programs':programs,'interval_hours':6,
-            'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Not connected — discovery uses directory data and rules',
+            'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Local rules — all listed programs reviewed, no AI API fees',
             'submissions':[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY at DESC')],
             'delivery_status':'Delivery connection is shown separately. Recorded submissions require a receipt; none are inferred from findings.'}
 

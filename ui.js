@@ -81,7 +81,8 @@ function openProgram(p){const root=modal(p.name);root.append(el('span',money(p),
  root.append(safeLink('Open official program policy ↗',p.url),el('br'),safeLink('View discovery source ↗',p.source_url));
  root.append(el('h3','What happens next'),el('p','Verify eligible web assets, exclusions, permitted automation and reporting route. A high maximum reward may apply to work this scanner cannot perform.'));
  if(p.policy_review){root.append(el('h3','Permission review'),el('p',p.policy_review.note),el('small','Reviewed '+p.policy_review.reviewed_on+'; check current terms before testing.'));p.policy_review.sources.forEach(u=>root.append(safeLink('Official source ↗',u),el('br')));}
- if(p.ai_note)root.append(el('h3','AI advisory'),el('p',p.ai_note));
+ if(p.local_review)root.append(el('h3','Automatic review · local rules'),el('p',p.local_review.note));
+ if(p.ai_note)root.append(el('h3','Earlier AI advisory'),el('p',p.ai_note));
  const actions=el('div',undefined,'controls');actions.append(button(p.stage==='review'?'Remove from shortlist':'Shortlist this company',async()=>{await change('/api/program-stage',{id:p.id,stage:p.stage==='review'?'queue':'review'});$('detail').close();}));
  actions.append(button('Hide this company',async()=>{await change('/api/program-stage',{id:p.id,stage:'dismissed'});$('detail').close();}));root.append(actions);
 }
@@ -114,24 +115,18 @@ function renderSimpleStatus(){
  $('masterPause').textContent=running?'Pause everything':'Resume';
  $('status').textContent=w.enabled?(state.paused||!active?'● Finding websites':'● Running'):(!state.paused&&active?'● Checking websites':'● Paused');
  $('plainSummary').textContent=running?`${w.programs.filter(p=>p.stage!=='dismissed').length} companies found. ${active} websites ${state.paused?'paused':'have scheduled checks'}.`:'Everything is paused. Your saved progress is safe.';
- const ready=state.connection?.enabled;
- $('nextTitle').textContent=ready?'AI connected':'Account setup needs you';
- $('nextText').textContent=ready?'AI will review eligible items automatically. No confirmed bug is ready to send yet.':'Discovery is working. Finish setup to connect your AI and reporting accounts.';
- $('connectAI').textContent=ready?'AI settings':'Connect AI';
- $('openSetup').textContent=ready?'Setup status':'Finish setup';
+ $('nextTitle').textContent='Local reviews · no API fees';
+ $('nextText').textContent='Every listed company and finding is assessed with rules. Basic checks cannot prove a bounty-worthy bug. Hosting is billed separately.';
+ $('connectAI').textContent='Review settings';
+ $('openSetup').textContent='Setup status';
 }
 function setup(){
- const root=modal('Finish your setup');
- root.append(el('p','Website discovery and basic checks are already set up.','muted'));
+ const root=modal('Your setup');
+ root.append(el('p','Free local reviews are active. OpenAI requests are disabled.','muted'));
  const list=el('div',undefined,'setup-list');
- [['✓','Find companies','Working automatically every 6 hours.'],['✓','Check approved websites','Existing permission rules and schedules are saved.'],[state.connection?.enabled?'✓':'1','AI reviews',state.connection?.enabled?'Connected. Extra reviews run when eligible items are ready.':'Needs your private OpenAI API key.'],[state.reporting?.connected?'✓':'2','Send bounty reports',state.reporting?.connected?'HackerOne connected. Waiting for an independently validated bug.':'Needs a HackerOne API connection. No confirmed bug is ready to send.']].forEach(([icon,title,note])=>{const item=el('article',undefined,'setup-item');item.append(el('span',icon,'setup-icon'));const info=el('div');info.append(el('strong',title),el('small',note));item.append(info);list.append(item);});root.append(list);root.append(button(state.reporting?.connected?'Reporting account settings':'Connect reporting account',reportSetup));
- if(state.connection?.enabled){root.append(el('p','Up to four AI review attempts per day. Reviews can advise, but cannot approve a new website or send a report.','muted'));root.append(button('Disconnect AI',async()=>{await change('/api/ai/disconnect',{});setup();}));return;}
- root.append(el('h3','Connect AI in two steps'));
- const steps=el('ol');const first=el('li');first.append(safeLink('Create an OpenAI API key ↗','https://platform.openai.com/api-keys'));steps.append(first,el('li','Paste the key below and tap Connect AI.'));root.append(steps);
- root.append(el('p','AI API use has separate charges. An API account with billing is needed. Discovery keeps working without AI.','muted'));
- const form=el('form');form.autocomplete='off';const label=el('label','Private API key');const key=el('input');key.type='password';key.name='api_key';key.autocomplete='new-password';key.required=true;key.placeholder='Paste your key here';key.maxLength=500;key.spellcheck=false;key.autocapitalize='off';label.append(key);
- const permission=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;permission.append(check,document.createTextNode('Enable paid AI reviews: up to 4 attempts per day (3 issue reviews + 1 company review).'));
- const help=el('p','Your key is stored privately on this server. It is never shown in the dashboard or added to the code.','muted');const submit=el('button','Connect AI');submit.type='submit';const result=el('p');result.setAttribute('role','status');form.append(label,permission,help,submit,result);form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;submit.textContent='Checking connection…';const secret=key.value.trim();key.value='';try{await change('/api/ai/connect',{key:secret,approve_charges:check.checked});setup();}catch(err){result.textContent=err.message;submit.disabled=false;submit.textContent='Connect AI';}};root.append(form);
+ [['✓','Find companies','Public directories update every 6 hours.'],['✓','Review every company','Local rules assess reward uncertainty and missing permissions. No daily review quota.'],['✓','Check approved websites','Checks run on the server at their approved intervals, even when your phone is off.'],['✓','Review findings','Local rules check repeated observations and missing evidence. These are not AI reviews.'],[state.reporting?.connected?'✓':'1','Reporting account',state.reporting?.connected?'HackerOne connected. No confirmed bug is ready to send.':'Connect HackerOne when ready.']].forEach(([icon,title,note])=>{const item=el('article',undefined,'setup-item');item.append(el('span',icon,'setup-icon'));const info=el('div');info.append(el('strong',title),el('small',note));item.append(info);list.append(item);});
+ root.append(list,el('p','No AI API charges. Your existing hosting charge remains. Reports still require independently validated evidence.','muted'));
+ root.append(button(state.reporting?.connected?'Reporting account settings':'Connect reporting account',reportSetup));
 }
 $('connectAI').onclick=setup;$('openSetup').onclick=setup;
 $('detail').addEventListener('close',()=>{$('detail').querySelectorAll('input[type="password"]').forEach(i=>i.value='');});

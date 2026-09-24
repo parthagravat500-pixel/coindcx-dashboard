@@ -12,6 +12,8 @@ KEY='sk-fixture-for-private-connection-tests'
 
 class ConnectionTests(unittest.TestCase):
     def setUp(self):
+        local_mode = patch('connections.LOCAL_ONLY', False)
+        local_mode.start(); self.addCleanup(local_mode.stop)
         self.tmp=tempfile.TemporaryDirectory();self.old=app.DATA;app.DATA=Path(self.tmp.name)
         self.env=patch.dict(os.environ,{},clear=True);self.env.start();app.init()
     def tearDown(self):

@@ -6,6 +6,7 @@ import time
 import urllib.error
 import urllib.request
 
+LOCAL_ONLY = True  # This deployment never uses paid model APIs.
 MODEL = 'gpt-4.1-mini'
 FLAGS = ('SUPERVISOR_AI_ENABLED', 'DISCOVERY_AI_ENABLED')
 
@@ -20,6 +21,9 @@ def path(data_dir):
 
 
 def apply(config):
+    if LOCAL_ONLY:
+        config = {'enabled': False}
+        os.environ.pop('OPENAI_API_KEY', None)
     if config.get('enabled') is True:
         os.environ['OPENAI_API_KEY'] = config['key']
         os.environ['SUPERVISOR_AI_MODEL'] = MODEL
@@ -28,6 +32,9 @@ def apply(config):
 
 
 def load(data_dir):
+    if LOCAL_ONLY:
+        disconnect(data_dir)
+        return
     p = path(data_dir)
     if not p.exists():
         return  # Preserve explicit deployment environment configuration.
@@ -73,6 +80,8 @@ def verify_key(key):
 
 
 def connect(data_dir, data):
+    if LOCAL_ONLY:
+        raise ValueError('Free local reviews are active. Paid AI connections are disabled.')
     key = data.get('key', '')
     if not valid_key(key): raise ValueError('Paste your OpenAI API key in the private key field.')
     if data.get('approve_charges') is not True:
@@ -90,6 +99,9 @@ def disconnect(data_dir):
 
 
 def status():
+    if LOCAL_ONLY:
+        return {'enabled': False, 'mode': 'local', 'model': None, 'daily_attempt_limit': 0,
+                'description': 'Local rule reviews for every program and finding. No AI API requests or daily review quota. Hosting is billed separately.'}
     configured = bool(os.getenv('OPENAI_API_KEY')) and bool(os.getenv('SUPERVISOR_AI_MODEL'))
     return {'enabled': configured and all(os.getenv(flag) == 'true' for flag in FLAGS),
             'model': os.getenv('SUPERVISOR_AI_MODEL') if configured else MODEL,

@@ -1,3 +1,13 @@
+## Local review mode (current deployment)
+
+Paid model API requests are disabled, including when an old key or enabled flags remain in the environment. Startup removes the saved OpenAI connection. The connection endpoint rejects paid AI setup. Existing HackerOne settings are retained.
+
+Every listed program receives a deterministic local review of reward uncertainty and missing scope/permission evidence. Reviews are calculated from current saved data with no daily quota or model calls. Findings use the existing local supervisor rules. These are not AI or exploit-validation capabilities.
+
+Public directories refresh every six hours; approved exact-URL HEAD checks retain their individual intervals, pause controls, rate limits and permission expiry. The server runs these jobs without an open browser. Existing hosting and disk costs remain; this is zero AI API usage, not free hosting. Unproven findings cannot be submitted.
+
+Earlier AI notes are historical and may include failed attempts. Optional legacy paid routines remain covered by tests, but the deployed local-only guard prevents their use.
+
 # ScopeGuard — authorized research assistant
 
 This is a working first version of a conservative security observation and report-triage tool. It is not an autonomous penetration tester or a guaranteed income system. No target is preapproved. No external scanning has been performed during development.

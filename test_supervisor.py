@@ -11,6 +11,8 @@ import supervisor
 
 class SupervisorTests(unittest.TestCase):
     def setUp(self):
+        local_mode = patch('connections.LOCAL_ONLY', False)
+        local_mode.start(); self.addCleanup(local_mode.stop)
         self.temp = tempfile.TemporaryDirectory()
         self.previous = app.DATA
         app.DATA = Path(self.temp.name)
