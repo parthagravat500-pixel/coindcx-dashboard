@@ -1,10 +1,14 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScopeGuard · Research desk</title><link rel="stylesheet" href="/style.css"><script src="/ui.js" defer></script></head>
-<body><main><header><div class="brand">◈ SCOPEGUARD <span>RESEARCH DESK</span></div><div id="status">Connecting…</div></header>
-<section class="hero"><p class="eyebrow">AUTHORIZED SECURITY RESEARCH</p><h1>A quieter, safer<br>way to investigate.</h1><p>Scheduled observations. Evidence you can review.<br>Every target stays inside the scope you approve.</p><button id="pause">Loading…</button></section>
-<div id="message" role="status"></div><section class="stats"><article><b id="targetCount">0</b><span>Approved URLs</span></article><article><b id="findingCount">0</b><span>Review leads</span></article><article><b id="acceptedCount">0</b><span>Marked accepted</span></article></section>
-<section class="panel"><h2>Supervisor</h2><p id="supervisorRules"></p><p id="supervisorAI"></p><p id="supervisorDelivery"></p><p id="supervisorRepeat" class="muted"></p><p id="supervisorLimit" class="muted"></p></section>
-<div class="columns"><section class="panel"><h2>Add an authorized target</h2><p class="muted">Read the program policy first. Approval here records your attestation; it does not independently verify permission.</p><form id="targetForm">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ScopeGuard · Bounty workspace</title><link rel="stylesheet" href="/style.css"><script src="/ui.js" defer></script></head>
+<body><main><header><div class="brand">◈ SCOPEGUARD <span>BOUNTY WORKSPACE</span></div><div id="status">Connecting…</div></header>
+<section class="hero"><p class="eyebrow">YOUR RESEARCH WORKFLOW</p><h1>Discovery to review.<br>One clear workspace.</h1><p>Public programs, ranked rewards, and evidence in one place.</p><div class="controls"><button id="pause">Loading…</button><button id="discoveryPause" class="secondary">Loading discovery…</button><button id="discoveryRefresh" class="secondary">Refresh directory</button></div><p id="discoveryStatus" class="muted"></p></section>
+<div id="message" role="status" aria-live="polite"></div>
+<nav class="pipeline" aria-label="Workflow stages" id="stages"></nav>
+<section class="panel workspace"><div class="section-heading"><div><p class="eyebrow" id="stageEyebrow">PROGRAM INTAKE</p><h2 id="stageTitle">Websites in queue</h2></div><span id="listCount" class="tag"></span></div><p id="stageHelp" class="muted"></p>
+<div class="filters"><label>Search<input id="search" type="search" placeholder="Find a company, website or finding"></label><label id="currencyLabel">Reward currency<select id="currency"><option value="all">All · grouped by currency</option><option value="USD">USD · highest first</option><option value="EUR">EUR · highest first</option><option value="GBP">GBP · highest first</option><option value="unknown">Amount not published</option></select></label></div><div id="worklist"></div><button id="showMore" class="secondary" hidden>Show more</button></section>
+<section class="panel"><h2>Automation status</h2><div class="automation-grid"><article><span class="tag">DISCOVERY</span><p id="discoveryAI"></p><p class="muted">Public directory intake runs automatically. Each new program needs scope, exclusions and automation rules verified before testing.</p></article><article><span class="tag">SUPERVISOR</span><p id="supervisorRules"></p><p id="supervisorAI"></p><p id="supervisorRepeat" class="muted"></p></article><article><span class="tag">REPORT DELIVERY</span><p id="supervisorDelivery"></p><p id="supervisorLimit" class="muted"></p></article></div></section>
+<details class="panel"><summary>Sources & sync health</summary><div id="sources"></div><p class="muted">Directory: bounty-targets-data by Arkadiy Tetelman. Listings and reward amounts are third-party discovery data, not verified permission or a promise of payment. Open the program’s official policy for current terms.</p></details>
+<details class="panel"><summary>Advanced target management</summary><div class="stats"><article><b id="targetCount">0</b><span>Saved URLs</span></article><article><b id="findingCount">0</b><span>Review leads</span></article><article><b id="acceptedCount">0</b><span>Manually marked accepted</span></article></div><div class="columns"><section><h2>Add an authorized target</h2><p class="muted">Record the exact scope and permission from the program’s current policy. This form records your attestation.</p><form id="targetForm">
 <label>Program name<input name="name" required maxlength="100" placeholder="Your approved program"></label>
 <label>Exact approved URL<input name="url" type="url" required placeholder="https://approved.example/path"></label>
 <label>Program policy URL<input name="policy" type="url" required placeholder="https://platform.example/program"></label>
@@ -13,9 +17,8 @@
 <label class="check"><input type="checkbox" name="authorized" required>Written scope permits testing this exact URL.</label>
 <label class="check"><input type="checkbox" name="automation_allowed" required>Automated HEAD checks at this interval are permitted.</label>
 <label class="check"><input type="checkbox" name="cors">The policy also permits a HEAD request with a test Origin header.</label>
-<button type="submit">Add approved URL</button></form></section>
-<section class="panel"><h2>Target activity</h2><p class="muted">One target at a time. Redirects are never followed. Authorization expires automatically.</p><div id="targets"></div></section></div>
-<section class="panel"><h2>Evidence & review queue</h2><p class="muted">These are observations, not confirmed vulnerabilities. Priority reflects your feedback, not severity or probability of a payout.</p><div id="findings"></div></section>
-<section class="panel"><h2>Activity log</h2><div id="events"></div></section>
-<footer>ScopeGuard 1.1 · No automatic submissions · No guarantee of earnings · No response bodies or cookie values retained</footer>
+<button type="submit">Add approved URL</button></form></section><section><h2>Target activity</h2><div id="targets"></div></section></div><h2>Evidence & feedback</h2><div id="findings"></div></details>
+<details class="panel"><summary>Activity log</summary><div id="events"></div></details>
+<footer>ScopeGuard 2.0 · Advertised rewards are not earnings · Basic observations do not prove a vulnerability</footer>
+<dialog id="detail"><div class="dialog-top"><span class="eyebrow">WORKFLOW DETAILS</span><button id="closeDetail" class="secondary" aria-label="Close details">Close ✕</button></div><div id="detailContent"></div></dialog>
 </main></body></html>

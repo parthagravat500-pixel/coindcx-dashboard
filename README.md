@@ -85,3 +85,19 @@ Reporting channels were reviewed on 2026-09-24:
 - RoboForm: support system under Vulnerability Report, reached from https://www.roboform.com/researchers.
 
 These routes require portal submission, not guessed email addresses. No email delivery account is configured and no SMTP/automatic portal submission is implemented. An actual reproducible impact finding and current eligibility review are required before developing a delivery workflow. The supervisor does not fetch updated program policies or renew scope automatically.
+
+## Version 2: discovery and workflow dashboard
+
+The dashboard has five clickable views: Websites in queue, Under review, Supervisor review, Results, and Submitted / emailed. Search, currency filters, program details, scope-review shortlisting, target details and evidence downloads work on mobile.
+
+A persistent background worker checks the public `arkadiyt/bounty-targets-data` HackerOne and Intigriti directories every six hours. It imports paid programs and reported maximum rewards, deduplicates policy URLs, preserves review state, marks removed programs unavailable, and backs off after source failures. It does not request company websites or create scan targets. Directory data is attributed to https://github.com/arkadiyt/bounty-targets-data and must be checked against the official policy. Amounts are sorted descending within each currency, without fabricated exchange rates; unknown amounts are listed separately.
+
+New discovery is enabled by default. It can be paused independently of previously approved target checks. Directory refreshes have a five-minute cooldown. Saved catalog data and workflow state use the existing SQLite database on the persistent disk.
+
+Optional program-intake AI requires `DISCOVERY_AI_ENABLED=true`, `OPENAI_API_KEY`, and `SUPERVISOR_AI_MODEL`. It is OFF unless explicitly configured. It makes at most one attempt/day, with the attempt recorded before dispatch. Only program name, directory source and reported reward are sent; it cannot fetch sites, create targets, authorize tests, change scope, or submit reports. Supervisor AI retains its separate three-attempt/day cap. API charges are not included in hosting and require separate configuration/approval.
+
+Scope verification and reproducible impact still require actual evidence. This version does not automatically verify arbitrary program policies or perform exploitation. The current HEAD checks cannot establish bounty eligibility. Up to three scheduled observations lead to a held review result, never a verified bug solely on repetition.
+
+Automatic email/portal delivery is not connected. The submission view records an actual report reference supplied by an operator, labelled `user_recorded`; this neither sends a report nor independently verifies company receipt or payout. Feedback such as "accepted" never becomes proof of delivery.
+
+Tests: `python -m unittest -v` (including discovery isolation, changed/removed listings, mixed-currency ranking, AI limits, and receipt requirements).

@@ -12,6 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from engine import validate_url, observe, findings
 import supervisor
+import workflow
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -48,6 +49,7 @@ def init():
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER, message TEXT);
         ''')
         supervisor.init(c)
+        workflow.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -119,6 +121,16 @@ def worker():
         WAKE.wait(10)
 
 
+def discovery_worker():
+    while True:
+        try:
+            workflow.tick(db)
+            workflow.ai_tick(db)
+        except Exception:
+            pass
+        WAKE.wait(30)
+
+
 def supervisor_worker():
     while True:
         try:
@@ -147,12 +159,15 @@ def snapshot():
         return {'paused': bool(c.execute('SELECT paused FROM settings').fetchone()[0]), 'targets': targets,
                 'findings': sorted(items, key=lambda f: f['review_priority'], reverse=True),
                 'supervisor': supervisor.summary(),
+                'workflow': workflow.snapshot(c),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
 
 def mutate(path, data):
     with LOCK, db() as c:
-        if path == '/api/pause':
+        if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
+            workflow.mutate(c, path, data)
+        elif path == '/api/pause':
             c.execute('UPDATE settings SET paused=?', (int(bool(data['paused'])),))
             log(c, 'Scheduler paused' if data['paused'] else 'Scheduler resumed')
         elif path == '/api/targets':
@@ -269,6 +284,7 @@ if __name__ == '__main__':
     init()
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()
+    threading.Thread(target=discovery_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
     print('ScopeGuard dashboard ready. New installations start paused.', flush=True)
     server.serve_forever()
