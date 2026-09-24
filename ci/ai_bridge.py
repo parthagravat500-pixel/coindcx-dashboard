@@ -4,7 +4,6 @@ This host-side bridge is not copied into the analysis container. It sends result
 only to the fixed owner-controlled ScopeGuard receiver; redirects are forbidden.
 """
 import ast
-import base64
 import json
 import os
 from pathlib import Path
@@ -46,11 +45,6 @@ def workload_token():
     result=request_json(url,{'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
     token=result.get('value','')
     if not isinstance(token,str) or not 100<len(token)<16000:raise ValueError('Invalid identity response')
-    # These are public workflow metadata only, NOT the JWT or credentials.
-    # Server signature validation remains the sole authority for accepting it.
-    body=token.split('.')[1]
-    claims=json.loads(base64.urlsafe_b64decode(body+'='*(-len(body)%4)))
-    print('Workload metadata: '+json.dumps({k:claims.get(k) for k in ['iss','aud','repository','repository_id','repository_owner_id','ref','sub','workflow_ref','workflow_sha','sha','event_name','runner_environment']}))
     return token
 
 

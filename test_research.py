@@ -5,11 +5,14 @@ import subprocess
 import tempfile
 import time
 import unittest
+import http.client
+import threading
 from pathlib import Path
 from unittest.mock import patch
 
 import ci_identity as identity
 import research
+import app
 
 
 class IdentityTests(unittest.TestCase):
@@ -119,3 +122,39 @@ class ResearchTests(unittest.TestCase):
         with patch.object(research,'REQUEST_TIMES',[]):
             self.assertTrue(all(research.admit_request() for _ in range(12)))
             self.assertFalse(research.admit_request())
+
+
+class ReceiptHTTPTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp=tempfile.TemporaryDirectory();self.addCleanup(self.tmp.cleanup)
+        p=patch.object(app,'DATA',Path(self.tmp.name));p.start();self.addCleanup(p.stop)
+        p=patch.object(app,'TOKEN','unit-test-password-with-24-characters');p.start();self.addCleanup(p.stop)
+        p=patch.object(research,'REQUEST_TIMES',[]);p.start();self.addCleanup(p.stop)
+        app.init()
+        self.server=app.ThreadingHTTPServer(('127.0.0.1',0),app.Handler)
+        threading.Thread(target=self.server.serve_forever,daemon=True).start()
+        self.addCleanup(self.server.server_close);self.addCleanup(self.server.shutdown)
+
+    def request(self,path,headers,body='{}'):
+        connection=http.client.HTTPConnection('127.0.0.1',self.server.server_address[1],timeout=3)
+        try:
+            connection.request('POST',path,body,headers)
+            response=connection.getresponse()
+            return response.status,response.read().decode()
+        finally:connection.close()
+
+    def test_no_identity_bad_identity_and_size(self):
+        self.assertEqual(self.request('/api/ci-review',{})[0],401)
+        with patch.object(research,'claims_for',side_effect=ValueError('private diagnostic must not leak')):
+            status,body=self.request('/api/ci-review',{'Authorization':'Bearer invalid'})
+        self.assertEqual(status,403);self.assertNotIn('diagnostic',body)
+        self.assertEqual(self.request('/api/ci-review',{},'x'*32001)[0],400)
+
+    def test_ai_configuration_still_requires_auth(self):
+        self.assertEqual(self.request('/api/research-ai',{},'{"enabled":true}')[0],401)
+
+    def test_valid_identity_cannot_bypass_owner_pause(self):
+        claims={'sha':'a'*40,'run_id':'123','run_attempt':'1'}
+        with patch.object(research,'claims_for',return_value=claims):
+            status,body=self.request('/api/ci-review',{'Authorization':'Bearer synthetic'},json.dumps({'stage':'start','revision':'a'*40}))
+        self.assertEqual(status,200);self.assertFalse(json.loads(body)['accepted'])
