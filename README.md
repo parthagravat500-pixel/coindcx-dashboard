@@ -1,3 +1,9 @@
+## Background review queue
+
+A server worker checks every 10 seconds for new or changed local program and finding data. It persists review fingerprints and results, processes batches of at most 100, resumes after restarts, honors pause, and logs real completed work. Unchanged data is not repeatedly reviewed. Worker heartbeat and pending count are exposed separately from work events. No work means an explicit waiting status.
+
+Public bounty directories now refresh every 15 minutes, retaining exponential backoff after failures. Exact-URL website check intervals and permission expiry are unchanged. The queue makes no network requests and does not add targets or validate exploits. This is always-on scheduling, not continuous active security testing.
+
 ## Evidence review and report workspace
 
 Findings now have rule-specific investigation priorities, benign explanations, missing-evidence prompts and contextual remediation guidance. Duplicate/ineligible/false-positive feedback lowers review priority. Local duplicate checks do not cover private platform reports.
@@ -12,7 +18,7 @@ Paid model API requests are disabled, including when an old key or enabled flags
 
 Every listed program receives a deterministic local review of reward uncertainty and missing scope/permission evidence. Reviews are calculated from current saved data with no daily quota or model calls. Findings use the existing local supervisor rules. These are not AI or exploit-validation capabilities.
 
-Public directories refresh every six hours; approved exact-URL HEAD checks retain their individual intervals, pause controls, rate limits and permission expiry. The server runs these jobs without an open browser. Existing hosting and disk costs remain; this is zero AI API usage, not free hosting. Unproven findings cannot be submitted.
+Public directories refresh every 15 minutes; approved exact-URL HEAD checks retain their individual intervals, pause controls, rate limits and permission expiry. The server runs these jobs without an open browser. Existing hosting and disk costs remain; this is zero AI API usage, not free hosting. Unproven findings cannot be submitted.
 
 Earlier AI notes are historical and may include failed attempts. Optional legacy paid routines remain covered by tests, but the deployed local-only guard prevents their use.
 
@@ -108,7 +114,7 @@ These routes require portal submission, not guessed email addresses. No email de
 
 The dashboard has five clickable views: Websites in queue, Under review, Supervisor review, Results, and Submitted / emailed. Search, currency filters, program details, scope-review shortlisting, target details and evidence downloads work on mobile.
 
-A persistent background worker checks the public `arkadiyt/bounty-targets-data` HackerOne and Intigriti directories every six hours. It imports paid programs and reported maximum rewards, deduplicates policy URLs, preserves review state, marks removed programs unavailable, and backs off after source failures. It does not request company websites or create scan targets. Directory data is attributed to https://github.com/arkadiyt/bounty-targets-data and must be checked against the official policy. Amounts are sorted descending within each currency, without fabricated exchange rates; unknown amounts are listed separately.
+A persistent background worker checks the public `arkadiyt/bounty-targets-data` HackerOne and Intigriti directories every 15 minutes. It imports paid programs and reported maximum rewards, deduplicates policy URLs, preserves review state, marks removed programs unavailable, and backs off after source failures. It does not request company websites or create scan targets. Directory data is attributed to https://github.com/arkadiyt/bounty-targets-data and must be checked against the official policy. Amounts are sorted descending within each currency, without fabricated exchange rates; unknown amounts are listed separately.
 
 New discovery is enabled by default. It can be paused independently of previously approved target checks. Directory refreshes have a five-minute cooldown. Saved catalog data and workflow state use the existing SQLite database on the persistent disk.
 

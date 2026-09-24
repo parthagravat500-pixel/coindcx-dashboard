@@ -8,7 +8,7 @@ import time
 import urllib.request
 from urllib.parse import urlsplit
 
-INTERVAL = 6 * 3600
+INTERVAL = 15 * 60
 BASE = 'https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/'
 SOURCES = {
     'intigriti': (BASE + 'intigriti_data.json', {'www.intigriti.com', 'app.intigriti.com'}),
@@ -205,7 +205,7 @@ def snapshot(c):
         p['local_review']=local_review(p)
         programs.append(p)
     return {'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
-            'sources':sources,'programs':programs,'interval_hours':6,
+            'sources':sources,'programs':programs,'interval_hours':INTERVAL/3600,'interval_minutes':INTERVAL//60,
             'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Local rules — all listed programs reviewed, no AI API fees',
             'submissions':[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY at DESC')],
             'delivery_status':'Delivery connection is shown separately. Recorded submissions require a receipt; none are inferred from findings.'}

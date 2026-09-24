@@ -13,6 +13,7 @@ from pathlib import Path
 from engine import validate_url, observe, findings
 import supervisor
 import workflow
+import workqueue
 import casework
 import connections
 import reporting
@@ -55,6 +56,7 @@ def init():
         supervisor.init(c)
         workflow.init(c)
         reporting.init(c)
+        workqueue.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -155,6 +157,17 @@ def supervisor_worker():
         WAKE.wait(30)
 
 
+def queue_worker():
+    while True:
+        try:
+            with LOCK:
+                workqueue.tick(db, log)
+        except Exception:
+            with db() as c:
+                c.execute("UPDATE background_status SET status='Review failed; retrying on next cycle' WHERE id=1")
+        WAKE.wait(10)
+
+
 def snapshot():
     with db() as c:
         targets = [dict(r) for r in c.execute('SELECT * FROM targets')]
@@ -177,6 +190,7 @@ def snapshot():
                 'supervisor': supervisor.summary(),
                 'workflow': workflow.snapshot(c),
                 'connection': connections.status(),
+                'background': workqueue.snapshot(c),
                 'reporting': reporting.snapshot(c, DATA),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
@@ -326,6 +340,7 @@ if __name__ == '__main__':
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
     connections.load(DATA)
     init()
+    threading.Thread(target=queue_worker, daemon=True).start()
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()
     threading.Thread(target=discovery_worker, daemon=True).start()
