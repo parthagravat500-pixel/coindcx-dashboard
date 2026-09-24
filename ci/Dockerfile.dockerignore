@@ -1,0 +1,7 @@
+**
+!*.py
+!index.html
+!ui.js
+!ci/
+!ci/isolated_checks.py
+!ci/Dockerfile

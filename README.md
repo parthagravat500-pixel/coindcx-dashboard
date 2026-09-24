@@ -1,3 +1,25 @@
+## Isolated regression workflow
+
+`ScopeGuard isolated tests` runs on relevant pushes to `scopeguard-app`, separately
+from the trading workflows on `main`. It uses a standard public-repository GitHub
+runner, no paid AI, no larger runners, and no artifact/cache uploads. Existing
+Render hosting charges are unchanged. There is no schedule or 24-hour runner;
+GitHub schedules require the default branch, which this update does not change.
+
+A disposable runner builds a test-only image containing source and synthetic tests,
+not deployment data or credentials. The container has no external network, no host
+mounts or Docker socket, a read-only filesystem, no Linux capabilities, no-new-
+privileges, a non-root UID, and CPU/memory/process/time limits. Before test imports,
+the harness verifies those isolation settings and fails closed if unsupported.
+The regression suite includes real loopback HTTP authentication/CSRF tests; other
+external API cases are mocked. The Python base tag receives updates; the workflow
+build log records the resolved image digest. This is not a general hostile-code
+sandbox, expert AI analysis, exploit discovery, or proof of bounty eligibility.
+
+Look for **ScopeGuard isolated tests** and the `scopeguard-app` branch in Actions.
+Only a completed successful run verifies that revision; publishing this file alone
+does not prove the remote runtime passed. Paid API guards remain unchanged.
+
 ## Python source audits
 
 The dashboard includes a local Python AST pattern audit for dynamic code execution, shell commands, unsafe pickle/YAML loading, disabled TLS verification, dynamic SQL construction, and non-cryptographic randomness. Matches are leads, not confirmed vulnerabilities. There is no taint/data-flow analysis, dependency vulnerability lookup, interprocedural analysis or exploit validation. No matches does not certify security.
