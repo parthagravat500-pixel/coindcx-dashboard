@@ -97,6 +97,16 @@ class GitLabTests(unittest.TestCase):
         self.assertFalse(g.secret_path(self.root).exists())
         self.assertFalse(g.snapshot(self.c)['configured'])
 
+    def test_opaque_token_and_copy_padding(self):
+        token='glpat-'+('x'*24)+'.01.abc_def-123'
+        g.configure(self.c,self.root,dict(self.form,token=' \t'+token+' '))
+        saved=json.loads(g.secret_path(self.root).read_text())
+        self.assertEqual(saved['token'],token)
+        self.assertNotIn(token,json.dumps(g.snapshot(self.c)))
+        for bad in (token+'\n',token+'\r',token+'\x00',token+'\u200b',token+' more'):
+            with self.assertRaises(ValueError):
+                g.configure(self.c,self.root,dict(self.form,token=bad))
+
     def test_reject_url_and_header_injection(self):
         for v in ('https://evil.com/a/b','https://gitlab.com/a/b?token=x','https://u:p@gitlab.com/a/b','a/../b','a/b%2fprojects'):
             with self.assertRaises(ValueError):g.project_path(v)

@@ -51,10 +51,16 @@ def configure(c, root, data):
         raise ValueError('Confirm ownership, current permission and the read-only test.')
     project = project_path(data.get('project'))
     token = data.get('token', '')
+    if isinstance(token, str):
+        token = token.strip(' \t')
     marker = data.get('marker', '')
     rules = data.get('rules', '')
-    if not isinstance(token, str) or not 20 <= len(token) <= 512 or not re.fullmatch(r'[A-Za-z0-9_-]+', token):
-        raise ValueError('Enter your private GitLab access token in this form.')
+    if not isinstance(token, str) or not token:
+        raise ValueError('Paste your GitLab personal access token into the token field.')
+    # Treat credentials as opaque. GitLab validates authenticity and scope;
+    # locally reject whitespace/control characters unsafe in an HTTP header.
+    if not 20 <= len(token) <= 512 or not re.fullmatch(r'[!-~]+', token):
+        raise ValueError('The token has an invalid length or contains spaces, line breaks or hidden characters. Copy the complete token again using GitLab’s copy button.')
     if not isinstance(marker, str) or not re.fullmatch(r'scopeguard_[a-f0-9]{32}', marker):
         raise ValueError('Generate the test text and save it in your private project description first.')
     if not isinstance(rules, str) or not 30 <= len(rules.strip()) <= 4000:
