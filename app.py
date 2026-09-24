@@ -15,6 +15,7 @@ import supervisor
 import workflow
 import sourceaudit
 import dependencies
+import validation
 import workqueue
 import casework
 import connections
@@ -56,6 +57,7 @@ def init():
         ''')
         sourceaudit.init(c)
         dependencies.init(c)
+        validation.init(c)
         casework.init(c)
         supervisor.init(c)
         workflow.init(c)
@@ -161,6 +163,15 @@ def supervisor_worker():
         WAKE.wait(30)
 
 
+def validation_worker(port):
+    while True:
+        try:
+            validation.tick(db, log, port, TOKEN)
+        except Exception:
+            pass
+        WAKE.wait(30)
+
+
 def dependency_worker():
     while True:
         try:
@@ -210,6 +221,7 @@ def snapshot():
                 'background': workqueue.snapshot(c),
                 'source_audits': sourceaudit.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
+                'validation': validation.snapshot(c),
                 'reporting': reporting.snapshot(c, DATA),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
@@ -232,6 +244,8 @@ def mutate(path, data):
     with LOCK, db() as c:
         if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
+        elif path == '/api/validation/run':
+            validation.queue(c)
         elif path == '/api/dependencies':
             dependencies.upload(c, data)
             log(c, 'Dependency inventory queued; original file not retained.')
@@ -393,5 +407,6 @@ if __name__ == '__main__':
     threading.Thread(target=discovery_worker, daemon=True).start()
     threading.Thread(target=reporting_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
+    threading.Thread(target=validation_worker, args=(server.server_address[1],), daemon=True).start()
     print('ScopeGuard dashboard ready. New installations start paused.', flush=True)
     server.serve_forever()

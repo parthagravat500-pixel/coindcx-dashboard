@@ -128,6 +128,7 @@ $('search').oninput=()=>{visibleLimit=40;renderWorklist();};$('currency').onchan
 setInterval(()=>refresh().catch(e=>$('message').textContent=e.message),15000);
 
 function renderSimpleStatus(){
+ const v=state.validation;if(v)$("validationSummary").textContent=`${v.completed} completed runs · ${v.status}. Tests your ScopeGuard login and request protection every ${v.interval_minutes} minutes. Other websites are not included.`;
  const bg=state.background;
  if(bg){
   $('backgroundState').textContent=bg.status;
@@ -200,3 +201,17 @@ function openDependencies(){
  form.onsubmit=async e=>{e.preventDefault();const f=file.files[0];if(!f||f.size>500000){status.textContent='Choose a supported file up to 500 KB.';return;}submit.disabled=true;try{await change('/api/dependencies',{project:name.value,filename:f.name,source:await f.text(),owned:check.checked,share_packages:check.checked});openDependencies();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openDependencies').onclick=openDependencies;
+
+function openValidation(){
+ const root=modal('Live security validation'),v=state.validation;
+ root.append(el('p','Automatic checks of your own ScopeGuard application. These use its local server connection, not third-party websites. Actual HTTP statuses and response fingerprints are retained; passwords and response bodies are not.','muted'));
+ if(!v)return;
+ root.append(el('p',v.status),el('small','Last started: '+date(v.last_started)+' · Next scheduled: '+date(v.due)));
+ const run=el('button','Run checks now'),message=el('p');message.setAttribute('role','status');run.disabled=state.paused;
+ run.onclick=async()=>{run.disabled=true;try{await change('/api/validation/run',{});openValidation();}catch(e){message.textContent=e.message;run.disabled=false;}};root.append(run,message);
+ for(const entry of v.runs){const box=el('details');box.append(el('summary',date(entry.at)+' · '+entry.result.status));
+ for(const check of entry.result.checks){box.append(el('h3',(check.passed?'Passed: ':'Investigate: ')+check.title),el('p',check.method+' '+check.path+' · expected '+check.expected_status+' · received '+check.actual_status),el('small','Response fingerprint: '+check.response_sha256));}
+ box.append(el('p',entry.result.impact||'No completed impact assessment.'),el('p',entry.result.limitation||'This run did not complete.','muted'));root.append(box);}
+ if(!v.runs.length)root.append(el('p','Waiting for the first run. The worker checks for queued work every 30 seconds.'));
+}
+$('openValidation').onclick=openValidation;
