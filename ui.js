@@ -292,21 +292,40 @@ $('openGitlab').onclick=openGitlab;
 
 function openProjectAudits(){
  const root=modal('Project research');
- root.append(el('p','Follows external input between Python functions and files. Code is parsed, never executed. ScopeGuard reviews its own code after updates; you can also upload an authorized Python project.','muted'));
+ root.append(el('p','Investigate new code paths first, compare revisions, and keep evidence for each lead. Python code is parsed, never executed. Reviews are local and have no AI API fees.','muted'));
  const audits=state.project_audits||[];
  if(!audits.length)root.append(el('p','No project analysis has completed yet.'));
- for(const a of audits){const box=el('details');box.open=true;const r=a.result;
- box.append(el('summary',a.name+' · '+r.total_findings+' leads · 0 confirmed bugs'),el('small','Reviewed '+date(a.checked)),el('p',r.files_analyzed+' Python files · '+r.functions_analyzed+' top-level functions'));
+ for(const a of audits){const box=el('details');box.open=true;const r=a.result,c=r.changes;
+ box.append(el('summary',a.name+' · '+(r.active_leads??r.total_findings)+' active leads · 0 confirmed bugs'),el('small','Reviewed '+date(a.checked)),el('p',r.files_analyzed+' Python files · '+r.functions_analyzed+' top-level functions'));
+ if(c?.has_baseline){box.append(el('p',c.new_leads+' new leads · '+c.changed_files.length+' changed files · '+c.added_files.length+' added · '+c.removed_files.length+' removed'));
+ const changes=el('details');changes.append(el('summary','Changes since '+date(c.previous_checked)));
+ for(const [title,paths] of [['Changed',c.changed_files],['Added',c.added_files],['Removed',c.removed_files]])if(paths.length)changes.append(el('p',title+': '+paths.join(', ')));
+ if(c.no_longer_observed.length)changes.append(el('p','No longer observed: '+c.no_longer_observed.map(f=>f.title+' at '+f.file+':'+f.line).join('; ')),el('p',c.comparison_note,'muted'));box.append(changes);
+ }else box.append(el('p','Baseline recorded. Upload the next revision with the same project name and folder paths to compare changes.','muted'));
  if(r.syntax_skipped.length)box.append(el('p','Could not parse: '+r.syntax_skipped.join(', ')));
  if(r.bounded_or_truncated)box.append(el('p','Coverage is incomplete: a depth, work or output limit was reached.'));
  if(!r.findings.length)box.append(el('p','No input-to-operation paths found by the covered checks. This does not establish that the project is secure.'));
- for(const f of r.findings){const detail=el('details');detail.append(el('summary',f.title+' — '+f.file+':'+f.line));const steps=el('ol');f.trace.forEach(t=>steps.append(el('li',t.file+':'+t.line+' — '+t.role)));detail.append(steps,el('p',f.next_step),el('p','Evidence status: static hypothesis. No runtime impact demonstrated.','muted'));box.append(detail);}
+ for(const f of r.findings){const detail=el('details');detail.append(el('summary',(f.set_aside?'Set aside':f.change_status||'Lead')+' · '+f.title+' — '+f.file+':'+f.line));
+ if(f.changed_trace_files?.length)detail.append(el('p','Priority reason: path includes changed or added files: '+f.changed_trace_files.join(', ')));
+ const steps=el('ol');f.trace.forEach(t=>steps.append(el('li',t.file+':'+t.line+' — '+t.role)));detail.append(steps);
+ if(f.research){detail.append(el('strong',f.research.question));const checklist=el('ol');f.research.evidence_required.forEach(t=>checklist.append(el('li',t)));detail.append(checklist);
+ if(f.related_leads)detail.append(el('p',f.related_leads+' related leads use the same operation. '+f.research.variant_hint));}
+ detail.append(el('p','Evidence status: static hypothesis. No runtime impact demonstrated.','muted'));
+ const form=el('form'),decision=el('select'),dl=el('label','Review decision');
+ for(const [value,text] of [['investigate','Continue investigating'],['false_positive','False positive'],['duplicate','Known issue or duplicate'],['out_of_scope','Outside program scope']]){const op=el('option',text);op.value=value;decision.append(op);}decision.value=f.review_note?.disposition||'investigate';dl.append(decision);
+ const nl=el('label','Redacted evidence and reasoning'),notes=el('textarea');notes.maxLength=4000;notes.value=f.review_note?.notes||'';notes.placeholder='Record version, reachable entry point, expected and actual result, control case, and demonstrated impact. Do not paste secrets.';nl.append(notes);
+ if(f.review_note?.stale)form.append(el('p','Code changed since your decision. This lead is active again until you review the new evidence.'));
+ const save=el('button','Save research notes'),status=el('p');status.setAttribute('role','status');form.append(dl,nl,save,status);
+ form.onsubmit=async e=>{e.preventDefault();save.disabled=true;try{await change('/api/project-research-note',{project:a.name,finding:f.id,digest:a.digest,disposition:decision.value,notes:notes.value});openProjectAudits();}catch(err){status.textContent=err.message;}finally{save.disabled=false;}};
+ detail.append(form);box.append(detail);}
  box.append(el('p',r.limitation,'muted'));
  box.append(button('Download review evidence',()=>{const blob=new Blob([JSON.stringify(a,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=el('a');link.href=url;link.download='scopeguard-project-review.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}));root.append(box);}
  const form=el('form'),label=el('label','Review your Python project ZIP'),file=el('input');file.type='file';file.accept='.zip';file.required=true;label.append(file);
+ const nameLabel=el('label','Project name (keep the same for future revisions)'),name=el('input');name.required=true;name.maxLength=100;name.placeholder='My authorized Python project';nameLabel.append(name);
+ file.onchange=()=>{if(!name.value&&file.files[0])name.value=file.files[0].name;};
  const permission=el('label',undefined,'check'),owned=el('input');owned.type='checkbox';owned.required=true;permission.append(owned,document.createTextNode('I own this code or have permission to review it.'));
- const note=el('p','Remove credentials before uploading. Up to 80 Python files, 128 KB each, 2 MB total. The ZIP goes only to this server. Source code is not saved; evidence paths and fingerprints are saved. No websites are scanned.','muted');
- const submit=el('button','Review project'),status=el('p');status.setAttribute('role','status');form.append(label,permission,note,submit,status);
- form.onsubmit=async e=>{e.preventDefault();const f=file.files[0];if(!f||f.size>2000000){status.textContent='Choose a ZIP up to 2 MB.';return;}submit.disabled=true;status.textContent='Reviewing project…';try{const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(f);});await change('/api/project-audit',{name:f.name,archive:encoded,owned:owned.checked});openProjectAudits();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+ const note=el('p','Up to 80 Python files, 128 KB each, 2 MB total. Remove credentials first. Source code is not saved; paths, fingerprints and your research notes are saved. Keep folder paths stable between revisions. Ruby and JavaScript analysis is not supported.','muted');
+ const submit=el('button','Review project and compare'),status=el('p');status.setAttribute('role','status');form.append(nameLabel,label,permission,note,submit,status);
+ form.onsubmit=async e=>{e.preventDefault();const f=file.files[0];if(!f||f.size>2000000){status.textContent='Choose a ZIP up to 2 MB.';return;}submit.disabled=true;status.textContent='Reviewing project…';try{const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(f);});await change('/api/project-audit',{name:name.value,archive:encoded,owned:owned.checked});openProjectAudits();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openProjectAudit').onclick=openProjectAudits;

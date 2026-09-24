@@ -218,3 +218,25 @@ card is hidden unless already configured; Capital.com is unavailable in India.
 The Project research card analyzes up to 80 UTF-8 Python files in an owner-authorized ZIP (2 MB compressed and expanded, 128 KB per Python file). Archives are read in memory, never extracted; unsafe paths, symlinks and encrypted entries are rejected. Source text is not retained or executed. Results contain file/line paths and a content fingerprint, and can be downloaded as JSON.
 
 The bounded analyzer follows direct calls between top-level project functions, arguments and returns (six call levels, 60,000 expression visits). It looks for external input reaching SQL text, shell commands, dynamic code or object deserialization. Findings remain static hypotheses: framework reachability, sanitizers, object methods and runtime impact need separate review. It does not analyze Ruby/JavaScript, run arbitrary tests, claim critical severity, or submit reports. ScopeGuard's own 17 Python modules are reviewed automatically after code changes; uploaded archives are re-reviewed when uploaded again. Existing permission, pause and submission controls remain in force.
+
+### Change-aware project research
+
+Project research compares successive authorized Python ZIP uploads under the same
+project name. Keep paths within the ZIP stable across revisions. It stores file
+hashes, not source. New leads and leads traversing changed files appear first;
+that ordering is an investigation aid, not a severity or earnings prediction.
+Line-only movements preserve a lead identity. An engine upgrade starts a fresh
+baseline instead of presenting historical leads as newly introduced bugs.
+
+Each lead includes a hypothesis, an evidence checklist, and a count of other
+leads using the same sensitive operation. This is grouping, not automatic
+root-cause or variant validation. Investigators can save redacted notes and mark
+false positives, known issues, or out-of-scope leads. A changed project invalidates
+the old decision and returns the lead to active review. Notes cannot mark a lead
+confirmed or enable submission. Disappearing paths are labeled "no longer
+observed", never "fixed", because analysis coverage is incomplete.
+
+The installed application is reviewed after its source changes; uploaded projects
+require a new upload. This does not monitor third-party repositories, execute
+uploaded code, run an LLM, or validate exploits. Ruby, JavaScript, authorization
+logic and concurrency analysis remain outside this analyzer's coverage.

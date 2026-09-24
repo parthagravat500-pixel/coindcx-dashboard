@@ -310,6 +310,8 @@ def mutate(path, data):
         elif path == '/api/project-audit':
             projectaudit.upload(c,data)
             log(c,'Project code reviewed; see file-and-line paths in Project research. No report sent.')
+        elif path == '/api/project-research-note':
+            projectaudit.save_note(c,data)
         elif path == '/api/source-audit':
             sourceaudit.upload(c, data)
             log(c, 'Uploaded Python source audited; code was not stored or executed.')

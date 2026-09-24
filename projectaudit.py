@@ -9,7 +9,7 @@ import stat
 import time
 import zipfile
 
-VERSION = 'project-flow-1'
+VERSION = 'project-flow-2'
 MAX_TOTAL = 2000000
 MAX_FILE = 128000
 MAX_FILES = 80
@@ -124,9 +124,9 @@ def analyze(files):
                 flow = values[0] if values else keywords.get('source', keywords.get('command', keywords.get('sql', [])))
                 if sink and flow:
                     trace = merge(flow, [location(path,node,'Sensitive operation')])
-                    fingerprint = hashlib.sha256(json.dumps([path,node.lineno,sink,trace],sort_keys=True).encode()).hexdigest()[:20]
+                    fingerprint = hashlib.sha256(json.dumps([path,key,sink,ast.dump(node,include_attributes=False),[(t['file'],t['role']) for t in trace]],sort_keys=True).encode()).hexdigest()[:20]
                     findings[fingerprint] = {'id':fingerprint,'title':sink,'file':path,'line':node.lineno,'trace':trace,
-                        'priority':'Review first','confirmed':False,'submission_ready':False,
+                        'priority':'Review first','confirmed':False,'submission_ready':False,'research':research_plan(sink),
                         'next_step':'Verify that this path is reachable, check validation and authorization, then reproduce with synthetic data in an isolated copy.'}
                 candidate = modules[path] + '.' + call if call not in functions else call
                 if candidate not in functions:
@@ -176,13 +176,36 @@ def analyze(files):
 
 def init(c):
     c.execute('CREATE TABLE IF NOT EXISTS project_audits (name TEXT PRIMARY KEY,digest TEXT,checked INTEGER,result TEXT)')
+    c.execute('CREATE TABLE IF NOT EXISTS project_research_notes (project TEXT, finding TEXT, disposition TEXT, notes TEXT, digest TEXT, updated INTEGER, PRIMARY KEY(project,finding))')
 
 
 def record(c,name,files,skipped=0):
     digest = hashlib.sha256((VERSION+json.dumps(files,sort_keys=True)).encode()).hexdigest()
-    old = c.execute('SELECT digest FROM project_audits WHERE name=?',(name,)).fetchone()
+    old = c.execute('SELECT digest,result,checked FROM project_audits WHERE name=?',(name,)).fetchone()
     if old and old[0] == digest: return False
     result = analyze(files);result['non_python_or_excluded_files'] = skipped
+    manifest = {path:hashlib.sha256(source.encode()).hexdigest() for path,source in files.items()}
+    previous = json.loads(old[1]) if old else {}
+    compatible = previous.get('engine') == VERSION and 'manifest' in previous
+    prior_manifest = previous.get('manifest',{}) if compatible else {}
+    changed = sorted(path for path in manifest if path in prior_manifest and manifest[path] != prior_manifest[path])
+    added = sorted(set(manifest)-set(prior_manifest))
+    removed = sorted(set(prior_manifest)-set(manifest))
+    previous_findings = {f['id']:f for f in previous.get('findings',[])} if compatible else {}
+    for finding in result['findings']:
+        finding['change_status'] = ('Existing lead' if finding['id'] in previous_findings else 'New lead') if compatible else 'Baseline lead'
+        finding['changed_trace_files'] = sorted({t['file'] for t in finding['trace']} & set(changed+added)) if compatible else []
+        # A priority score is an investigation order, never severity or payout probability.
+        finding['research_priority'] = (30 if finding['change_status']=='New lead' else 0) + (20 if finding['changed_trace_files'] else 0) + min(len({t['file'] for t in finding['trace']}),5)
+        finding['related_leads'] = sum(f['title']==finding['title'] and f['id']!=finding['id'] for f in result['findings'])
+    current = {f['id'] for f in result['findings']}
+    result['manifest'] = manifest
+    result['changes'] = {'has_baseline':compatible,'previous_checked':old[2] if compatible else None,
+        'added_files':added if compatible else [],'changed_files':changed,'removed_files':removed,
+        'new_leads':sum(f['change_status']=='New lead' for f in result['findings']),
+        'no_longer_observed':[{'id':f['id'],'title':f['title'],'file':f['file'],'line':f['line']} for i,f in previous_findings.items() if i not in current],
+        'comparison_note':'Not observed is not proof of a fix; coverage limits and changed paths can hide a lead.'}
+
     c.execute('INSERT INTO project_audits VALUES(?,?,?,?) ON CONFLICT(name) DO UPDATE SET digest=excluded.digest,checked=excluded.checked,result=excluded.result',
               (name,digest,int(time.time()),json.dumps(result)))
     return True
@@ -200,6 +223,47 @@ def upload(c,data):
     record(c,name,files,skipped)
 
 
+def research_plan(title):
+    question = {
+        'Untrusted input reaches SQL text':'Can external input change the intended database query, or is it safely bound as data?',
+        'Untrusted input reaches a shell command':'Can external input change the intended command, or is it restricted before the call?',
+        'Untrusted input reaches code execution':'Can an untrusted user influence evaluated code through a reachable entry point?',
+        'Untrusted input reaches object deserialization':'Can untrusted serialized data reach this loader through a reachable entry point?',
+    }.get(title,'Does this reachable path violate a security boundary?')
+    return {'question':question,'evidence_required':[
+        'Identify the permitted entry point, test account role, and exact software version.',
+        'Follow the full path and inspect validation, authorization, and library behavior.',
+        'In an isolated copy, use synthetic data to compare expected behavior with the suspected failure.',
+        'Repeat the result and record a control case that should remain safe.',
+        'Describe the demonstrated security consequence, scope eligibility, and known-issue checks.'
+    ],'variant_hint':'Review other leads with the same sensitive operation for a shared cause. Similarity alone does not establish a second bug.'}
+
+
+def save_note(c,data):
+    project=data.get('project');finding=data.get('finding');disposition=data.get('disposition');notes=data.get('notes','')
+    if not isinstance(project,str) or not isinstance(finding,str):raise ValueError('Choose a current project lead.')
+    row=c.execute('SELECT digest,result FROM project_audits WHERE name=?',(project,)).fetchone()
+    if not row or finding not in {f['id'] for f in json.loads(row[1])['findings']}:raise ValueError('Lead no longer exists; refresh the review.')
+    if data.get('digest') != row[0]:raise ValueError('Project changed; refresh the review before saving notes.')
+    if disposition not in ('investigate','false_positive','duplicate','out_of_scope'):raise ValueError('Choose an available review decision.')
+    if not isinstance(notes,str) or len(notes)>4000:raise ValueError('Use at most 4000 characters of redacted evidence.')
+    if disposition!='investigate' and len(notes.strip())<10:raise ValueError('Explain why this lead should be set aside.')
+    c.execute('INSERT INTO project_research_notes VALUES(?,?,?,?,?,?) ON CONFLICT(project,finding) DO UPDATE SET disposition=excluded.disposition,notes=excluded.notes,digest=excluded.digest,updated=excluded.updated',
+        (project,finding,disposition,notes.strip(),row[0],int(time.time())))
+
+
 def snapshot(c):
-    return [{'name':r['name'],'digest':r['digest'],'checked':r['checked'],'result':json.loads(r['result'])}
-            for r in c.execute('SELECT * FROM project_audits ORDER BY checked DESC,name')]
+    audits=[]
+    for row in c.execute('SELECT * FROM project_audits ORDER BY checked DESC,name'):
+        item={'name':row['name'],'digest':row['digest'],'checked':row['checked'],'result':json.loads(row['result'])}
+        result=item['result']
+        notes={n['finding']:dict(n) for n in c.execute('SELECT * FROM project_research_notes WHERE project=?',(row['name'],))}
+        for f in result['findings']:
+            n=notes.get(f['id'])
+            f['review_note']={'disposition':n['disposition'],'notes':n['notes'],'updated':n['updated'],'stale':n['digest']!=row['digest']} if n else None
+            f['set_aside']=bool(n and n['digest']==row['digest'] and n['disposition']!='investigate')
+            f.setdefault('research',research_plan(f['title']))
+        result['findings'].sort(key=lambda f:(f['set_aside'],-f.get('research_priority',0),f['file'],f['line']))
+        result['active_leads']=sum(not f['set_aside'] for f in result['findings'])
+        audits.append(item)
+    return audits
