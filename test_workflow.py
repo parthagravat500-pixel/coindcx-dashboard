@@ -17,6 +17,8 @@ def program(name='Example',maximum=10000,currency='USD'):
 
 class WorkflowTests(unittest.TestCase):
     def setUp(self):
+        fx = patch("rewards.refresh")
+        fx.start(); self.addCleanup(fx.stop)
         local_mode = patch('connections.LOCAL_ONLY', False)
         local_mode.start(); self.addCleanup(local_mode.stop)
         self.temp=tempfile.TemporaryDirectory();self.old=app.DATA;app.DATA=Path(self.temp.name);app.init();self.now=int(time.time())

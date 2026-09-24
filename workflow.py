@@ -123,7 +123,10 @@ def tick(db):
     with db() as c:
         if not c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]: return
         source = c.execute('SELECT * FROM discovery_sources WHERE due<=? ORDER BY due,id LIMIT 1',(now,)).fetchone()
-        if not source: return
+    if not source:
+        rewards.refresh(db, urllib.request.build_opener(NoRedirect()))
+        return
+    with db() as c:
         source = dict(source)
         # Claim before network request; survives restarts, prevents request storms.
         c.execute('UPDATE discovery_sources SET last_attempt=?,due=?,status=? WHERE id=?',
