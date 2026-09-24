@@ -17,6 +17,7 @@ AUDIENCE = 'scopeguard-private-code-review'
 REPOSITORY = 'parthagravat500-pixel/coindcx-dashboard'
 BRANCH = 'refs/heads/scopeguard-app'
 WORKFLOW = REPOSITORY + '/.github/workflows/scopeguard-ai.yml@' + BRANCH
+SUBJECT = 'repo:parthagravat500-pixel@319591622/coindcx-dashboard@1350819047:ref:' + BRANCH
 
 
 def decode64(value):
@@ -73,7 +74,7 @@ def verify_token(token, jwks, now=None):
     verify_signature((header64+'.'+claims64).encode('ascii'), decode64(signature64), keys[0]['x5c'][0])
     expected = {'iss': ISSUER, 'aud': AUDIENCE, 'repository': REPOSITORY,
                 'repository_id': '1350819047', 'repository_owner_id': '319591622',
-                'ref': BRANCH, 'sub': 'repo:'+REPOSITORY+':ref:'+BRANCH,
+                'ref': BRANCH, 'sub': SUBJECT,
                 'workflow_ref': WORKFLOW, 'event_name': 'push', 'runner_environment': 'github-hosted'}
     if any(claims.get(k) != v for k, v in expected.items()):
         raise ValueError('This workflow is not authorized')

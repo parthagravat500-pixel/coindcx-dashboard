@@ -30,7 +30,7 @@ class IdentityTests(unittest.TestCase):
     def claims(self):
         return dict(iss=identity.ISSUER,aud=identity.AUDIENCE,repository=identity.REPOSITORY,
                     repository_id='1350819047',repository_owner_id='319591622',ref=identity.BRANCH,
-                    sub='repo:'+identity.REPOSITORY+':ref:'+identity.BRANCH,workflow_ref=identity.WORKFLOW,
+                    sub=identity.SUBJECT,workflow_ref=identity.WORKFLOW,
                     event_name='push',runner_environment='github-hosted',iat=1000,nbf=1000,exp=1300,
                     sha='a'*40,workflow_sha='a'*40,run_id='123',run_attempt='1')
 
@@ -46,6 +46,7 @@ class IdentityTests(unittest.TestCase):
 
     def test_wrong_claims_fail(self):
         for key,value in [('repository','other/repo'),('aud','other'),('ref','refs/heads/main'),('sub','other'),
+                          ('sub','repo:'+identity.REPOSITORY+':ref:'+identity.BRANCH),
                           ('workflow_ref','other'),('repository_id','1'),('repository_owner_id','1'),
                           ('runner_environment','self-hosted'),('event_name','pull_request'),('exp',1001),
                           ('iat',True),('workflow_sha','b'*40),('run_id','../../x')]:

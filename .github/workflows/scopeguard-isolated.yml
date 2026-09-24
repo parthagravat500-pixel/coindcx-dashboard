@@ -35,6 +35,9 @@ jobs:
       - name: Build credential-free test image
         run: docker build --pull --file ci/Dockerfile --tag scopeguard-isolated-test .
 
+      - name: Check dashboard DOM wiring and text-only review rendering
+        run: python -c "import tempfile,pathlib,json,app; t=tempfile.TemporaryDirectory(); app.DATA=pathlib.Path(t.name); app.init(); print(json.dumps(app.snapshot()))" | node ci/test_ui.js
+
       - name: Run isolated owned-code tests
         shell: bash
         run: |
