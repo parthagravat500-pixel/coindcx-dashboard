@@ -69,9 +69,9 @@ function money(p){if(p.maximum===null||!p.currency)return 'Reward not shown';ret
 function date(at){return at?new Date(at*1000).toLocaleString():'Not yet';}
 function workflowRows(stage){const w=state.workflow||{programs:[],submissions:[]};const p=w.programs.filter(p=>p.stage!=='dismissed');
  if(stage==='queue')return p.sort((a,b)=>Number(b.stage==='review'&&b.available)-Number(a.stage==='review'&&a.available)).map(p=>({kind:'program',data:p}));
- if(stage==='review')return state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now()).map(t=>({kind:'target',data:t}));
+ if(stage==='review')return state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now()).map(t=>({kind:'target',data:t})).concat(capitalActive()?[{kind:'capital',data:{...state.capital_demo,name:'Capital.com demo watchlist'}}]:[]);
  if(stage==='supervisor')return state.findings.filter(f=>f.feedback==='unreviewed'&&(f.supervisor?.repeat_count||0)<3).map(f=>({kind:'finding',data:f}));
- if(stage==='results')return state.findings.filter(f=>f.feedback!=='unreviewed'||(f.supervisor?.repeat_count||0)>=3).map(f=>({kind:'finding',data:f}));
+ if(stage==='results')return state.findings.filter(f=>f.feedback!=='unreviewed'||(f.supervisor?.repeat_count||0)>=3).map(f=>({kind:'finding',data:f})).concat(state.capital_demo?.checked?[{kind:'capital',data:{...state.capital_demo,name:'Capital.com demo test result'}}]:[]);
  return w.submissions.map(s=>({kind:'submission',data:s}));
 }
 function modal(title){$('detailContent').replaceChildren(el('h2',title));if(!$('detail').open)$('detail').showModal();return $('detailContent');}
@@ -119,6 +119,7 @@ function renderWorklist(){const stage=stages.find(s=>s[0]===currentStage);$('sta
  const card=el('button',undefined,'work-card');card.type='button';const left=el('div'),right=el('div',undefined,'work-meta');
  if(row.kind==='program'){left.append(el('strong',p.name),el('small',p.source+' · '+(!p.available?'Unavailable — do not test':p.stale?'Cached listing — verify':'Permission not checked')));if(p.stage==='review')left.append(el('small','Priority · setup needed before testing'));right.append(el('span',money(p),'reward'));if(p.reward_usd!=null&&p.currency!=='USD')right.append(el('small','≈ '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(p.reward_usd)+' USD'));card.onclick=()=>openProgram(p);}
  else if(row.kind==='target'){left.append(el('strong',p.name),el('small',p.url));right.append(el('span',!p.enabled?'Disabled':p.expires*1000<Date.now()?'Scope expired':state.paused?'Paused':p.state||'Waiting','tag'),el('small','Next check: '+date(p.due)));card.onclick=()=>openTarget(p);}
+ else if(row.kind==='capital'){left.append(el('strong',p.name),el('small','Your demo account · watchlist access only'));right.append(el('span',state.paused?'Paused':p.status,'tag'),el('small',currentStage==='results'?'Last check: '+date(p.checked):'Next check: '+date(p.due)));card.onclick=openCapital;}
  else if(row.kind==='finding'){left.append(el('strong',p.title),el('small',state.targets.find(t=>t.id===p.target)?.name||''));right.append(el('span',(p.supervisor?.repeat_count||0)+'/3 checks','tag'),el('small',p.casework?.label||'Not a confirmed bug'));card.onclick=()=>openFinding(p);}
  else {left.append(el('strong',state.findings.find(f=>f.id===p.finding)?.title||'Submitted report'),el('small',p.receipt));right.append(el('span',p.channel==='email'?'Email · recorded':'Portal · recorded','tag'));card.onclick=()=>openSubmission(p);}
  card.append(left,right,el('span','↗','arrow'));$('worklist').append(card);});$('showMore').hidden=rows.length<=visibleLimit;
@@ -127,17 +128,19 @@ function render(){renderLegacy();const w=state.workflow;if(!w)return;$('stages')
 $('search').oninput=()=>{visibleLimit=40;renderWorklist();};$('currency').onchange=()=>{visibleLimit=40;renderWorklist();};$('showMore').onclick=()=>{visibleLimit+=40;renderWorklist();};$('closeDetail').onclick=()=>$('detail').close();$('detail').addEventListener('click',e=>{if(e.target===$('detail'))$('detail').close();});$('discoveryPause').onclick=()=>change('/api/discovery/pause',{enabled:!state.workflow.enabled}).catch(e=>$('message').textContent=e.message);$('discoveryRefresh').onclick=()=>change('/api/discovery/refresh',{}).catch(e=>$('message').textContent=e.message);
 setInterval(()=>refresh().catch(e=>$('message').textContent=e.message),15000);
 
+function capitalActive(){const c=state.capital_demo;return !!(c?.enabled&&c.expires*1000>Date.now());}
 function renderSimpleStatus(){
+ const cap=state.capital_demo; if(cap){$('capitalSummary').textContent=capitalActive()?(state.paused?'Paused. ':cap.status+'. ')+cap.runs+' runs · next check '+date(cap.due):cap.connected?(cap.expires*1000<=Date.now()?'Permission expired. Reconnect after reviewing current rules.':cap.status):'Ready for setup. Connect your own demo account to test its watchlist login boundary.';$('openCapital').textContent=cap.connected?'View demo test and setup':'Connect demo account';}
  const ac=state.access_checks||[];$("accessSummary").textContent=ac.length?`${ac.filter(p=>p.enabled&&p.expires*1000>Date.now()).length} active tests · ${ac.filter(p=>p.result.reproduced).length} reproduced marker exposures. Tap to see evidence and setup issues.`:"Not connected yet. Needs a permitted private JSON endpoint and synthetic test data you own. Checks whether that data is exposed without login.";
  const v=state.validation;if(v)$("validationSummary").textContent=`${v.completed} completed runs · ${v.status}. Tests your ScopeGuard login and request protection every ${v.interval_minutes} minutes. Other websites are not included.`;
  const bg=state.background;
  if(bg){
   $('backgroundState').textContent=bg.status;
   $('backgroundDetails').textContent=`${bg.pending} items waiting · ${bg.completed} local reviews completed · Last worker check-in: ${date(bg.heartbeat)}. Last reviewed: ${bg.last_task}.`;
-  $('backgroundNext').textContent=state.paused?'Background reviews and website checks are paused.':`Next website check: ${bg.next_website_check?date(bg.next_website_check):'No approved websites available'}. Directory update: ${bg.directory_enabled?date(bg.next_directory_update):'Paused'}. The worker looks for changed data every 10 seconds.`;
+  $('backgroundNext').textContent=state.paused?'Background reviews and website checks are paused.':`Next website check: ${bg.next_website_check?date(bg.next_website_check):capitalActive()?'Demo test: '+date(state.capital_demo.due):'No approved websites available'}. Directory update: ${bg.directory_enabled?date(bg.next_directory_update):'Paused'}. The worker looks for changed data every 10 seconds.`;
  }
 
- const w=state.workflow,active=state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now()).length;
+ const w=state.workflow,active=workflowRows('review').length;
  const running=w.enabled||!state.paused;
  $('masterPause').textContent=running?'Pause everything':'Resume';
  $('status').textContent=w.enabled?(state.paused||!active?'● Finding websites':'● Running'):(!state.paused&&active?'● Checking websites':'● Paused');
@@ -240,3 +243,22 @@ function openAccess(){
  form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/access-check',{target:Number(select.value),marker:marker.value,authorization:auth.value,rules:rules.value,permission:check.checked,own_data:check.checked,read_only:check.checked,private_expected:check.checked});auth.value='';openAccess();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openAccess').onclick=openAccess;
+
+function openCapital(){
+ const root=modal('Connect Capital.com demo');const c=state.capital_demo||{};
+ root.append(el('p','This tests whether your private demo watchlist can be read without logging in. It uses a demo account, creates one empty test watchlist and checks every 15 minutes. Login sessions renew automatically. This covers one access-control test, not the entire bounty program.'));
+ root.append(safeLink('Read Capital.com bounty rules ↗','https://app.intigriti.com/programs/capitalcom/capitalcom/detail'),el('br'),safeLink('Open Capital.com demo account setup ↗','https://capital.com/'),el('br'),safeLink('Official API setup instructions ↗','https://open-api.capital.com/'));
+ root.append(el('h3','One-time account setup'));
+ const steps=el('ol');['Create your own Capital.com demo account if it is available to you. Use your real country and account details. No deposit is needed for this connector.','Enable two-factor authentication in Capital.com.','In Settings → API integrations, generate a key and its separate API password. Enter them below; do not share them in chat.','Join the Capital.com program through Intigriti for reporting. Your HackerOne connection does not submit to Intigriti.'].forEach(t=>steps.append(el('li',t)));root.append(steps);
+ root.append(el('p','The connector contacts only the demo server. Its allowed requests are login, reading watchlists and creating an empty test watchlist. It cannot place orders, move funds or change balances. Review permission again after seven days.','muted'));
+ if(c.connected){facts(root,[['Status',c.expires*1000<=Date.now()?'Permission expired':state.paused&&c.enabled?'Paused':c.status],['Runs',c.runs],['Last checked',date(c.checked)],['Next check',c.enabled?date(c.due):'Stopped'],['Permission expires',date(c.expires)],['Reporting','Manual Intigriti submission only; no report sent']]);
+ for(const e of c.result?.evidence||[])root.append(el('p',e.step+': HTTP '+e.status+' · synthetic marker '+(e.marker_present?'present':'absent')));
+ if(c.result?.reproduced)root.append(el('p','The test marker appeared without login twice. Testing stopped. This still requires manual review of intended privacy and impact; it is not a confirmed critical bug.'));
+ root.append(button('Disconnect and remove credentials',async()=>{await change('/api/capital-demo/disconnect',{});openCapital();}));}
+ const form=el('form'),inputs={};
+ [['identifier','Demo account email','email'],['api_key','Capital.com API key','password'],['password','Separate API key password','password']].forEach(([key,title,type])=>{const label=el('label',title),input=el('input');input.type=type;input.required=true;input.autocomplete='off';input.maxLength=512;label.append(input);form.append(label);inputs[key]=input;});
+ const label=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;label.append(check,document.createTextNode('This demo account belongs to me. I have checked current program rules and am permitted to test this demo API, create one empty synthetic watchlist and compare logged-in and anonymous access at this rate.'));
+ const note=el('p');note.setAttribute('role','status');const submit=el('button','Connect demo test');submit.type='submit';form.append(label,submit,note);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/capital-demo/connect',{...Object.fromEntries(Object.entries(inputs).map(([k,v])=>[k,v.value])),permission:check.checked,demo_only:check.checked,own_account:check.checked,create_watchlist:check.checked});Object.values(inputs).forEach(i=>i.value='');openCapital();}catch(err){note.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+}
+$('openCapital').onclick=openCapital;
