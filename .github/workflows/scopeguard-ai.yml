@@ -42,12 +42,12 @@ jobs:
           set -euo pipefail
           scopeguard_job_dir=$(mktemp -d "$RUNNER_TEMP/scopeguard-ai.XXXXXX")
           chmod 755 "$scopeguard_job_dir"
+          printf 'SCOPEGUARD_JOB_DIR=%s\n' "$scopeguard_job_dir" >> "$GITHUB_ENV"
           mkdir "$scopeguard_job_dir/input" "$scopeguard_job_dir/output" "$scopeguard_job_dir/build"
-          sudo chown 65532:65532 "$scopeguard_job_dir/output"
           chmod 700 "$scopeguard_job_dir/output"
+          sudo chown 65532:65532 "$scopeguard_job_dir/output"
           python3 ci/ai_bridge.py prepare "$scopeguard_job_dir/input/excerpts.json"
           cp ci/ai_review.py ci/isolated_checks.py "$scopeguard_job_dir/build/"
-          printf 'SCOPEGUARD_JOB_DIR=%s\n' "$scopeguard_job_dir" >> "$GITHUB_ENV"
 
       - name: Download and verify official CPU runner and model
         if: steps.lease.outputs.accepted == 'true'
@@ -84,8 +84,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${SCOPEGUARD_JOB_DIR:-}" ]; then
-            sudo chown -R "$(id -u):$(id -g)" "$SCOPEGUARD_JOB_DIR/output"
+            if [ -d "$SCOPEGUARD_JOB_DIR/output" ]; then
+              sudo chown -R "$(id -u):$(id -g)" "$SCOPEGUARD_JOB_DIR/output"
+            fi
             python3 ci/ai_bridge.py result "$SCOPEGUARD_JOB_DIR/output/result.json"
+          else
+            python3 ci/ai_bridge.py result /nonexistent-scopeguard-result
           fi
 
       - name: Clean up this job's container
