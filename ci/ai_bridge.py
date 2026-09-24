@@ -4,12 +4,14 @@ This host-side bridge is not copied into the analysis container. It sends result
 only to the fixed owner-controlled ScopeGuard receiver; redirects are forbidden.
 """
 import ast
+import base64
 import json
 import os
 from pathlib import Path
 import sys
 import urllib.parse
 import urllib.request
+import urllib.error
 
 RECEIVER = 'https://scopeguard-research.onrender.com/api/ci-review'
 AUDIENCE = 'scopeguard-private-code-review'
@@ -23,10 +25,14 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 def request_json(url, headers=None, data=None):
     req = urllib.request.Request(url,headers=headers or {},data=data)
-    with urllib.request.build_opener(NoRedirect).open(req,timeout=30) as response:
-        raw=response.read(64001)
-        if len(raw)>64000:raise ValueError('Response too large')
-        return json.loads(raw)
+    try:
+        with urllib.request.build_opener(NoRedirect).open(req,timeout=30) as response:
+            raw=response.read(64001)
+            if len(raw)>64000:raise ValueError('Response too large')
+            return json.loads(raw)
+    except urllib.error.HTTPError as error:
+        print(('Private receiver' if url==RECEIVER else 'GitHub identity endpoint')+' returned HTTP '+str(error.code)+'.')
+        raise
 
 
 def workload_token():
@@ -40,6 +46,11 @@ def workload_token():
     result=request_json(url,{'Authorization':'Bearer '+os.environ['ACTIONS_ID_TOKEN_REQUEST_TOKEN']})
     token=result.get('value','')
     if not isinstance(token,str) or not 100<len(token)<16000:raise ValueError('Invalid identity response')
+    # These are public workflow metadata only, NOT the JWT or credentials.
+    # Server signature validation remains the sole authority for accepting it.
+    body=token.split('.')[1]
+    claims=json.loads(base64.urlsafe_b64decode(body+'='*(-len(body)%4)))
+    print('Workload metadata: '+json.dumps({k:claims.get(k) for k in ['iss','aud','repository','repository_id','repository_owner_id','ref','sub','workflow_ref','workflow_sha','sha','event_name','runner_environment']}))
     return token
 
 
@@ -84,10 +95,10 @@ def main():
             print('Private result receipt '+('accepted.' if accepted else 'not accepted; check dashboard settings.'))
             return 0 if accepted else 1
         raise ValueError('Unknown stage')
-    except Exception:
+    except Exception as error:
         # Exceptions may include an identity URL, bearer token or model text.
         # Never print them into a public repository's Actions log.
-        print('Private bridge failed. No credentials or analysis printed. Check dashboard/runner status.')
+        print('Private bridge failed ('+type(error).__name__+'). No credentials or analysis printed. Check dashboard/runner status.')
         return 1
 
 
