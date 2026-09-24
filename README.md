@@ -16,6 +16,25 @@ Pause/disable prevents new receipts. The model cannot mark a bug confirmed or
 submit a report. Do not enable this on forks without reviewing and replacing the
 fixed identity allowlist.
 
+The private AI workflow runs only after relevant ScopeGuard branch pushes, not
+on a timer or on the unrelated trading branch. It downloads the official
+Apache-2.0 Qwen2.5-Coder-7B-Instruct Q4_K_M model and a pinned llama.cpp CPU release,
+verifying both SHA-256 digests. No model is downloaded until the private server
+accepts a review lease. Inference runs without external network, credentials,
+capabilities or writable source, as a non-root user with 2 CPU, 10 GiB memory,
+128-process and 1,000-second limits inside a disposable hosted runner.
+
+Two tiny synthetic cases must be classified correctly before reviewing the
+request handler and workload-identity verifier. This is a smoke test, NOT an
+expert benchmark. Coverage is two excerpts, not a full-repository audit. Model
+text is untrusted, displayed as text only, never executed, and never a confirmed
+finding. Analysis is posted privately; it is not uploaded as a public Actions
+artifact or printed in logs. Runner logs expose only status and counts. Existing
+public source stays public. No customer tokens or application database are sent
+to the runner. Disable reviews from the dashboard; an already running container
+may finish, but a paused/disabled receiver rejects its receipt. Failed jobs have
+no automatic retry; stalled leases expire after thirty minutes.
+
 ## Isolated regression workflow
 
 `ScopeGuard isolated tests` runs on relevant pushes to `scopeguard-app`, separately
