@@ -1,3 +1,11 @@
+## Evidence review and report workspace
+
+Findings now have rule-specific investigation priorities, benign explanations, missing-evidence prompts and contextual remediation guidance. Duplicate/ineligible/false-positive feedback lowers review priority. Local duplicate checks do not cover private platform reports.
+
+Open a finding to save up to eight short evidence sections. Notes are unverified user assertions, rendered as text, and included in the downloadable draft. They never enable submissions, change testing permissions or trigger network requests. Current observation checks remain HEAD-only; authenticated authorization testing and exploit validation are not implemented.
+
+Guidance references: https://docs.hackerone.com/en/articles/8475116-quality-reports and https://wstg.owasp.org/v4.2/5-Reporting/.
+
 ## Local review mode (current deployment)
 
 Paid model API requests are disabled, including when an old key or enabled flags remain in the environment. Startup removes the saved OpenAI connection. The connection endpoint rejects paid AI setup. Existing HackerOne settings are retained.

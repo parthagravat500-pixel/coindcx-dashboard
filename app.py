@@ -13,6 +13,7 @@ from pathlib import Path
 from engine import validate_url, observe, findings
 import supervisor
 import workflow
+import casework
 import connections
 import reporting
 
@@ -50,6 +51,7 @@ def init():
         feedback TEXT DEFAULT 'unreviewed');
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER, message TEXT);
         ''')
+        casework.init(c)
         supervisor.init(c)
         workflow.init(c)
         reporting.init(c)
@@ -169,8 +171,9 @@ def snapshot():
             f['supervisor'] = supervisor.review(c, f, target)
             ai = c.execute('SELECT status,note FROM supervisor_ai WHERE finding=? ORDER BY at DESC LIMIT 1', (f['id'],)).fetchone()
             f['supervisor']['ai_review'] = dict(ai) if ai else None
+            f['casework'] = casework.assess(c, f, f['supervisor'])
         return {'paused': bool(c.execute('SELECT paused FROM settings').fetchone()[0]), 'targets': targets,
-                'findings': sorted(items, key=lambda f: f['review_priority'], reverse=True),
+                'findings': sorted(items, key=lambda f: (f['casework']['priority'], f['review_priority']), reverse=True),
                 'supervisor': supervisor.summary(),
                 'workflow': workflow.snapshot(c),
                 'connection': connections.status(),
@@ -196,6 +199,8 @@ def mutate(path, data):
     with LOCK, db() as c:
         if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
+        elif path == '/api/evidence':
+            casework.save(c, data)
         elif path == '/api/all-pause':
             if not isinstance(data.get('paused'), bool):
                 raise ValueError('Choose pause or resume')
@@ -286,6 +291,7 @@ class Handler(BaseHTTPRequestHandler):
                 with db() as c:
                     target = dict(c.execute('SELECT * FROM targets WHERE id=?', (f['target'],)).fetchone())
                     review = supervisor.review(c, dict(f), target)
+                    case = casework.assess(c, dict(f), review)
                 report = '\n'.join(['# DRAFT — manual review required', '', f['title'], 'URL: ' + f['url'], 'Policy: ' + f['policy'],
                     'Recorded scope/rules: ' + f['rules'], 'Status: ' + f['feedback'], 'Severity: Informational; no impact established',
                     '', '## Reproduction', 'Only if current authorization permits: send HEAD to the exact URL above.',
@@ -296,6 +302,7 @@ class Handler(BaseHTTPRequestHandler):
                     'Reporting channel: ' + review['channel']['name'] + ' ' + review['channel']['url'],
                     'Not submitted. AI or repeated headers cannot establish security impact.', '', '## Before submission',
                     'Confirm current scope and eligibility. Establish reproducible security impact. Check duplicates. Add remediation. Submit privately through the program channel.'])
+                report += casework.report_section(case)
                 return self.reply(200, report, 'text/plain')
         self.reply(404, '{"error":"Not found"}')
 
