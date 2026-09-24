@@ -1,5 +1,6 @@
 # Dedicated test image: never copy a deployment database, credentials, or .git.
 FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY *.py index.html ui.js /app/
 COPY ci/isolated_checks.py /app/ci/isolated_checks.py

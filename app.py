@@ -25,6 +25,7 @@ import workqueue
 import casework
 import connections
 import reporting
+import research
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -73,6 +74,7 @@ def init():
         workflow.init(c)
         reporting.init(c)
         workqueue.init(c)
+        research.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -245,6 +247,15 @@ def source_watch_worker():
         WAKE.wait(15)
 
 
+def research_worker():
+    while True:
+        try:
+            research.tick(db)
+        except Exception:
+            pass
+        WAKE.wait(60)
+
+
 def snapshot():
     with db() as c:
         targets = [dict(r) for r in c.execute('SELECT * FROM targets')]
@@ -271,6 +282,7 @@ def snapshot():
                 'source_audits': sourceaudit.snapshot(c),
                 'project_audits': projectaudit.snapshot(c),
                 'source_watch': sourcewatch.snapshot(c),
+                'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
                 'validation': validation.snapshot(c),
                 'access_checks': accesscheck.snapshot(c),
@@ -459,6 +471,24 @@ class Handler(BaseHTTPRequestHandler):
         self.reply(404, '{"error":"Not found"}')
 
     def do_POST(self):
+        if self.path == '/api/ci-review':
+            if not research.admit_request():
+                return self.reply(429, '{"error":"Too many receipt attempts"}')
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 1 <= size <= 32000:
+                    return self.reply(400, '{"error":"Invalid receipt size"}')
+                auth = self.headers.get('Authorization','')
+                if not auth.startswith('Bearer '):
+                    return self.reply(401, '{"error":"Workload identity required"}')
+                claims = research.claims_for(auth[7:])
+                self.connection.settimeout(10)
+                payload = json.loads(self.rfile.read(size))
+                with LOCK, db() as c:
+                    result = research.receive(c, claims, payload)
+                return self.reply(200, json.dumps(result))
+            except Exception:
+                return self.reply(403, '{"error":"Receipt could not be verified"}')
         if not self.authenticate():
             return
         if not hmac.compare_digest(self.headers.get('X-CSRF-Token', ''), CSRF):
@@ -468,7 +498,12 @@ class Handler(BaseHTTPRequestHandler):
             limit=3000000 if self.path in ('/api/dependencies','/api/project-audit') else 800000 if self.path == '/api/source-audit' else 16000
             if size < 1 or size > limit:
                 raise ValueError('Invalid request size')
-            mutate(self.path, json.loads(self.rfile.read(size)))
+            payload = json.loads(self.rfile.read(size))
+            if self.path == '/api/research-ai':
+                with LOCK, db() as c:
+                    research.configure(c, payload)
+            else:
+                mutate(self.path, payload)
             self.reply(200, '{"ok":true}')
         except (ValueError, KeyError, TypeError, sqlite3.IntegrityError) as e:
             self.reply(400, json.dumps({'error': str(e)}))
@@ -479,6 +514,7 @@ if __name__ == '__main__':
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
     connections.load(DATA)
     init()
+    threading.Thread(target=research_worker, daemon=True).start()
     threading.Thread(target=gitlab_worker, daemon=True).start()
     threading.Thread(target=capital_worker, daemon=True).start()
     threading.Thread(target=access_worker, daemon=True).start()

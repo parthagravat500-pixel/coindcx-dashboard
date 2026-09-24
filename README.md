@@ -1,3 +1,21 @@
+## Private research dashboard
+
+The dashboard distinguishes local rules, isolated regression CI, experimental
+local-model reviews, and confirmed findings. GitHub status is polled every five
+minutes and marked stale after fifteen. Test results are tied to a commit; a
+different deployed commit is explicitly identified. Passing regressions does
+not establish a bounty finding.
+
+Private AI review is opt-in through the authenticated dashboard. The receipt
+endpoint accepts only signed, short-lived GitHub OIDC identities for this exact
+repository, owner, branch, push event and AI workflow. GitHub signing certificates
+are retrieved only from its fixed HTTPS endpoint and signatures are verified by
+system OpenSSL. No dashboard password or GitLab token is copied into CI. Receipts
+are bounded, rate-limited, revision-bound and restricted to one active run.
+Pause/disable prevents new receipts. The model cannot mark a bug confirmed or
+submit a report. Do not enable this on forks without reviewing and replacing the
+fixed identity allowlist.
+
 ## Isolated regression workflow
 
 `ScopeGuard isolated tests` runs on relevant pushes to `scopeguard-app`, separately

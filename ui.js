@@ -131,7 +131,32 @@ setInterval(()=>refresh().catch(e=>$('message').textContent=e.message),15000);
 
 function capitalActive(){const c=state.capital_demo;return !!(c?.enabled&&c.expires*1000>Date.now());}
 function gitlabActive(){const g=state.gitlab;return !!(g?.configured&&g.enabled&&g.expires*1000>Date.now());}
+function renderResearchStatus(){
+ const r=state.research;
+ if(!r){$('capabilityStatus').textContent='Research status is not available from this server yet.';return;}
+ const runtime=r.runs.find(x=>x.kind==='runtime'),ai=r.ai_reviews[0];
+ const box=$('capabilityStatus');box.replaceChildren();
+ facts(box,[['Local rules','Available · not AI'],['Isolated runtime tests',runtime?(runtime.conclusion||runtime.status):'No run received'],['Private local-model review',!r.ai_enabled?'Disabled':ai?ai.state:'Enabled · awaiting a run'],['Autonomous bounty hunting','Not enabled'],['Confirmed payable bugs','None established by these checks']]);
+ $('runtimeStatus').textContent=runtime?('Latest run: '+(runtime.conclusion||runtime.status)+(r.fresh?'':' · status may be stale')):'Waiting for a verified GitHub run status.';
+ $('runtimeDetails').textContent=runtime?'Owned-app regression tests in a network-isolated, read-only container. Tested revision '+runtime.revision.slice(0,8)+'. '+(runtime.revision===r.deployed_revision?'Matches the deployed revision.':'Does not match the deployed revision; do not assume deployment coverage.')+' Last status sync: '+date(r.checked):r.status;
+ $('runtimeLink').replaceChildren(...(runtime?[safeLink('Open isolated test run ↗',runtime.url)]:[]));
+ $('privateAIStatus').textContent=state.paused?'Paused':!r.ai_enabled?'Disabled':!r.identity_ready?'Waiting for secure runner connection':ai?(ai.state==='reviewed'?'Review received · unverified':ai.state==='running'?'Local model review running':ai.state.replaceAll('_',' ')):'Enabled · awaiting first review';
+ $('privateAIDetails').textContent='Experimental local model, not expert AI. '+r.trigger+'. Results stay in this authenticated dashboard. '+r.cost+'.';
+}
+function openPrivateAI(){
+ const r=state.research,root=modal('Private AI code review');if(!r){root.append(el('p','Research status is unavailable.'));return;}
+ root.append(el('p',r.scope),el('p','A small local model reviews at most two code excerpts after relevant pushes. It cannot guarantee a bug or a bounty. It never executes generated code or submits reports.','muted'));
+ root.append(button(r.ai_enabled?'Disable private AI reviews':'Enable private AI reviews',async()=>{await change('/api/research-ai',{enabled:!r.ai_enabled});openPrivateAI();}));
+ if(!r.ai_reviews.length)root.append(el('p','No model review has been received. Enabling this does not claim that AI is already running.'));
+ for(const review of r.ai_reviews){const item=el('details');item.open=review===r.ai_reviews[0];item.append(el('summary',review.state+' · '+review.revision.slice(0,8)));
+ facts(item,[['Started',date(review.started)],['Updated',date(review.updated)],['Source revision',review.revision],['Confirmed bugs',0]]);
+ if(review.result.model){facts(item,[['Model',review.result.model],['Basic synthetic calibration',review.result.calibration_passed?'Passed (not an expert benchmark)':'Not passed']]);
+ item.append(el('p',review.result.limitation,'muted'));for(const part of review.result.reviews||[]){item.append(el('h3',part.file+':'+part.line+' · '+part.status),el('p',part.analysis));}}
+ item.append(safeLink('Open runner status ↗',review.url));root.append(item);}
+}
+$('openPrivateAI').onclick=openPrivateAI;
 function renderSimpleStatus(){
+ renderResearchStatus();
  const sourceWatch=state.source_watch;
  if(sourceWatch){const active=sourceWatch.watches.filter(w=>w.enabled&&w.expires*1000>Date.now());
  $('sourceWatchSummary').textContent=(state.paused?'Paused · ':active.length?'Monitoring · ':'Not monitoring · ')+active.length+' approved repositories · '+sourceWatch.watches.reduce((n,w)=>n+w.reviews,0)+' commit reviews completed';
@@ -159,7 +184,7 @@ function renderSimpleStatus(){
  if(bg&&!state.paused)$('status').textContent=state.targets.some(t=>t.state==='Checking')?'● Checking website':!bg.healthy?'● Check worker':bg.pending?'● Reviews queued':'● Waiting · online';
  $('plainSummary').textContent=running?`${w.programs.filter(p=>p.stage!=='dismissed').length} companies found. ${active} websites ${state.paused?'paused':'have scheduled checks'}.`:'Everything is paused. Your saved progress is safe.';
  $('nextTitle').textContent='Local reviews · no API fees';
- $('nextText').textContent='Every listed company and finding is assessed with rules. Basic checks cannot prove a bounty-worthy bug. Hosting is billed separately.';
+ $('nextText').textContent='Company and finding reviews use local rules. Experimental AI source reviews have separate status below. Neither proves a bounty-worthy bug. Existing hosting is billed separately.';
  $('connectAI').textContent='Review settings';
  $('openSetup').textContent='Setup status';
 }
