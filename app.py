@@ -240,6 +240,24 @@ def mutate(path, data):
             c.execute('INSERT INTO targets(name,url,policy,rules,expires,interval,cors) VALUES (?,?,?,?,?,?,?)',
                       (data['name'][:100], data['url'], data['policy'], data['rules'][:8000], expires, interval, int(bool(data.get('cors')))))
             log(c, 'Added exact URL with authorization attestation: ' + data['url'])
+        elif path == '/api/target-schedule':
+            if data.get('reviewed') is not True:
+                raise ValueError('Review the program automation policy before changing frequency.')
+            interval = data.get('interval')
+            if type(interval) is not int or not 300 <= interval <= 604800:
+                raise ValueError('Check interval must be 5 minutes to 168 hours.')
+            rules = data.get('rules', '')
+            if not isinstance(rules, str) or not 30 <= len(rules.strip()) <= 8000:
+                raise ValueError('Record the reviewed scope and rate limits.')
+            target = c.execute('SELECT * FROM targets WHERE id=?', (int(data['id']),)).fetchone()
+            if not target or not target['enabled'] or target['expires'] <= time.time():
+                raise ValueError('Only active targets with current permission can be rescheduled.')
+            delay = data.get('start_delay', 0)
+            if type(delay) is not int or not 0 <= delay <= interval:
+                raise ValueError('Invalid stagger delay')
+            c.execute('UPDATE targets SET interval=?,due=?,rules=? WHERE id=?',
+                      (interval, int(time.time()) + delay, rules.strip(), target['id']))
+            log(c, 'Schedule updated for ' + target['name'] + ': every ' + str(interval // 60) + ' minutes; scope unchanged.')
         elif path == '/api/target-state':
             c.execute('UPDATE targets SET enabled=? WHERE id=?', (int(bool(data['enabled'])), int(data['id'])))
             log(c, 'Target ' + str(int(data['id'])) + ' enabled=' + str(bool(data['enabled'])))

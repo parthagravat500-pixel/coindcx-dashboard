@@ -72,6 +72,20 @@ class AppTests(unittest.TestCase):
     def resume(self):
         app.mutate('/api/pause',{'paused':False})
 
+    def test_schedule_changes_require_active_permission_and_preserve_scope(self):
+        self.add()
+        data={'id':1,'interval':300,'reviewed':True,'rules':'Reviewed fixture permission for low-volume exact URL HEAD only.','start_delay':60}
+        for change in [{'reviewed':False},{'interval':1},{'interval':True},{'start_delay':301}]:
+            with self.assertRaises(ValueError):app.mutate('/api/target-schedule',{**data,**change})
+        app.mutate('/api/target-schedule',data)
+        t=app.snapshot()['targets'][0]
+        self.assertEqual(t['interval'],300);self.assertEqual(t['url'],self.target['url'])
+        self.assertEqual(t['expires'],self.target['expires']);self.assertFalse(t['cors'])
+        app.mutate('/api/target-state',{'id':1,'enabled':False})
+        with self.assertRaises(ValueError):app.mutate('/api/target-schedule',data)
+        with app.db() as c:c.execute('UPDATE targets SET enabled=1,expires=0 WHERE id=1')
+        with self.assertRaises(ValueError):app.mutate('/api/target-schedule',data)
+
     def test_authorization_required(self):
         for key in ['authorized','automation_allowed']:
             with self.assertRaises(ValueError):
