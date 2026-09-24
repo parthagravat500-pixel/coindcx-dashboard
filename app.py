@@ -13,6 +13,7 @@ from pathlib import Path
 from engine import validate_url, observe, findings
 import supervisor
 import workflow
+import connections
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -160,13 +161,27 @@ def snapshot():
                 'findings': sorted(items, key=lambda f: f['review_priority'], reverse=True),
                 'supervisor': supervisor.summary(),
                 'workflow': workflow.snapshot(c),
+                'connection': connections.status(),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
 
 def mutate(path, data):
+    if path in ('/api/ai/connect', '/api/ai/disconnect'):
+        with LOCK:
+            if path == '/api/ai/connect':
+                connections.connect(DATA, data)
+            else:
+                connections.disconnect(DATA)
+        return
     with LOCK, db() as c:
         if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
+        elif path == '/api/all-pause':
+            if not isinstance(data.get('paused'), bool):
+                raise ValueError('Choose pause or resume')
+            c.execute('UPDATE settings SET paused=?', (int(data['paused']),))
+            c.execute('UPDATE discovery_settings SET enabled=?', (int(not data['paused']),))
+            log(c, 'All workers paused' if data['paused'] else 'Discovery and approved checks resumed')
         elif path == '/api/pause':
             c.execute('UPDATE settings SET paused=?', (int(bool(data['paused'])),))
             log(c, 'Scheduler paused' if data['paused'] else 'Scheduler resumed')
@@ -214,6 +229,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('Content-Length', str(len(raw)))
         self.send_header('Cache-Control', 'no-store')
         self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
         self.end_headers()
         self.wfile.write(raw)
@@ -281,6 +297,7 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == '__main__':
     if len(TOKEN) < 24:
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
+    connections.load(DATA)
     init()
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()

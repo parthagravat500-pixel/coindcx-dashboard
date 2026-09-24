@@ -101,3 +101,15 @@ Scope verification and reproducible impact still require actual evidence. This v
 Automatic email/portal delivery is not connected. The submission view records an actual report reference supplied by an operator, labelled `user_recorded`; this neither sends a report nor independently verifies company receipt or payout. Feedback such as "accepted" never becomes proof of delivery.
 
 Tests: `python -m unittest -v` (including discovery isolation, changed/removed listings, mixed-currency ranking, AI limits, and receipt requirements).
+
+## Version 2.1: simple mode and private AI setup
+
+The phone dashboard shows five plain-language stages without horizontal scrolling: Found websites, Checking, Double-checking, Results and Sent reports. Checking counts only enabled URLs whose authorization has not expired. The single Pause everything / Resume control updates the scheduler and discovery settings together in one database transaction. Technical controls remain under Settings & details.
+
+Finish setup opens a private OpenAI connection form. It requires explicit acknowledgement of separate paid API usage. It verifies access using GET /v1/models/gpt-4.1-mini (no generation), then stores the key only at DATA_DIR/ai-connection.json, atomically with mode 0600. Credentials are never returned by /api/state or stored in source. Both optional advisers then use gpt-4.1-mini, retaining their existing persistent daily attempt caps (3 finding reviews plus 1 program review). No paid call is made without configuration. The user still needs an API account, suitable permissions and billing; model access alone does not prove billing availability.
+
+Disconnect removes the stored key and disables both advisers across restarts. Existing deployment-environment configuration is preserved when no private connection file exists. Failed verification leaves an existing connection unchanged.
+
+Official references checked: https://developers.openai.com/api/docs/models/gpt-4.1-mini and https://developers.openai.com/api/reference/resources/models/methods/retrieve .
+
+No confirmed vulnerability exists in the current header-only lead. Report delivery remains pending: GitHub requires HackerOne and RoboForm requires its support portal. A connection or AI opinion cannot replace reproducible security impact or program eligibility. No newly discovered program is authorized by this update.

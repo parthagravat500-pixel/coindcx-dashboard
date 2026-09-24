@@ -10,4 +10,6 @@ The operator authorized scheduled checks in the conversation. Preserve the saved
 
 Version 2 adds passive discovery (two public directory files every six hours), currency-aware reward sorting, and five dashboard stages. It does not authorize new scan targets. Optional intake and supervisor AI remain off without explicit configuration. Automatic report delivery is not connected. No credentials or production database are included in the source.
 
-Local tests passed (25). Production deployment and post-deployment verification must be checked in Render for the exact commit; this source file does not assert a successful rollout.
+Local tests passed (30). Production deployment and post-deployment verification must be checked in Render for the exact commit; this source file does not assert a successful rollout.
+
+Version 2.1 adds the simplified mobile layout, one global pause control, and a private AI connection form. No API key has been supplied or enabled by this update. Automatic submissions remain unconnected and no confirmed vulnerability is ready to send.
