@@ -237,6 +237,42 @@ confirmed or enable submission. Disappearing paths are labeled "no longer
 observed", never "fixed", because analysis coverage is incomplete.
 
 The installed application is reviewed after its source changes; uploaded projects
-require a new upload. This does not monitor third-party repositories, execute
-uploaded code, run an LLM, or validate exploits. Ruby, JavaScript, authorization
-logic and concurrency analysis remain outside this analyzer's coverage.
+require a new upload unless separately connected to automatic source research.
+This does not execute uploaded code, run an LLM, or validate exploits. Ruby,
+JavaScript, authorization logic and concurrency analysis remain outside this
+analyzer's coverage.
+
+### Automatic source research
+
+The persistent source-watch worker supports up to three explicitly approved public
+GitHub repositories. Every 15 minutes it resolves the configured branch to a
+commit, downloads a bounded ZIP for that exact commit when needed, and runs the
+existing Python analyzer. It strips the revision-dependent archive root so paths
+remain stable across comparisons. An optional source subdirectory filters the
+Python files, but archive-wide size and entry limits still apply. Changes to
+other languages are not analyzed. Unchanged commits are not downloaded again;
+new commits with identical Python content reuse the previous analysis. An engine
+version change causes reanalysis.
+
+Only GET requests to fixed api.github.com and codeload.github.com endpoints are
+used, with public-IP pinning and TLS hostname validation. No cookies, passwords,
+tokens, redirects, repository commands, dependency installs, or uploaded-code
+execution are allowed. Requests honor owner pause, permission expiry, and
+configuration generation changes. An already-dispatched request may finish.
+Permission must be renewed within seven days. A rate-limit response backs off
+all source watches, repeated transient failures stop the watch, and permanent
+errors require operator review. Prior evidence is preserved on failure.
+
+Jobs persist their next due time before network work; after process restart a
+claimed job is retried when due. A worker check-in, last successful commit,
+review count, and the latest 20 of up to 100 retained activity records are
+visible. Background processing shares the existing single-instance service and
+SQLite disk; no extra paid worker or AI API is provisioned. This is automated
+source review, not permission to probe GitHub or the repository's deployed app.
+The analyzer and all its static-evidence limitations still apply. A completed
+review is not a validated vulnerability or a promise of a bounty.
+
+References for source ingestion:
+- https://docs.github.com/en/rest/git/refs#get-a-reference
+- https://docs.github.com/en/repositories/working-with-files/using-files/downloading-source-code-archives
+- https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api

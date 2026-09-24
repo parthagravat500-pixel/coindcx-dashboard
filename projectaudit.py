@@ -20,7 +20,7 @@ LIMITATION = ('Static review of Python only: follows direct calls to project fun
 SKIP = {'.git', '.venv', 'venv', 'node_modules', '__pycache__'}
 
 
-def archive(encoded):
+def archive(encoded, prefix=''):
     if not isinstance(encoded, str) or len(encoded) > 2800000:
         raise ValueError('Choose a ZIP up to 2 MB.')
     try:
@@ -40,16 +40,18 @@ def archive(encoded):
                     stat.S_ISLNK(item.external_attr >> 16) or item.flag_bits & 1):
                 raise ValueError('ZIP contains an unsafe path, symbolic link or encrypted file.')
             if item.is_dir(): continue
+            if prefix and not item.filename.startswith(prefix):
+                skipped += 1; continue
             if p.suffix != '.py' or any(v in SKIP for v in p.parts):
                 skipped += 1; continue
-            if item.filename in files: raise ValueError('ZIP has duplicate Python paths.')
+            if item.filename[len(prefix):] in files: raise ValueError('ZIP has duplicate Python paths.')
             total += item.file_size
             if item.file_size > MAX_FILE or total > MAX_TOTAL or len(files) >= MAX_FILES:
                 raise ValueError('Use at most 80 Python files, 128 KB each and 2 MB total expanded size.')
             try:
                 with z.open(item) as f: content = f.read(MAX_FILE + 1)
                 if len(content) > MAX_FILE: raise ValueError()
-                files[item.filename] = content.decode('utf-8-sig')
+                files[item.filename[len(prefix):]] = content.decode('utf-8-sig')
             except (UnicodeError, ValueError, RuntimeError, zipfile.BadZipFile):
                 raise ValueError('Python files must be valid UTF-8 and within the size limits.') from None
     if not files: raise ValueError('No Python files found. Ruby and JavaScript are not supported by this analyzer.')

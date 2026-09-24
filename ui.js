@@ -132,6 +132,11 @@ setInterval(()=>refresh().catch(e=>$('message').textContent=e.message),15000);
 function capitalActive(){const c=state.capital_demo;return !!(c?.enabled&&c.expires*1000>Date.now());}
 function gitlabActive(){const g=state.gitlab;return !!(g?.configured&&g.enabled&&g.expires*1000>Date.now());}
 function renderSimpleStatus(){
+ const sourceWatch=state.source_watch;
+ if(sourceWatch){const active=sourceWatch.watches.filter(w=>w.enabled&&w.expires*1000>Date.now());
+ $('sourceWatchSummary').textContent=(state.paused?'Paused · ':active.length?'Monitoring · ':'Not monitoring · ')+active.length+' approved repositories · '+sourceWatch.watches.reduce((n,w)=>n+w.reviews,0)+' commit reviews completed';
+ $('sourceWatchHealth').textContent='Worker check-in: '+date(sourceWatch.heartbeat)+' · New commits checked every 15 minutes. Unchanged commits are not rescanned. Source analysis only—not automated exploitation.';
+ }
  const g=state.gitlab||{};
  $('gitlabSummary').textContent=g.configured?((g.expires*1000<=Date.now()?'Permission expired':state.paused&&g.enabled?'Paused':g.status)+' · '+g.runs+' completed checks · '+(gitlabActive()&&!state.paused?'Next check: '+date(g.due):'Open setup for details.')):'Your private project is not connected. Add a read-only token and synthetic test text. No repository files are needed.';
  $('openGitlab').textContent=g.configured?'View GitLab test and setup':'Finish GitLab setup';
@@ -297,6 +302,7 @@ function openProjectAudits(){
  if(!audits.length)root.append(el('p','No project analysis has completed yet.'));
  for(const a of audits){const box=el('details');box.open=true;const r=a.result,c=r.changes;
  box.append(el('summary',a.name+' · '+(r.active_leads??r.total_findings)+' active leads · 0 confirmed bugs'),el('small','Reviewed '+date(a.checked)),el('p',r.files_analyzed+' Python files · '+r.functions_analyzed+' top-level functions'));
+ if(r.source_revision)box.append(safeLink('Source commit '+r.source_revision.commit.slice(0,12)+' ↗',r.source_revision.url));
  if(c?.has_baseline){box.append(el('p',c.new_leads+' new leads · '+c.changed_files.length+' changed files · '+c.added_files.length+' added · '+c.removed_files.length+' removed'));
  const changes=el('details');changes.append(el('summary','Changes since '+date(c.previous_checked)));
  for(const [title,paths] of [['Changed',c.changed_files],['Added',c.added_files],['Removed',c.removed_files]])if(paths.length)changes.append(el('p',title+': '+paths.join(', ')));
@@ -329,3 +335,27 @@ function openProjectAudits(){
  form.onsubmit=async e=>{e.preventDefault();const f=file.files[0];if(!f||f.size>2000000){status.textContent='Choose a ZIP up to 2 MB.';return;}submit.disabled=true;status.textContent='Reviewing project…';try{const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(f);});await change('/api/project-audit',{name:name.value,archive:encoded,owned:owned.checked});openProjectAudits();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openProjectAudit').onclick=openProjectAudits;
+
+function openSourceWatch(){
+ const root=modal('Automatic source research'),s=state.source_watch;
+ root.append(el('p','Connect up to three public GitHub repositories you own or are permitted to review. The worker checks each explicit branch every 15 minutes and analyzes new commits. No tokens or paid AI calls are used.','muted'));
+ if(!s)return;
+ root.append(el('p',s.limitation,'muted'));
+ for(const w of s.watches){const card=el('details');card.open=true;card.append(el('summary',w.repository+' · '+w.branch),el('p',w.status),el('small','Checked: '+date(w.checked)+' · Next due: '+date(w.due)),el('p','Permission expires: '+date(w.expires)+' · Completed reviews: '+w.reviews));
+ if(w.last_commit)card.append(safeLink('Last reviewed commit '+w.last_commit.slice(0,12)+' ↗','https://github.com/'+w.repository+'/commit/'+w.last_commit));
+ card.append(el('p',w.subdirectory?'Source folder: '+w.subdirectory:'Source folder: repository root'));
+ if(w.enabled)card.append(button('Disable monitoring',async()=>{await change('/api/source-watch/disable',{id:w.id});openSourceWatch();}));
+ card.append(button('Edit or renew permission',()=>{inputs.repository.value=w.repository;inputs.branch.value=w.branch;inputs.subdirectory.value=w.subdirectory;rules.value=w.rules;confirmed.checked=false;form.scrollIntoView({block:'start'});}));root.append(card);}
+ root.append(button('Review source evidence',openProjectAudits));
+ const history=el('details');history.append(el('summary','Recent source activity'));
+ for(const run of s.runs){const w=s.watches.find(x=>x.id===run.watch);history.append(el('p',date(run.at)+' · '+(w?.repository||'Repository')+' · '+run.status+' · '+(run.revision?run.revision.slice(0,12):'')));
+ if(run.status==='reviewed')history.append(el('small',run.details.files+' Python files · '+run.details.leads+' unverified leads'+(run.details.limited?' · Limited coverage':'')));
+ if(run.status==='error')history.append(el('small',run.details.message));}root.append(history);
+ const form=el('form'),inputs={};form.append(el('h3','Add or renew an approved source'));
+ for(const [key,label,placeholder,required] of [['repository','GitHub owner/repository','owner/repository',true],['branch','Exact branch','main',true],['subdirectory','Optional Python source folder','src',false]]){const l=el('label',label),i=el('input');i.required=required;i.maxLength=160;i.placeholder=placeholder;l.append(i);form.append(l);inputs[key]=i;}
+ const rl=el('label','Ownership or permission for this source review'),rules=el('textarea');rules.required=true;rules.minLength=30;rules.maxLength=2000;rl.append(rules);
+ const cl=el('label',undefined,'check'),confirmed=el('input');confirmed.type='checkbox';confirmed.required=true;cl.append(confirmed,document.createTextNode('I own this repository or have permission for automated read-only source analysis. Review this authorization again in seven days.'));
+ const submit=el('button','Start automatic source reviews'),status=el('p');status.setAttribute('role','status');form.append(rl,cl,el('p','Supported limit: 2 MB compressed archive, 500 entries, 80 Python files, 128 KB per file. Oversized or unsupported projects stop with an error. Code is neither executed nor saved. This does not grant permission to test the hosted application.','muted'),submit,status);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/source-watch',{repository:inputs.repository.value.trim(),branch:inputs.branch.value.trim(),subdirectory:inputs.subdirectory.value.trim(),rules:rules.value,authorized:confirmed.checked,expires:Math.floor(Date.now()/1000)+7*86400-60});openSourceWatch();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+}
+$('openSourceWatch').onclick=openSourceWatch;

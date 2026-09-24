@@ -15,6 +15,7 @@ import supervisor
 import workflow
 import sourceaudit
 import projectaudit
+import sourcewatch
 import dependencies
 import validation
 import accesscheck
@@ -61,6 +62,7 @@ def init():
         ''')
         sourceaudit.init(c)
         projectaudit.init(c)
+        sourcewatch.init(c)
         dependencies.init(c)
         validation.init(c)
         accesscheck.init(c)
@@ -233,6 +235,16 @@ def queue_worker():
         WAKE.wait(10)
 
 
+def source_watch_worker():
+    while True:
+        try:
+            sourcewatch.tick(db, LOCK, log)
+        except Exception:
+            with db() as c:
+                log(c, 'Source watch worker failed; previous results retained. Retrying on next cycle.')
+        WAKE.wait(15)
+
+
 def snapshot():
     with db() as c:
         targets = [dict(r) for r in c.execute('SELECT * FROM targets')]
@@ -258,6 +270,7 @@ def snapshot():
                 'background': workqueue.snapshot(c),
                 'source_audits': sourceaudit.snapshot(c),
                 'project_audits': projectaudit.snapshot(c),
+                'source_watch': sourcewatch.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
                 'validation': validation.snapshot(c),
                 'access_checks': accesscheck.snapshot(c),
@@ -312,6 +325,11 @@ def mutate(path, data):
             log(c,'Project code reviewed; see file-and-line paths in Project research. No report sent.')
         elif path == '/api/project-research-note':
             projectaudit.save_note(c,data)
+        elif path == '/api/source-watch':
+            sourcewatch.configure(c,data)
+            log(c,'Public-source monitoring configured; no live-target testing authorized by this connection.')
+        elif path == '/api/source-watch/disable':
+            sourcewatch.disable(c,data.get('id'))
         elif path == '/api/source-audit':
             sourceaudit.upload(c, data)
             log(c, 'Uploaded Python source audited; code was not stored or executed.')
@@ -466,6 +484,7 @@ if __name__ == '__main__':
     threading.Thread(target=access_worker, daemon=True).start()
     threading.Thread(target=dependency_worker, daemon=True).start()
     threading.Thread(target=queue_worker, daemon=True).start()
+    threading.Thread(target=source_watch_worker, daemon=True).start()
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()
     threading.Thread(target=discovery_worker, daemon=True).start()
