@@ -13,6 +13,12 @@ function render() {
   $('targetCount').textContent = state.targets.length;
   $('findingCount').textContent = state.findings.length;
   $('acceptedCount').textContent = state.findings.filter(f=>f.feedback==='accepted').length;
+  const supervisor=state.supervisor || {};
+  $('supervisorRules').textContent=supervisor.rules_status || 'Loading review status';
+  $('supervisorAI').textContent='AI: '+(supervisor.ai_status || 'Not connected');
+  $('supervisorDelivery').textContent=supervisor.delivery_status || '';
+  $('supervisorRepeat').textContent=supervisor.repeat_policy || '';
+  $('supervisorLimit').textContent=supervisor.limitation || '';
   $('targets').replaceChildren();
   if(!state.targets.length) $('targets').append(el('p','No targets yet. Add one using its written program scope.','empty'));
   state.targets.forEach(t=>{
@@ -30,6 +36,13 @@ function render() {
     const card=el('article',undefined,'item'); card.append(el('span','INFORMATIONAL · IMPACT UNVERIFIED','tag'),el('strong',f.title));
     card.append(el('small',state.targets.find(t=>t.id===f.target)?.url||''));
     card.append(el('small',JSON.parse(f.evidence).note),el('small','Review priority '+f.review_priority+' · Last observed '+new Date(f.last_seen*1000).toLocaleString()));
+    if(f.supervisor){
+      const review=f.supervisor;
+      card.append(el('strong',review.status),el('small','Repeat observations: '+review.repeat_count+'/3'),el('small',review.reason));
+      if(!review.current_observation)card.append(el('small','Not seen in the latest successful check.'));
+      card.append(el('small','Reporting channel: '+review.channel.name));
+      if(review.ai_review)card.append(el('small','AI advisory ('+review.ai_review.status+'): '+review.ai_review.note));
+    }
     const select=el('select');select.setAttribute('aria-label','Review outcome for '+f.title);
     ['unreviewed','validated','accepted','duplicate','false_positive','ineligible'].forEach(v=>{const option=el('option',v.replaceAll('_',' '));option.value=v;option.selected=f.feedback===v;select.append(option);});
     select.onchange=()=>change('/api/feedback',{id:f.id,feedback:select.value}).catch(e=>$('message').textContent=e.message);

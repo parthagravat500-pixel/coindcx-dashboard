@@ -11,6 +11,7 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from engine import validate_url, observe, findings
+import supervisor
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -46,6 +47,7 @@ def init():
         feedback TEXT DEFAULT 'unreviewed');
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER, message TEXT);
         ''')
+        supervisor.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -96,6 +98,7 @@ def tick():
                 c.execute('''INSERT INTO findings(id,target,rule,title,evidence,severity,impact,first_seen,last_seen)
                 VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,evidence=excluded.evidence''',
                           (key, t['id'], f['rule'], f['title'], evidence, f['severity'], f['impact'], now, now))
+                supervisor.record(c, key, now)
             c.execute('UPDATE targets SET state=?,failures=0 WHERE id=?', ('Checked HTTP ' + str(status) + ' at ' + time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(now)), t['id']))
             log(c, 'Check completed for target ' + str(t['id']))
     except Exception as e:
@@ -116,6 +119,15 @@ def worker():
         WAKE.wait(10)
 
 
+def supervisor_worker():
+    while True:
+        try:
+            supervisor.ai_tick(db)
+        except Exception:
+            pass
+        WAKE.wait(30)
+
+
 def snapshot():
     with db() as c:
         targets = [dict(r) for r in c.execute('SELECT * FROM targets')]
@@ -128,8 +140,13 @@ def snapshot():
         for f in items:
             p, n = counts[f['rule']]
             f['review_priority'] = round((p + 1) / (p + n + 2), 3)
+            target = next(t for t in targets if t['id'] == f['target'])
+            f['supervisor'] = supervisor.review(c, f, target)
+            ai = c.execute('SELECT status,note FROM supervisor_ai WHERE finding=? ORDER BY at DESC LIMIT 1', (f['id'],)).fetchone()
+            f['supervisor']['ai_review'] = dict(ai) if ai else None
         return {'paused': bool(c.execute('SELECT paused FROM settings').fetchone()[0]), 'targets': targets,
                 'findings': sorted(items, key=lambda f: f['review_priority'], reverse=True),
+                'supervisor': supervisor.summary(),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
 
@@ -215,12 +232,18 @@ class Handler(BaseHTTPRequestHandler):
             with db() as c:
                 f = c.execute('SELECT f.*,t.url,t.policy,t.rules FROM findings f JOIN targets t ON t.id=f.target WHERE f.id=?', (key,)).fetchone()
             if f:
+                with db() as c:
+                    target = dict(c.execute('SELECT * FROM targets WHERE id=?', (f['target'],)).fetchone())
+                    review = supervisor.review(c, dict(f), target)
                 report = '\n'.join(['# DRAFT — manual review required', '', f['title'], 'URL: ' + f['url'], 'Policy: ' + f['policy'],
                     'Recorded scope/rules: ' + f['rules'], 'Status: ' + f['feedback'], 'Severity: Informational; no impact established',
                     '', '## Reproduction', 'Only if current authorization permits: send HEAD to the exact URL above.',
                     'For CORS observations only, include Origin: https://scopeguard.invalid.', 'Redirects are not followed.',
                     '', '## Evidence (cookie values and response bodies are not retained)', f['evidence'], '',
-                    '## Impact', f['impact'], '', '## Before submission',
+                    '## Impact', f['impact'], '', '## Supervisor review', review['status'], review['reason'],
+                    'Independent observations: ' + str(review['repeat_count']) + '/3',
+                    'Reporting channel: ' + review['channel']['name'] + ' ' + review['channel']['url'],
+                    'Not submitted. AI or repeated headers cannot establish security impact.', '', '## Before submission',
                     'Confirm current scope and eligibility. Establish reproducible security impact. Check duplicates. Add remediation. Submit privately through the program channel.'])
                 return self.reply(200, report, 'text/plain')
         self.reply(404, '{"error":"Not found"}')
@@ -245,6 +268,7 @@ if __name__ == '__main__':
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
     init()
     threading.Thread(target=worker, daemon=True).start()
+    threading.Thread(target=supervisor_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
     print('ScopeGuard dashboard ready. New installations start paused.', flush=True)
     server.serve_forever()

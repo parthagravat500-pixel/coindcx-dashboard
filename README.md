@@ -67,3 +67,21 @@ Reference policies (reviewed during development):
 - https://docs.hackerone.com/en/articles/8494552-defining-scope
 
 This project is a starting point for authorized research, not a substitute for a program's written rules.
+
+
+## Supervisor (1.1)
+
+The automatic rules review counts up to three observations separated by the approved target interval. Historical installations retain only their last observation, so older repeats are not invented. It checks scope expiry, repeatability, evidence limitations, and a verified reporting route for the configured GitHub and RoboForm URLs. Current HEAD-only observations are always held: neither repeat counts, manual feedback labels, nor AI opinions prove impact. Draft downloads include the supervisor decision. No report is sent automatically.
+
+Optional OpenAI advisory review is implemented but disabled by default. Configure all three server-only Render environment variables to activate it after approving API costs:
+- SUPERVISOR_AI_ENABLED=true
+- OPENAI_API_KEY=<secret, never commit or enter in the dashboard UI>
+- SUPERVISOR_AI_MODEL=<Responses API model available to your account>
+
+AI reviews begin only after three spaced observations and while the scheduler and target remain enabled. Each distinct finding/review input is attempted once, with a persistent maximum of three attempts per UTC day for the whole app. Failed attempts consume the limit and are not automatically retried. This is a request limit, not a dollar budget. The request sends only a derived rule, observation note, repeat count and evidence limitations; no response bodies, cookie values, credentials or raw headers. store=false is requested. AI output is displayed as escaped advisory text and cannot change scope, dispatch tests, validate findings, choose recipients or send reports. Network/API validation with a real provider account remains pending.
+
+Reporting channels were reviewed on 2026-09-24:
+- GitHub, GitHub API, Gist, npm: https://hackerone.com/github (rules: https://bounty.github.com/rules).
+- RoboForm: support system under Vulnerability Report, reached from https://www.roboform.com/researchers.
+
+These routes require portal submission, not guessed email addresses. No email delivery account is configured and no SMTP/automatic portal submission is implemented. An actual reproducible impact finding and current eligibility review are required before developing a delivery workflow. The supervisor does not fetch updated program policies or renew scope automatically.

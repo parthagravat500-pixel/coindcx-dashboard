@@ -3,6 +3,7 @@
 <body><main><header><div class="brand">◈ SCOPEGUARD <span>RESEARCH DESK</span></div><div id="status">Connecting…</div></header>
 <section class="hero"><p class="eyebrow">AUTHORIZED SECURITY RESEARCH</p><h1>A quieter, safer<br>way to investigate.</h1><p>Scheduled observations. Evidence you can review.<br>Every target stays inside the scope you approve.</p><button id="pause">Loading…</button></section>
 <div id="message" role="status"></div><section class="stats"><article><b id="targetCount">0</b><span>Approved URLs</span></article><article><b id="findingCount">0</b><span>Review leads</span></article><article><b id="acceptedCount">0</b><span>Marked accepted</span></article></section>
+<section class="panel"><h2>Supervisor</h2><p id="supervisorRules"></p><p id="supervisorAI"></p><p id="supervisorDelivery"></p><p id="supervisorRepeat" class="muted"></p><p id="supervisorLimit" class="muted"></p></section>
 <div class="columns"><section class="panel"><h2>Add an authorized target</h2><p class="muted">Read the program policy first. Approval here records your attestation; it does not independently verify permission.</p><form id="targetForm">
 <label>Program name<input name="name" required maxlength="100" placeholder="Your approved program"></label>
 <label>Exact approved URL<input name="url" type="url" required placeholder="https://approved.example/path"></label>
@@ -16,5 +17,5 @@
 <section class="panel"><h2>Target activity</h2><p class="muted">One target at a time. Redirects are never followed. Authorization expires automatically.</p><div id="targets"></div></section></div>
 <section class="panel"><h2>Evidence & review queue</h2><p class="muted">These are observations, not confirmed vulnerabilities. Priority reflects your feedback, not severity or probability of a payout.</p><div id="findings"></div></section>
 <section class="panel"><h2>Activity log</h2><div id="events"></div></section>
-<footer>ScopeGuard 1.0 · No automatic submissions · No guarantee of earnings · No response bodies or cookie values retained</footer>
+<footer>ScopeGuard 1.1 · No automatic submissions · No guarantee of earnings · No response bodies or cookie values retained</footer>
 </main></body></html>
