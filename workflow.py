@@ -1,5 +1,6 @@
 """Passive program intake. Directory entries never grant scan authorization."""
 import connections
+import rewards
 import hashlib
 import json
 import math
@@ -82,6 +83,7 @@ def normalize(source, p):
 
 
 def init(c):
+    rewards.init(c)
     c.executescript('''
     CREATE TABLE IF NOT EXISTS discovery_settings (id INTEGER PRIMARY KEY, enabled INTEGER NOT NULL);
     INSERT OR IGNORE INTO discovery_settings VALUES (1,1);
@@ -128,6 +130,7 @@ def tick(db):
                   (now,now+INTERVAL,'Updating directory',source['id']))
     try:
         sync(db,source['id'],fetch_directory(source['id']),now)
+        rewards.refresh(db, urllib.request.build_opener(NoRedirect()))
     except Exception as exc:
         with db() as c:
             failures = source['failures']+1
@@ -194,7 +197,7 @@ def snapshot(c):
     sources=[dict(r) for r in c.execute('SELECT * FROM discovery_sources ORDER BY id')]
     source_map={s['id']:s for s in sources}
     programs=[]
-    # Compare only equal currencies; unknown amounts come last, never treated as zero.
+    # Ranking uses cached reference rates; original published amounts are preserved.
     for row in c.execute("SELECT * FROM programs ORDER BY CASE WHEN maximum IS NULL THEN 1 ELSE 0 END,currency,maximum DESC,name"):
         p=dict(row);p['details']=json.loads(p['details'])
         s=source_map[p['source']]
@@ -204,7 +207,8 @@ def snapshot(c):
         p['policy_review']=POLICY_REVIEWS.get(p['url'].rstrip('/'))
         p['local_review']=local_review(p)
         programs.append(p)
-    return {'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
+    exchange = rewards.rank(c, programs)
+    return {'reward_exchange':exchange,'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
             'sources':sources,'programs':programs,'interval_hours':INTERVAL/3600,'interval_minutes':INTERVAL//60,
             'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Local rules — all listed programs reviewed, no AI API fees',
             'submissions':[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY at DESC')],

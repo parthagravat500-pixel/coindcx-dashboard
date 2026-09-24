@@ -58,7 +58,7 @@ refresh().catch(e=>$('message').textContent=e.message);
 
 let currentStage='queue', visibleLimit=40;
 const stages=[
-  ['queue','Found websites','Companies with bounty programs. Higher rewards appear first within each currency. Permission must be checked before testing a new website.'],
+  ['queue','Found websites','Highest published rewards first, compared in US dollars. These are possible maximum rewards, not expected earnings. New websites still need permission checks.'],
   ['review','Checking','Websites with permission and a scheduled check. They are checked at set times, not all at once.'],
   ['supervisor','Double-checking','Possible issues being checked again. They are not confirmed bugs yet.'],
   ['results','Results','Completed reviews. Open a result to see whether it still needs more proof.'],
@@ -113,10 +113,11 @@ function openSubmission(s){const f=state.findings.find(f=>f.id===s.finding),root
 function renderWorklist(){const stage=stages.find(s=>s[0]===currentStage);$('stageTitle').textContent=stage[1];$('stageHelp').textContent=stage[2];$('stageEyebrow').textContent='YOUR PROGRESS';$('currencyLabel').hidden=!['queue','review'].includes(currentStage);const query=$('search').value.toLowerCase();let rows=workflowRows(currentStage).filter(r=>JSON.stringify(r.data).toLowerCase().includes(query));const currency=$('currency').value;
  if(['queue','review'].includes(currentStage)&&currency!=='all')rows=rows.filter(r=>r.kind!=='program'||(currency==='unknown'?r.data.maximum===null:r.data.currency===currency));
  $('listCount').textContent=rows.length+(rows.length===1?' item':' items');$('worklist').replaceChildren();let group='';
+ if(currentStage==='queue')$('worklist').append(el('p',state.workflow.reward_exchange?.date?'Currency comparison uses ECB rates dated '+state.workflow.reward_exchange.date+'. Original rewards are shown below.':'Exchange rates are loading. USD rewards appear first; other currencies are listed separately until rates are available.','muted'));
  if(!rows.length)$('worklist').append(el('p',currentStage==='sent'?'No reports have been sent.':currentStage==='results'?'No completed reviews yet. Possible issues are in Double-checking.':'No matching items in this stage.','empty'));
- rows.slice(0,visibleLimit).forEach(row=>{const p=row.data;if(row.kind==='program'&&currency==='all'&&group!==(p.maximum===null?'Unknown reward':p.currency)){group=p.maximum===null?'Unknown reward':p.currency;$('worklist').append(el('h3',group==='Unknown reward'?group:group+' · highest reported rewards first','group-title'));}
+ rows.slice(0,visibleLimit).forEach(row=>{const p=row.data;if(row.kind==='program'&&group!==p.reward_group){group=p.reward_group;$('worklist').append(el('h3',group,'group-title'));}
  const card=el('button',undefined,'work-card');card.type='button';const left=el('div'),right=el('div',undefined,'work-meta');
- if(row.kind==='program'){left.append(el('strong',p.name),el('small',p.source+' · '+(!p.available?'Unavailable — do not test':p.stale?'Cached listing — verify':'Permission not checked')));right.append(el('span',money(p),'reward'));card.onclick=()=>openProgram(p);}
+ if(row.kind==='program'){left.append(el('strong',p.name),el('small',p.source+' · '+(!p.available?'Unavailable — do not test':p.stale?'Cached listing — verify':'Permission not checked')));right.append(el('span',money(p),'reward'));if(p.reward_usd!=null&&p.currency!=='USD')right.append(el('small','≈ '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(p.reward_usd)+' USD'));card.onclick=()=>openProgram(p);}
  else if(row.kind==='target'){left.append(el('strong',p.name),el('small',p.url));right.append(el('span',!p.enabled?'Disabled':p.expires*1000<Date.now()?'Scope expired':'Checks scheduled','tag'));card.onclick=()=>openTarget(p);}
  else if(row.kind==='finding'){left.append(el('strong',p.title),el('small',state.targets.find(t=>t.id===p.target)?.name||''));right.append(el('span',(p.supervisor?.repeat_count||0)+'/3 checks','tag'),el('small',p.casework?.label||'Not a confirmed bug'));card.onclick=()=>openFinding(p);}
  else {left.append(el('strong',state.findings.find(f=>f.id===p.finding)?.title||'Submitted report'),el('small',p.receipt));right.append(el('span',p.channel==='email'?'Email · recorded':'Portal · recorded','tag'));card.onclick=()=>openSubmission(p);}
