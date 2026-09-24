@@ -14,6 +14,7 @@ from engine import validate_url, observe, findings
 import supervisor
 import workflow
 import sourceaudit
+import projectaudit
 import dependencies
 import validation
 import accesscheck
@@ -59,6 +60,7 @@ def init():
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER, message TEXT);
         ''')
         sourceaudit.init(c)
+        projectaudit.init(c)
         dependencies.init(c)
         validation.init(c)
         accesscheck.init(c)
@@ -221,6 +223,8 @@ def queue_worker():
                 workqueue.tick(db, log)
                 with db() as c:
                     if not c.execute('SELECT paused FROM settings').fetchone()[0]:
+                        project_changed=projectaudit.record(c,'ScopeGuard',{name:(ROOT/name).read_text() for name in sourceaudit.FILES if (ROOT/name).is_file()})
+                        if project_changed:log(c,'Project flow review completed for ScopeGuard. Evidence paths are hypotheses, not confirmed bounty findings.')
                         count=sourceaudit.installed(c,ROOT)
                         if count:log(c,'Source audit completed for '+str(count)+' changed ScopeGuard Python files; pattern matches require review.')
         except Exception:
@@ -253,6 +257,7 @@ def snapshot():
                 'connection': connections.status(),
                 'background': workqueue.snapshot(c),
                 'source_audits': sourceaudit.snapshot(c),
+                'project_audits': projectaudit.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
                 'validation': validation.snapshot(c),
                 'access_checks': accesscheck.snapshot(c),
@@ -302,6 +307,9 @@ def mutate(path, data):
             log(c, 'Dependency inventory queued; original file not retained.')
         elif path == '/api/dependencies/delete':
             c.execute('DELETE FROM dependency_projects WHERE name=?',(data.get('project'),))
+        elif path == '/api/project-audit':
+            projectaudit.upload(c,data)
+            log(c,'Project code reviewed; see file-and-line paths in Project research. No report sent.')
         elif path == '/api/source-audit':
             sourceaudit.upload(c, data)
             log(c, 'Uploaded Python source audited; code was not stored or executed.')
@@ -437,7 +445,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, '{"error":"Refresh the dashboard and try again"}')
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            limit=3000000 if self.path == '/api/dependencies' else 800000 if self.path == '/api/source-audit' else 16000
+            limit=3000000 if self.path in ('/api/dependencies','/api/project-audit') else 800000 if self.path == '/api/source-audit' else 16000
             if size < 1 or size > limit:
                 raise ValueError('Invalid request size')
             mutate(self.path, json.loads(self.rfile.read(size)))

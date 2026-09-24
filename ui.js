@@ -289,3 +289,24 @@ function openGitlab(){
  form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/gitlab/connect',{project:inputs.project.value,token:inputs.token.value,marker:inputs.marker.value,rules:rules.value,own_project:check.checked,policy_permission:check.checked,read_only:check.checked});inputs.token.value='';openGitlab();}catch(err){note.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openGitlab').onclick=openGitlab;
+
+function openProjectAudits(){
+ const root=modal('Project research');
+ root.append(el('p','Follows external input between Python functions and files. Code is parsed, never executed. ScopeGuard reviews its own code after updates; you can also upload an authorized Python project.','muted'));
+ const audits=state.project_audits||[];
+ if(!audits.length)root.append(el('p','No project analysis has completed yet.'));
+ for(const a of audits){const box=el('details');box.open=true;const r=a.result;
+ box.append(el('summary',a.name+' · '+r.total_findings+' leads · 0 confirmed bugs'),el('small','Reviewed '+date(a.checked)),el('p',r.files_analyzed+' Python files · '+r.functions_analyzed+' top-level functions'));
+ if(r.syntax_skipped.length)box.append(el('p','Could not parse: '+r.syntax_skipped.join(', ')));
+ if(r.bounded_or_truncated)box.append(el('p','Coverage is incomplete: a depth, work or output limit was reached.'));
+ if(!r.findings.length)box.append(el('p','No input-to-operation paths found by the covered checks. This does not establish that the project is secure.'));
+ for(const f of r.findings){const detail=el('details');detail.append(el('summary',f.title+' — '+f.file+':'+f.line));const steps=el('ol');f.trace.forEach(t=>steps.append(el('li',t.file+':'+t.line+' — '+t.role)));detail.append(steps,el('p',f.next_step),el('p','Evidence status: static hypothesis. No runtime impact demonstrated.','muted'));box.append(detail);}
+ box.append(el('p',r.limitation,'muted'));
+ box.append(button('Download review evidence',()=>{const blob=new Blob([JSON.stringify(a,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const link=el('a');link.href=url;link.download='scopeguard-project-review.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}));root.append(box);}
+ const form=el('form'),label=el('label','Review your Python project ZIP'),file=el('input');file.type='file';file.accept='.zip';file.required=true;label.append(file);
+ const permission=el('label',undefined,'check'),owned=el('input');owned.type='checkbox';owned.required=true;permission.append(owned,document.createTextNode('I own this code or have permission to review it.'));
+ const note=el('p','Remove credentials before uploading. Up to 80 Python files, 128 KB each, 2 MB total. The ZIP goes only to this server. Source code is not saved; evidence paths and fingerprints are saved. No websites are scanned.','muted');
+ const submit=el('button','Review project'),status=el('p');status.setAttribute('role','status');form.append(label,permission,note,submit,status);
+ form.onsubmit=async e=>{e.preventDefault();const f=file.files[0];if(!f||f.size>2000000){status.textContent='Choose a ZIP up to 2 MB.';return;}submit.disabled=true;status.textContent='Reviewing project…';try{const encoded=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=reject;reader.readAsDataURL(f);});await change('/api/project-audit',{name:f.name,archive:encoded,owned:owned.checked});openProjectAudits();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+}
+$('openProjectAudit').onclick=openProjectAudits;

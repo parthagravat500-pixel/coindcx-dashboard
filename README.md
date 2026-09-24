@@ -212,3 +212,9 @@ severity rating or bounty claim; confidential impact and eligibility require rev
 Tests use mocked GitLab responses; the user's live connection needs their token and
 synthetic description before it can be verified. The unused Capital.com connector
 card is hidden unless already configured; Capital.com is unavailable in India.
+
+### Project research
+
+The Project research card analyzes up to 80 UTF-8 Python files in an owner-authorized ZIP (2 MB compressed and expanded, 128 KB per Python file). Archives are read in memory, never extracted; unsafe paths, symlinks and encrypted entries are rejected. Source text is not retained or executed. Results contain file/line paths and a content fingerprint, and can be downloaded as JSON.
+
+The bounded analyzer follows direct calls between top-level project functions, arguments and returns (six call levels, 60,000 expression visits). It looks for external input reaching SQL text, shell commands, dynamic code or object deserialization. Findings remain static hypotheses: framework reachability, sanitizers, object methods and runtime impact need separate review. It does not analyze Ruby/JavaScript, run arbitrary tests, claim critical severity, or submit reports. ScopeGuard's own 17 Python modules are reviewed automatically after code changes; uploaded archives are re-reviewed when uploaded again. Existing permission, pause and submission controls remain in force.
