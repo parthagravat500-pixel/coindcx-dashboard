@@ -13,6 +13,7 @@ from pathlib import Path
 from engine import validate_url, observe, findings
 import supervisor
 import workflow
+import sourceaudit
 import workqueue
 import casework
 import connections
@@ -52,6 +53,7 @@ def init():
         feedback TEXT DEFAULT 'unreviewed');
         CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY, at INTEGER, message TEXT);
         ''')
+        sourceaudit.init(c)
         casework.init(c)
         supervisor.init(c)
         workflow.init(c)
@@ -162,6 +164,10 @@ def queue_worker():
         try:
             with LOCK:
                 workqueue.tick(db, log)
+                with db() as c:
+                    if not c.execute('SELECT paused FROM settings').fetchone()[0]:
+                        count=sourceaudit.installed(c,ROOT)
+                        if count:log(c,'Source audit completed for '+str(count)+' changed ScopeGuard Python files; pattern matches require review.')
         except Exception:
             with db() as c:
                 c.execute("UPDATE background_status SET status='Review failed; retrying on next cycle' WHERE id=1")
@@ -191,6 +197,7 @@ def snapshot():
                 'workflow': workflow.snapshot(c),
                 'connection': connections.status(),
                 'background': workqueue.snapshot(c),
+                'source_audits': sourceaudit.snapshot(c),
                 'reporting': reporting.snapshot(c, DATA),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
@@ -213,6 +220,9 @@ def mutate(path, data):
     with LOCK, db() as c:
         if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
+        elif path == '/api/source-audit':
+            sourceaudit.upload(c, data)
+            log(c, 'Uploaded Python source audited; code was not stored or executed.')
         elif path == '/api/evidence':
             casework.save(c, data)
         elif path == '/api/all-pause':
@@ -345,7 +355,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, '{"error":"Refresh the dashboard and try again"}')
         try:
             size = int(self.headers.get('Content-Length', '0'))
-            if size < 1 or size > 16000:
+            limit=800000 if self.path == '/api/source-audit' else 16000
+            if size < 1 or size > limit:
                 raise ValueError('Invalid request size')
             mutate(self.path, json.loads(self.rfile.read(size)))
             self.reply(200, '{"ok":true}')

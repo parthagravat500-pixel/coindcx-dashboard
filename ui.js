@@ -168,3 +168,17 @@ function reportSetup(){
  const result=el('p');result.setAttribute('role','status');const submit=el('button','Connect HackerOne');submit.type='submit';form.append(nameLabel,tokenLabel,permission,el('p','Credentials stay private on this server. Connecting does not submit the current unproven finding.','muted'),submit,result);
  form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;submit.textContent='Checking account…';const secret=token.value.trim();token.value='';try{await change('/api/reporting/connect',{username:name.value.trim(),token:secret,authorize_delivery:check.checked});reportSetup();}catch(err){result.textContent=err.message;submit.disabled=false;submit.textContent='Connect HackerOne';}};root.append(form);
 }
+
+function openCodeAudits(){
+ const root=modal('Your code security');
+ root.append(el('p','Python only. Seven pattern checks run locally. Findings need human review; a clean result does not prove security. ScopeGuard files are rechecked automatically when code changes.','muted'));
+ for(const audit of state.source_audits||[]){const box=el('details');box.append(el('summary',audit.name+' · '+audit.result.total_findings+' patterns to review'),el('small','Checked '+date(audit.checked)));
+ if(!audit.result.total_findings)box.append(el('p','No covered patterns detected. Other vulnerabilities may still exist.'));
+ for(const finding of audit.result.findings)box.append(el('h3','Line '+finding.line+': '+finding.title),el('p',finding.remediation));
+ box.append(el('p',audit.result.limitation,'muted'));root.append(box);}
+ const form=el('form'),label=el('label','Audit a Python file you own'),file=el('input');file.type='file';file.accept='.py';file.required=true;label.append(file);
+ const permission=el('label',undefined,'check'),owned=el('input');owned.type='checkbox';owned.required=true;permission.append(owned,document.createTextNode('I own this code or have permission to audit it.'));
+ const help=el('p','Remove credentials and personal data first. The file is sent only to your ScopeGuard server. Results and a file fingerprint are saved; source text is not saved. Maximum 128 KB.','muted'),submit=el('button','Check file'),status=el('p');submit.type='submit';status.setAttribute('role','status');
+ form.append(label,permission,help,submit,status);form.onsubmit=async e=>{e.preventDefault();const chosen=file.files[0];if(!chosen||chosen.size>128000){status.textContent='Choose a Python file up to 128 KB.';return;}submit.disabled=true;try{await change('/api/source-audit',{name:chosen.name,source:await chosen.text(),owned:owned.checked});openCodeAudits();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+}
+$('openCodeAudit').onclick=openCodeAudits;

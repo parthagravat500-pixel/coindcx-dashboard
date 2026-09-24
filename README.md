@@ -1,3 +1,9 @@
+## Python source audits
+
+The dashboard includes a local Python AST pattern audit for dynamic code execution, shell commands, unsafe pickle/YAML loading, disabled TLS verification, dynamic SQL construction, and non-cryptographic randomness. Matches are leads, not confirmed vulnerabilities. There is no taint/data-flow analysis, dependency vulnerability lookup, interprocedural analysis or exploit validation. No matches does not certify security.
+
+Only a fixed list of ScopeGuard source files is automatically checked, and results are refreshed when file content changes. Operators can upload Python files they own or are authorized to audit (128 KB per file, at most 20 distinct uploaded filenames). Source text is parsed in memory, not imported or executed, and is not saved. Results store filename, digest, line number, rule and remediation without code snippets. Strip secrets before upload. This audit does not probe GitHub or automatically submit bounty reports. Existing website schedules remain unchanged.
+
 ## Background review queue
 
 A server worker checks every 10 seconds for new or changed local program and finding data. It persists review fingerprints and results, processes batches of at most 100, resumes after restarts, honors pause, and logs real completed work. Unchanged data is not repeatedly reviewed. Worker heartbeat and pending count are exposed separately from work events. No work means an explicit waiting status.
