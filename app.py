@@ -16,6 +16,7 @@ import workflow
 import sourceaudit
 import dependencies
 import validation
+import accesscheck
 import workqueue
 import casework
 import connections
@@ -58,6 +59,7 @@ def init():
         sourceaudit.init(c)
         dependencies.init(c)
         validation.init(c)
+        accesscheck.init(c)
         casework.init(c)
         supervisor.init(c)
         workflow.init(c)
@@ -163,6 +165,15 @@ def supervisor_worker():
         WAKE.wait(30)
 
 
+def access_worker():
+    while True:
+        try:
+            accesscheck.tick(db, DATA, log)
+        except Exception:
+            pass
+        WAKE.wait(30)
+
+
 def validation_worker(port):
     while True:
         try:
@@ -222,6 +233,7 @@ def snapshot():
                 'source_audits': sourceaudit.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
                 'validation': validation.snapshot(c),
+                'access_checks': accesscheck.snapshot(c),
                 'reporting': reporting.snapshot(c, DATA),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
@@ -244,6 +256,11 @@ def mutate(path, data):
     with LOCK, db() as c:
         if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
+        elif path == '/api/access-check':
+            accesscheck.configure(c,DATA,data)
+            log(c,'Private-data access comparison configured for an approved target.')
+        elif path == '/api/access-check/remove':
+            accesscheck.remove(c,DATA,data.get('target'))
         elif path == '/api/validation/run':
             validation.queue(c)
         elif path == '/api/dependencies':
@@ -400,6 +417,7 @@ if __name__ == '__main__':
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
     connections.load(DATA)
     init()
+    threading.Thread(target=access_worker, daemon=True).start()
     threading.Thread(target=dependency_worker, daemon=True).start()
     threading.Thread(target=queue_worker, daemon=True).start()
     threading.Thread(target=worker, daemon=True).start()

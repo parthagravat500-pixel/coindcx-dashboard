@@ -128,6 +128,7 @@ $('search').oninput=()=>{visibleLimit=40;renderWorklist();};$('currency').onchan
 setInterval(()=>refresh().catch(e=>$('message').textContent=e.message),15000);
 
 function renderSimpleStatus(){
+ const ac=state.access_checks||[];$("accessSummary").textContent=ac.length?`${ac.filter(p=>p.enabled&&p.expires*1000>Date.now()).length} active tests · ${ac.filter(p=>p.result.reproduced).length} reproduced marker exposures. Tap to see evidence and setup issues.`:"Not connected yet. Needs a permitted private JSON endpoint and synthetic test data you own. Checks whether that data is exposed without login.";
  const v=state.validation;if(v)$("validationSummary").textContent=`${v.completed} completed runs · ${v.status}. Tests your ScopeGuard login and request protection every ${v.interval_minutes} minutes. Other websites are not included.`;
  const bg=state.background;
  if(bg){
@@ -215,3 +216,27 @@ function openValidation(){
  if(!v.runs.length)root.append(el('p','Waiting for the first run. The worker checks for queued work every 30 seconds.'));
 }
 $('openValidation').onclick=openValidation;
+
+function openAccess(){
+ const root=modal('Private data access tests');
+ root.append(el('p','Tests one exact approved JSON API URL using your own test account and a unique marker in your own private test data. It sends up to four GET requests every 15 minutes. No crawling, object-ID guessing or account changes. A reproduced marker exposure still needs intended-access and impact review.','muted'));
+ for(const profile of state.access_checks||[]){const target=state.targets.find(t=>t.id===profile.target),box=el('details');box.append(el('summary',(target?.name||'Target '+profile.target)+' · '+profile.status),el('p',target?.url||''),el('small','Last checked: '+date(profile.checked)+' · Scope expires: '+date(profile.expires)));
+ for(const proof of profile.result.evidence||[])box.append(el('p',proof.step+': HTTP '+proof.status+' · test marker '+(proof.marker_present?'present':'absent')+' · '+proof.bytes+' bytes'),el('small','Response fingerprint: '+proof.sha256));
+ if(profile.result.impact)box.append(el('p',profile.result.impact));
+ for(const step of profile.result.reproduction||[])box.append(el('p',step));
+ if(profile.result.remediation)box.append(el('p','Suggested fix: '+profile.result.remediation));
+ box.append(el('p','Severity requires impact review. Nothing has been submitted.','muted'));
+ const remove=el('button','Stop and remove saved credentials','secondary');remove.onclick=async()=>{try{await change('/api/access-check/remove',{target:profile.target});openAccess();}catch(e){remove.textContent=e.message;}};box.append(remove);root.append(box);}
+ root.append(el('h3','Connect a private test endpoint'),el('p','First add its exact URL in Settings & details → Advanced target management. Use a URL containing only your own synthetic test record. A public home page is not suitable.'));
+ const form=el('form'),targetLabel=el('label','Approved exact API URL'),select=el('select');select.required=true;const empty=el('option','Choose a URL');empty.value='';select.append(empty);
+ state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now()).forEach(t=>{const option=el('option',t.url);option.value=t.id;select.append(option);});targetLabel.append(select);
+ const markerLabel=el('label','Unique marker saved in your private test record'),marker=el('input');marker.required=true;marker.minLength=24;marker.maxLength=160;marker.autocomplete='off';markerLabel.append(marker);
+ const generate=el('button','Generate a test marker','secondary');generate.type='button';generate.onclick=()=>{const b=new Uint8Array(16);crypto.getRandomValues(b);marker.value='scopeguard_'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');};
+ const authLabel=el('label','Authorization value for your test account'),auth=el('input');auth.type='password';auth.autocomplete='off';auth.required=true;auth.placeholder='Bearer … or Basic …';auth.maxLength=4096;authLabel.append(auth);
+ const rulesLabel=el('label','Program permission for this exact test'),rules=el('textarea');rules.required=true;rules.minLength=30;rules.maxLength=8000;rules.rows=3;rules.placeholder='Record the current policy allowing authenticated and anonymous GET comparisons at this rate.';rulesLabel.append(rules);
+ const confirm=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;confirm.append(check,document.createTextNode('I have permission for this read-only test. The record and account are mine, the marker is synthetic, and the response should require login.'));
+ const status=el('p');status.setAttribute('role','status');const submit=el('button','Connect and start checks');submit.type='submit';
+ form.append(targetLabel,markerLabel,generate,el('p','Save the generated marker inside your private test record before connecting. Do not put it in the URL. Responses must be JSON and no larger than 64 KB.','muted'),authLabel,el('p','Credentials stay in a private file on your server and go only to this exact HTTPS host. They are never shown in results. Do not send passwords or tokens in chat.','muted'),rulesLabel,confirm,submit,status);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/access-check',{target:Number(select.value),marker:marker.value,authorization:auth.value,rules:rules.value,permission:check.checked,own_data:check.checked,read_only:check.checked,private_expected:check.checked});auth.value='';openAccess();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+}
+$('openAccess').onclick=openAccess;

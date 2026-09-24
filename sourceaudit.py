@@ -14,7 +14,7 @@ RULES = {
  'dynamic-sql': ('Dynamically constructed SQL', 'Bind untrusted values through query parameters; allowlist identifiers.'),
  'weak-random': ('Non-cryptographic random generator', 'Use secrets for tokens. Ordinary simulation randomness is not a security bug.'),
 }
-FILES = ('app.py','engine.py','supervisor.py','workflow.py','workqueue.py','casework.py','connections.py','reporting.py','sourceaudit.py','codeflow.py','dependencies.py','rewards.py','validation.py')
+FILES = ('app.py','engine.py','supervisor.py','workflow.py','workqueue.py','casework.py','connections.py','reporting.py','sourceaudit.py','codeflow.py','dependencies.py','rewards.py','validation.py','accesscheck.py')
 MAX_BYTES=128000
 
 
