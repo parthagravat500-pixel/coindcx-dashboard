@@ -113,3 +113,15 @@ Disconnect removes the stored key and disables both advisers across restarts. Ex
 Official references checked: https://developers.openai.com/api/docs/models/gpt-4.1-mini and https://developers.openai.com/api/reference/resources/models/methods/retrieve .
 
 No confirmed vulnerability exists in the current header-only lead. Report delivery remains pending: GitHub requires HackerOne and RoboForm requires its support portal. A connection or AI opinion cannot replace reproducible security impact or program eligibility. No newly discovered program is authorized by this update.
+
+## Version 2.2: HackerOne reporting connection
+
+Finish setup now includes a private HackerOne API username/token connection. Access is verified with GET `/v1/hackers/me/reports?page[size]=1` before credentials are saved. The operator must explicitly permit submission through that account. Credentials are stored only in DATA_DIR/reporting-connection.json with mode 0600; disconnect removes them. They are never returned in the dashboard state.
+
+A reporting worker can submit via POST `/v1/hackers/reports` only when the supervisor independently marks a report `submission_ready` and supplies a validated reproduction and demonstrated impact. The current header-only supervisor never marks its observations ready: none of the current leads qualify. AI feedback, a repeat count and manual "accepted" feedback cannot authorize delivery. Scope must remain enabled and unexpired, the scheduler must be active, and the reporting route must be a verified HackerOne program URL.
+
+At most one delivery attempt per UTC day is allowed. An attempt is persisted before dispatch. Timeout, malformed receipt or crash requires manual reconciliation: the same finding is never blindly retried. A report appears in Sent reports only after a valid HackerOne report ID is received, labelled `hackerone_receipt`; this does not prove bounty acceptance or payment. Existing manually recorded receipts retain their separate label. RoboForm has no connector in this release because its required route is the support portal.
+
+Official API reference: https://api.hackerone.com/hacker-resources/ (Get Reports / Create Report). Policy checks for GitHub, GitLab and Cloudflare are included in listing details, dated 2026-09-24. Reporting-route confirmation does not grant scanning permission. Program policies must be rechecked before new testing.
+
+All 36 tests pass with mocked delivery and credentials. No real HackerOne account has been connected or real report submitted during implementation. Paid AI still requires the user's private API key and opt-in.

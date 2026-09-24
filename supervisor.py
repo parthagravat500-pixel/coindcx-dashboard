@@ -126,6 +126,6 @@ def ai_tick(db):
 def summary():
     return {'rules_status': 'Active — three-stage evidence review',
             'ai_status': 'Connected — advisory reviews enabled' if ai_enabled() else 'Not connected — AI API configuration required',
-            'delivery_status': 'No reports sent. Current programs use reporting portals; automatic submission is not enabled.',
+            'delivery_status': 'Delivery requires independently validated evidence and the program’s approved reporting channel. See Sent reports for receipts.',
             'repeat_policy': 'Up to three observations at the existing interval. No extra scanning requests.',
             'limitation': 'The current checks cannot prove exploitability. Repeating a warning or an AI opinion does not validate it.'}

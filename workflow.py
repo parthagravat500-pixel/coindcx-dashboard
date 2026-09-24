@@ -185,12 +185,13 @@ def snapshot(c):
         p['stale']=not s['last_success'] or s['last_success']<now-86400 or s['failures']>0
         p['source_url']=SOURCES[p['source']][0]
         p['scan_authorized']=False
+        p['policy_review']=POLICY_REVIEWS.get(p['url'].rstrip('/'))
         programs.append(p)
     return {'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
             'sources':sources,'programs':programs,'interval_hours':6,
             'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Not connected — discovery uses directory data and rules',
             'submissions':[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY at DESC')],
-            'delivery_status':'Automatic delivery is not connected. Recorded submissions require a receipt; none are inferred from findings.'}
+            'delivery_status':'Delivery connection is shown separately. Recorded submissions require a receipt; none are inferred from findings.'}
 
 
 def mutate(c,path,data):
@@ -218,3 +219,10 @@ def mutate(c,path,data):
         c.execute('INSERT INTO submissions(finding,channel,receipt,at,origin) VALUES (?,?,?,?,?)',
                   (f['id'],data['channel'],receipt,int(time.time()),'user_recorded'))
     else: raise ValueError('Unknown workflow action')
+
+
+POLICY_REVIEWS = {
+ 'https://hackerone.com/github': {'reviewed_on':'2026-09-24','note':'GitHub allows low-volume automation only on its listed scope. Existing saved URLs have separate limited approval. This listing does not authorize other GitHub assets. Reports must show reproducible security impact and use HackerOne.','sources':['https://bounty.github.com/rules','https://bounty.github.com/ineligible']},
+ 'https://hackerone.com/gitlab': {'reviewed_on':'2026-09-24','note':'GitLab directs security reports to HackerOne and no longer accepts security email submissions. Exact targets and automation permission still need to be verified from the program policy. No scanning authorized by this review.','sources':['https://about.gitlab.com/security/disclosure/']},
+ 'https://hackerone.com/cloudflare': {'reviewed_on':'2026-09-24','note':'Cloudflare directs vulnerability reports to HackerOne. This disclosure page alone does not establish exact asset scope or permission for automated checks. No scanning authorized by this review.','sources':['https://www.cloudflare.com/disclosure/']}
+}

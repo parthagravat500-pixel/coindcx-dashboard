@@ -14,6 +14,7 @@ from engine import validate_url, observe, findings
 import supervisor
 import workflow
 import connections
+import reporting
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -51,6 +52,7 @@ def init():
         ''')
         supervisor.init(c)
         workflow.init(c)
+        reporting.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -122,6 +124,16 @@ def worker():
         WAKE.wait(10)
 
 
+def reporting_worker():
+    while True:
+        try:
+            with LOCK:
+                reporting.tick(db, DATA)
+        except Exception:
+            pass
+        WAKE.wait(60)
+
+
 def discovery_worker():
     while True:
         try:
@@ -162,10 +174,18 @@ def snapshot():
                 'supervisor': supervisor.summary(),
                 'workflow': workflow.snapshot(c),
                 'connection': connections.status(),
+                'reporting': reporting.snapshot(c, DATA),
                 'events': [dict(r) for r in c.execute('SELECT * FROM events ORDER BY id DESC LIMIT 30')], 'csrf': CSRF}
 
 
 def mutate(path, data):
+    if path in ('/api/reporting/connect', '/api/reporting/disconnect'):
+        with LOCK:
+            if path.endswith('/connect'):
+                reporting.connect(DATA, data)
+            else:
+                reporting.save(DATA, {'enabled': False})
+        return
     if path in ('/api/ai/connect', '/api/ai/disconnect'):
         with LOCK:
             if path == '/api/ai/connect':
@@ -302,6 +322,7 @@ if __name__ == '__main__':
     threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()
     threading.Thread(target=discovery_worker, daemon=True).start()
+    threading.Thread(target=reporting_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
     print('ScopeGuard dashboard ready. New installations start paused.', flush=True)
     server.serve_forever()

@@ -16,7 +16,7 @@ function renderLegacy() {
   const supervisor=state.supervisor || {};
   $('supervisorRules').textContent=supervisor.rules_status || 'Loading review status';
   $('supervisorAI').textContent='AI: '+(supervisor.ai_status || 'Not connected');
-  $('supervisorDelivery').textContent=supervisor.delivery_status || '';
+  $('supervisorDelivery').textContent=state.reporting?.connected?'HackerOne connected. Only independently validated reports can be sent.':'Reporting account not connected. Open Finish setup.';
   $('supervisorRepeat').textContent=supervisor.repeat_policy || '';
   $('supervisorLimit').textContent=supervisor.limitation || '';
   $('targets').replaceChildren();
@@ -62,7 +62,7 @@ const stages=[
   ['review','Checking','Websites with permission and a scheduled check. They are checked at set times, not all at once.'],
   ['supervisor','Double-checking','Possible issues being checked again. They are not confirmed bugs yet.'],
   ['results','Results','Completed reviews. Open a result to see whether it still needs more proof.'],
-  ['sent','Sent reports','Reports recorded as submitted to a company. Sending is not automatic yet.']
+  ['sent','Sent reports','Reports with a submission receipt. A receipt does not mean a bounty has been approved.']
 ];
 function safeLink(text,url){const a=el('a',text);try{const u=new URL(url);if(u.protocol!=='https:')return el('span',text);a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';return a;}catch{return el('span',text);}}
 function money(p){if(p.maximum===null||!p.currency)return 'Reward not shown';return new Intl.NumberFormat('en-US',{style:'currency',currency:p.currency,maximumFractionDigits:0}).format(p.maximum)+' '+p.currency+' possible';}
@@ -80,6 +80,7 @@ function openProgram(p){const root=modal(p.name);root.append(el('span',money(p),
  facts(root,[['Directory status',!p.available?'Unavailable or removed':p.stale?'Cached / needs refresh':'Listed as open'],['Last directory observation',date(p.last_seen)],['Requirements',p.details.requirements.join('; ')||'Read the current program terms'],['Listed scope entries',p.details.scope_count],['Scan permission','Not verified. No target is created from this listing.']]);
  root.append(safeLink('Open official program policy ↗',p.url),el('br'),safeLink('View discovery source ↗',p.source_url));
  root.append(el('h3','What happens next'),el('p','Verify eligible web assets, exclusions, permitted automation and reporting route. A high maximum reward may apply to work this scanner cannot perform.'));
+ if(p.policy_review){root.append(el('h3','Permission review'),el('p',p.policy_review.note),el('small','Reviewed '+p.policy_review.reviewed_on+'; check current terms before testing.'));p.policy_review.sources.forEach(u=>root.append(safeLink('Official source ↗',u),el('br')));}
  if(p.ai_note)root.append(el('h3','AI advisory'),el('p',p.ai_note));
  const actions=el('div',undefined,'controls');actions.append(button(p.stage==='review'?'Remove from shortlist':'Shortlist this company',async()=>{await change('/api/program-stage',{id:p.id,stage:p.stage==='review'?'queue':'review'});$('detail').close();}));
  actions.append(button('Hide this company',async()=>{await change('/api/program-stage',{id:p.id,stage:'dismissed'});$('detail').close();}));root.append(actions);
@@ -90,7 +91,7 @@ function openFinding(f){const root=modal(f.title),r=f.supervisor;root.append(el(
  const a=el('a','Download evidence draft');a.href='/report/'+f.id;a.download='scopeguard-'+f.id+'.md';root.append(el('br'),a);
  const details=el('details');details.append(el('summary','Record a report already submitted'));const form=el('form');const info=el('p','Use only if you already submitted this finding through an accepted channel. This records your reference; it does not send or validate a report.','muted');const receipt=el('input');receipt.required=true;receipt.minLength=8;receipt.maxLength=1000;receipt.placeholder='Report ID, receipt or confirmation reference';receipt.setAttribute('aria-label','Submission receipt');const channel=el('select');['portal','email'].forEach(v=>{const o=el('option',v==='portal'?'Reporting portal':'Email');o.value=v;channel.append(o);});channel.setAttribute('aria-label','Actual submission channel');const label=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;label.append(check,document.createTextNode('I actually submitted this report and have a receipt.'));const submit=el('button','Save submission record');submit.type='submit';form.append(info,channel,receipt,label,submit);form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/submissions/record',{finding:f.id,channel:channel.value,receipt:receipt.value,actually_submitted:check.checked});$('detail').close();}catch(err){info.textContent=err.message;}finally{submit.disabled=false;}};details.append(form);root.append(details);
 }
-function openSubmission(s){const f=state.findings.find(f=>f.id===s.finding),root=modal(f?.title||'Submission record');facts(root,[['Channel',s.channel],['Receipt / reference',s.receipt],['Recorded at',date(s.at)],['Evidence source','User-recorded receipt; delivery and bounty acceptance are not independently verified']]);}
+function openSubmission(s){const f=state.findings.find(f=>f.id===s.finding),root=modal(f?.title||'Submission record');facts(root,[['Channel',s.channel],['Receipt / reference',s.receipt],['Recorded at',date(s.at)],['Evidence source',s.origin==='hackerone_receipt'?'HackerOne returned this report ID. Acceptance and payment are not yet confirmed.':'User-recorded receipt; delivery and bounty acceptance are not independently verified']]);}
 function renderWorklist(){const stage=stages.find(s=>s[0]===currentStage);$('stageTitle').textContent=stage[1];$('stageHelp').textContent=stage[2];$('stageEyebrow').textContent='YOUR PROGRESS';$('currencyLabel').hidden=!['queue','review'].includes(currentStage);const query=$('search').value.toLowerCase();let rows=workflowRows(currentStage).filter(r=>JSON.stringify(r.data).toLowerCase().includes(query));const currency=$('currency').value;
  if(['queue','review'].includes(currentStage)&&currency!=='all')rows=rows.filter(r=>r.kind!=='program'||(currency==='unknown'?r.data.maximum===null:r.data.currency===currency));
  $('listCount').textContent=rows.length+(rows.length===1?' item':' items');$('worklist').replaceChildren();let group='';
@@ -114,8 +115,8 @@ function renderSimpleStatus(){
  $('status').textContent=w.enabled?(state.paused||!active?'● Finding websites':'● Running'):(!state.paused&&active?'● Checking websites':'● Paused');
  $('plainSummary').textContent=running?`${w.programs.filter(p=>p.stage!=='dismissed').length} companies found. ${active} websites ${state.paused?'paused':'have scheduled checks'}.`:'Everything is paused. Your saved progress is safe.';
  const ready=state.connection?.enabled;
- $('nextTitle').textContent=ready?'AI connected':'One setup step needs you';
- $('nextText').textContent=ready?'AI will review eligible items automatically. No confirmed bug is ready to send yet.':'Website discovery is working. Connect your AI account to enable extra reviews.';
+ $('nextTitle').textContent=ready?'AI connected':'Account setup needs you';
+ $('nextText').textContent=ready?'AI will review eligible items automatically. No confirmed bug is ready to send yet.':'Discovery is working. Finish setup to connect your AI and reporting accounts.';
  $('connectAI').textContent=ready?'AI settings':'Connect AI';
  $('openSetup').textContent=ready?'Setup status':'Finish setup';
 }
@@ -123,7 +124,7 @@ function setup(){
  const root=modal('Finish your setup');
  root.append(el('p','Website discovery and basic checks are already set up.','muted'));
  const list=el('div',undefined,'setup-list');
- [['✓','Find companies','Working automatically every 6 hours.'],['✓','Check approved websites','Existing permission rules and schedules are saved.'],[state.connection?.enabled?'✓':'1','AI reviews',state.connection?.enabled?'Connected. Extra reviews run when eligible items are ready.':'Needs your private OpenAI API key.'],['…','Send bounty reports','Waiting for a confirmed bug and a connected reporting account. No report has been sent automatically.']].forEach(([icon,title,note])=>{const item=el('article',undefined,'setup-item');item.append(el('span',icon,'setup-icon'));const info=el('div');info.append(el('strong',title),el('small',note));item.append(info);list.append(item);});root.append(list);
+ [['✓','Find companies','Working automatically every 6 hours.'],['✓','Check approved websites','Existing permission rules and schedules are saved.'],[state.connection?.enabled?'✓':'1','AI reviews',state.connection?.enabled?'Connected. Extra reviews run when eligible items are ready.':'Needs your private OpenAI API key.'],[state.reporting?.connected?'✓':'2','Send bounty reports',state.reporting?.connected?'HackerOne connected. Waiting for an independently validated bug.':'Needs a HackerOne API connection. No confirmed bug is ready to send.']].forEach(([icon,title,note])=>{const item=el('article',undefined,'setup-item');item.append(el('span',icon,'setup-icon'));const info=el('div');info.append(el('strong',title),el('small',note));item.append(info);list.append(item);});root.append(list);root.append(button(state.reporting?.connected?'Reporting account settings':'Connect reporting account',reportSetup));
  if(state.connection?.enabled){root.append(el('p','Up to four AI review attempts per day. Reviews can advise, but cannot approve a new website or send a report.','muted'));root.append(button('Disconnect AI',async()=>{await change('/api/ai/disconnect',{});setup();}));return;}
  root.append(el('h3','Connect AI in two steps'));
  const steps=el('ol');const first=el('li');first.append(safeLink('Create an OpenAI API key ↗','https://platform.openai.com/api-keys'));steps.append(first,el('li','Paste the key below and tap Connect AI.'));root.append(steps);
@@ -135,3 +136,15 @@ function setup(){
 $('connectAI').onclick=setup;$('openSetup').onclick=setup;
 $('detail').addEventListener('close',()=>{$('detail').querySelectorAll('input[type="password"]').forEach(i=>i.value='');});
 $('masterPause').onclick=async()=>{const b=$('masterPause');b.disabled=true;const pause=state.workflow.enabled||!state.paused;try{await change('/api/all-pause',{paused:pause});}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};
+
+function reportSetup(){
+ const root=modal('Connect your reporting account');
+ root.append(el('p','GitHub reports go through HackerOne. RoboForm uses its own support portal; it cannot use this connection.','muted'));
+ if(state.reporting?.connected){root.append(el('strong','HackerOne is connected'),el('p','At most one verified report is attempted per day. If delivery is uncertain, the app stops rather than sending a duplicate.'));(state.reporting.attempts||[]).forEach(a=>root.append(el('p',a.status+': '+a.note)));root.append(button('Disconnect reporting',async()=>{await change('/api/reporting/disconnect',{});reportSetup();}));return;}
+ root.append(safeLink('Open HackerOne API setup instructions ↗','https://api.hackerone.com/getting-started-hacker-api/'),el('p','Create an API token in your own HackerOne account. Enter its API username and token below.','muted'));
+ const form=el('form');form.autocomplete='off';const nameLabel=el('label','API username'),name=el('input');name.required=true;name.autocomplete='off';name.maxLength=150;nameLabel.append(name);
+ const tokenLabel=el('label','Private API token'),token=el('input');token.type='password';token.required=true;token.autocomplete='new-password';token.maxLength=500;tokenLabel.append(token);
+ const permission=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;permission.append(check,document.createTextNode('Allow ScopeGuard to submit independently validated reports through my HackerOne account.'));
+ const result=el('p');result.setAttribute('role','status');const submit=el('button','Connect HackerOne');submit.type='submit';form.append(nameLabel,tokenLabel,permission,el('p','Credentials stay private on this server. Connecting does not submit the current unproven finding.','muted'),submit,result);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;submit.textContent='Checking account…';const secret=token.value.trim();token.value='';try{await change('/api/reporting/connect',{username:name.value.trim(),token:secret,authorize_delivery:check.checked});reportSetup();}catch(err){result.textContent=err.message;submit.disabled=false;submit.textContent='Connect HackerOne';}};root.append(form);
+}
