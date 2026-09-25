@@ -1,0 +1,31 @@
+# Prepared configuration. Creating this service incurs hosting charges.
+# Review the current Render price before applying.
+services:
+  - type: web
+    name: dcx-pilot-engine
+    runtime: node
+    plan: starter
+    region: singapore
+    branch: dcx-pilot-engine
+    numInstances: 1
+    buildCommand: node --experimental-strip-types --test tests/core.test.mjs tests/execution.test.mjs tests/server.test.mjs
+    startCommand: node --experimental-strip-types engine/server.mjs
+    healthCheckPath: /healthz
+    autoDeployTrigger: off
+    disk:
+      name: dcx-pilot-state
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_DIR
+        value: /var/data
+      - key: PERSISTENT_STORAGE
+        value: "true"
+      - key: ALWAYS_ON
+        value: "true"
+      - key: ENGINE_TOKEN
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY
+        sync: false
