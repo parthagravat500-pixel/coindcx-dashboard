@@ -13,3 +13,5 @@ New real-money orders are disabled. The protected execution adapter has mock tes
 render.yaml defines one Starter service in Singapore with a 1 GB persistent disk. Base cost was approved at approximately US$7.25/month before taxes and extra usage. The deployment is not active merely because this file exists.
 
 Research limitations: fixed baseline rules, current-universe selection bias, short recent-data diagnostics, simulated fills and funding reserve, no historical order-book or event-time news replay. RSS events act as an entry risk guard, not a verified directional prediction.
+
+Production startup checks the actual mounted data path. Without the disk, the service stays in SETUP mode: health checks work, all trading actions are rejected, and the trading engine is not imported. Attaching a disk at DATA_DIR and redeploying allows the paper engine to start.

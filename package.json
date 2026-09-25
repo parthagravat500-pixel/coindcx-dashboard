@@ -7,7 +7,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "start": "node --experimental-strip-types engine/server.mjs",
-    "test": "node --experimental-strip-types --test tests/core.test.mjs tests/execution.test.mjs tests/server.test.mjs"
+    "start": "node --experimental-strip-types engine/launch.mjs",
+    "test": "node --experimental-strip-types --test tests/core.test.mjs tests/execution.test.mjs tests/server.test.mjs tests/launch.test.mjs"
   }
 }

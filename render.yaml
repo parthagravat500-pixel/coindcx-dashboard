@@ -8,8 +8,8 @@ services:
     region: singapore
     branch: dcx-pilot-engine
     numInstances: 1
-    buildCommand: node --experimental-strip-types --test tests/core.test.mjs tests/execution.test.mjs tests/server.test.mjs
-    startCommand: node --experimental-strip-types engine/server.mjs
+    buildCommand: node --experimental-strip-types --test tests/core.test.mjs tests/execution.test.mjs tests/server.test.mjs tests/launch.test.mjs
+    startCommand: node --experimental-strip-types engine/launch.mjs
     healthCheckPath: /healthz
     autoDeployTrigger: off
     disk:
