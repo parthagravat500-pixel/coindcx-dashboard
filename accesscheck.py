@@ -10,6 +10,8 @@ import socket
 import ssl
 import tempfile
 import time
+import accessmatrix
+import programqueue
 from engine import validate_url, public_addresses
 
 INTERVAL=900
@@ -37,17 +39,39 @@ def configure(c,root,data):
     if not isinstance(auth,str) or not auth.startswith(('Bearer ','Basic ')) or not 15<=len(auth)<=4096 or any(ord(ch)<32 or ord(ch)>126 for ch in auth):
         raise ValueError('Enter a Bearer or Basic authorization value for your own test account.')
     if not isinstance(rules,str) or not 30<=len(rules.strip())<=8000:raise ValueError('Record policy permission for authenticated and anonymous GET comparisons, up to four requests per 15 minutes.')
+    mode=data.get('mode','anonymous')
+    if mode not in ('anonymous','two_account'):raise ValueError('Choose anonymous or two-account comparison')
+    config={'url':url,'marker':marker,'authorization':auth,'mode':mode}
+    expires=target['expires']
+    if mode=='two_account':
+        if data.get('two_accounts_owned') is not True or data.get('six_requests_permitted') is not True:
+            raise ValueError('Confirm two distinct owned accounts, private unshared records and permission for six read-only requests per fifteen minutes.')
+        peer=c.execute('SELECT * FROM targets WHERE id=?',(data.get('peer_target'),)).fetchone()
+        if not peer or peer['id']==target['id'] or not peer['enabled'] or peer['expires']<=time.time():
+            raise ValueError('Choose a second active approved resource for account B.')
+        if validate_url(peer['url']).netloc!=validate_url(url).netloc or peer['policy'].rstrip('/')!=target['policy'].rstrip('/'):
+            raise ValueError('Both resources must use the same HTTPS origin and program policy.')
+        peer_auth=data.get('peer_authorization','');peer_marker=data.get('peer_marker','')
+        if not isinstance(peer_auth,str) or peer_auth==auth or not peer_auth.startswith(('Bearer ','Basic ')) or not 15<=len(peer_auth)<=4096 or any(ord(ch)<32 or ord(ch)>126 for ch in peer_auth):
+            raise ValueError('Enter a different valid Authorization value for your second owned account.')
+        if not isinstance(peer_marker,str) or not 24<=len(peer_marker)<=160 or not peer_marker.isascii() or not all(ch.isalnum() or ch in '_-' for ch in peer_marker) or marker in peer_marker or peer_marker in marker or peer_marker in url or peer_marker in peer['url'] or marker in peer['url']:
+            raise ValueError('Use distinct synthetic markers, absent from both URLs.')
+        config.update(peer_target=peer['id'],peer_url=peer['url'],peer_authorization=peer_auth,peer_marker=peer_marker,policy=target['policy'])
+        expires=min(expires,peer['expires'])
+    if programqueue.directory_gate(c,target['policy'],int(time.time())):
+        raise ValueError('Refresh and review the program directory before configuring a test.')
     revision=secrets.token_hex(16)
+    config['revision']=revision
     fd,temp=tempfile.mkstemp(prefix='.access-',dir=root)
     try:
         with os.fdopen(fd,'w') as f:
-            os.fchmod(f.fileno(),0o600);json.dump({'revision':revision,'url':url,'marker':marker,'authorization':auth},f);f.flush();os.fsync(f.fileno())
+            os.fchmod(f.fileno(),0o600);json.dump(config,f);f.flush();os.fsync(f.fileno())
         os.replace(temp,config_path(root,target['id']))
     finally:
         if os.path.exists(temp):os.unlink(temp)
     c.execute('''INSERT INTO access_checks VALUES(?,?,?,?,1,0,0,'Queued','{}')
       ON CONFLICT(target) DO UPDATE SET revision=excluded.revision,rules=excluded.rules,expires=excluded.expires,
-      enabled=1,due=0,checked=0,status='Queued',result='{}' ''',(target['id'],revision,rules.strip(),target['expires']))
+      enabled=1,due=0,checked=0,status='Queued',result='{}' ''',(target['id'],revision,rules.strip(),expires))
 
 
 def fetch(url,authorization,marker):
@@ -79,7 +103,11 @@ def fetch(url,authorization,marker):
         conn.close();raw.close()
 
 
-def compare(config,allowed=lambda:True,transport=fetch):
+def compare(config,allowed=lambda:True,transport=None):
+    transport=fetch if transport is None else transport
+    if config.get('mode','anonymous')=='two_account':
+        return accessmatrix.compare(config,transport,allowed)
+    if config.get('mode','anonymous')!='anonymous':raise ValueError('Unsupported test mode')
     evidence=[]
     def observe(label,auth):
         if not allowed():raise InterruptedError('Profile stopped or scope expired')
@@ -88,7 +116,7 @@ def compare(config,allowed=lambda:True,transport=fetch):
         return r
     def positive(r):return 200<=r['status']<300 and r['json'] and r['marker_present']
     first=observe('Authenticated control',config['authorization'])
-    result={'evidence':evidence,'marker_sha256':hashlib.sha256(config['marker'].encode()).hexdigest(),
+    result={'mode':'anonymous','evidence':evidence,'marker_sha256':hashlib.sha256(config['marker'].encode()).hexdigest(),
             'reproduced':False,'submission_ready':False,'severity':'Not assessed'}
     if not positive(first):return {**result,'status':'Setup needs attention: authenticated control did not return the private test marker'}
     anonymous=observe('Anonymous comparison',None)
@@ -109,21 +137,29 @@ def tick(db,root,log):
     now=int(time.time())
     with db() as c:
         if c.execute('SELECT paused FROM settings').fetchone()[0]:return
-        row=c.execute('''SELECT a.*,t.url FROM access_checks a JOIN targets t ON t.id=a.target
-          WHERE a.enabled=1 AND a.expires>? AND t.enabled=1 AND t.expires>? AND a.due<=? ORDER BY a.due,a.target LIMIT 1''',(now,now,now)).fetchone()
+        row=c.execute('''SELECT a.*,t.url,t.policy FROM access_checks a JOIN targets t ON t.id=a.target
+          LEFT JOIN program_rotation p ON p.policy=rtrim(t.policy,'/')
+          WHERE a.enabled=1 AND a.expires>? AND t.enabled=1 AND t.expires>? AND a.due<=?
+          ORDER BY coalesce(p.last_started,0),a.due,a.target LIMIT 1''',(now,now,now)).fetchone()
         if not row:return
         row=dict(row);c.execute("UPDATE access_checks SET due=?,status='Checking private-data access' WHERE target=?",(now+INTERVAL,row['target']))
+        c.execute('INSERT INTO program_rotation VALUES(?,?) ON CONFLICT(policy) DO UPDATE SET last_started=excluded.last_started',(row['policy'].rstrip('/'),now))
     def allowed():
         with db() as c:
-            current=c.execute('''SELECT a.revision,a.enabled,a.expires,t.enabled AS active,t.expires AS scope_expires,t.url
+            current=c.execute('''SELECT a.revision,a.enabled,a.expires,t.enabled AS active,t.expires AS scope_expires,t.url,t.policy
               FROM access_checks a JOIN targets t ON t.id=a.target WHERE a.target=?''',(row['target'],)).fetchone()
-            return bool(current and current['revision']==row['revision'] and current['url']==row['url'] and current['enabled'] and current['active'] and min(current['expires'],current['scope_expires'])>time.time() and not c.execute('SELECT paused FROM settings').fetchone()[0])
+            valid=bool(current and current['revision']==row['revision'] and current['url']==row['url'] and current['policy']==row['policy'] and current['enabled'] and current['active'] and min(current['expires'],current['scope_expires'])>time.time() and not c.execute('SELECT paused FROM settings').fetchone()[0])
+            if not valid or programqueue.directory_gate(c,current['policy'],int(time.time())):return False
+            if config.get('mode')=='two_account':
+                peer=c.execute('SELECT * FROM targets WHERE id=?',(config['peer_target'],)).fetchone()
+                return bool(peer and peer['enabled'] and peer['expires']>time.time() and peer['url']==config['peer_url'] and peer['policy']==config['policy'] and current['policy']==config['policy'])
+            return True
     try:
         config=json.loads(config_path(root,row['target']).read_text())
         if config['revision']!=row['revision'] or config['url']!=row['url']:raise ValueError('Profile credentials require reconnection')
         result=compare(config,allowed)
         # Stop after a reproduced exposure or bad positive control; do not keep reading data.
-        stop=result['reproduced'] or result['status'].startswith('Setup needs attention')
+        stop=result['reproduced'] or result['status'].startswith(('Setup needs attention','Inconclusive'))
         delay=INTERVAL
     except Exception as exc:
         result={'status':'Check stopped ('+type(exc).__name__+'); no conclusion established','reproduced':False,'submission_ready':False,'evidence':[]}

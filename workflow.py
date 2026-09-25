@@ -1,6 +1,7 @@
 """Passive program intake. Directory entries never grant scan authorization."""
 import connections
 import rewards
+import readiness
 import hashlib
 import json
 import math
@@ -197,6 +198,7 @@ def local_review(program):
 
 def snapshot(c):
     now=int(time.time())
+    readiness_context=readiness.context(c,now)
     sources=[dict(r) for r in c.execute('SELECT * FROM discovery_sources ORDER BY id')]
     source_map={s['id']:s for s in sources}
     programs=[]
@@ -209,9 +211,15 @@ def snapshot(c):
         p['scan_authorized']=False
         p['policy_review']=POLICY_REVIEWS.get(p['url'].rstrip('/'))
         p['local_review']=local_review(p)
+        p['readiness']=readiness.assess(p,readiness_context)
         programs.append(p)
     exchange = rewards.rank(c, programs)
-    return {'reward_exchange':exchange,'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
+    return {'reward_exchange':exchange,'methods':readiness.METHODS,
+            'readiness_summary':{'active':sum(p['readiness']['active'] for p in programs),
+                                 'configured':sum(p['readiness']['configured'] for p in programs),
+                                 'needs_setup':sum(p['readiness']['category']=='setup' for p in programs),
+                                 'specialist':sum(p['readiness']['category']=='specialist' for p in programs)},
+            'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
             'sources':sources,'programs':programs,'interval_hours':INTERVAL/3600,'interval_minutes':INTERVAL//60,
             'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Local rules — all listed programs reviewed, no AI API fees',
             'submissions':[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY at DESC')],

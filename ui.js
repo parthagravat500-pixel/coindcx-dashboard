@@ -58,7 +58,7 @@ refresh().catch(e=>$('message').textContent=e.message);
 
 let currentStage='queue', visibleLimit=40;
 const stages=[
-  ['queue','Found websites','Your priority shortlist first, then highest published rewards compared in US dollars. These are possible maximum rewards, not expected earnings. New websites still need permission checks.'],
+  ['queue','Found programs','Configured checks first, then programs needing setup or review. Specialist environments are shown separately. Listed rewards are ceilings, not expected earnings or detected bugs.'],
   ['review','Checking','Websites with permission and a scheduled check. They are checked at set times, not all at once.'],
   ['supervisor','Double-checking','Possible issues being checked again. They are not confirmed bugs yet.'],
   ['results','Results','Completed reviews. Open a result to see whether it still needs more proof.'],
@@ -68,7 +68,7 @@ function safeLink(text,url){const a=el('a',text);try{const u=new URL(url);if(u.p
 function money(p){if(p.maximum===null||!p.currency)return 'Reward not shown';return new Intl.NumberFormat('en-US',{style:'currency',currency:p.currency,maximumFractionDigits:0}).format(p.maximum)+' '+p.currency+' possible';}
 function date(at){return at?new Date(at*1000).toLocaleString():'Not yet';}
 function workflowRows(stage){const w=state.workflow||{programs:[],submissions:[]};const p=w.programs.filter(p=>p.stage!=='dismissed');
- if(stage==='queue')return p.sort((a,b)=>Number(b.stage==='review'&&b.available)-Number(a.stage==='review'&&a.available)).map(p=>({kind:'program',data:p}));
+ if(stage==='queue')return p.sort((a,b)=>(a.readiness?.rank??2)-(b.readiness?.rank??2)||Number(b.stage==='review'&&b.available)-Number(a.stage==='review'&&a.available)).map(p=>({kind:'program',data:p}));
  if(stage==='review')return (gitlabActive()?[{kind:'gitlab',data:state.gitlab}]:[]).concat(state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now()).map(t=>({kind:'target',data:t})).concat(capitalActive()?[{kind:'capital',data:{...state.capital_demo,name:'Capital.com demo watchlist'}}]:[]));
  if(stage==='supervisor')return state.findings.filter(f=>f.feedback==='unreviewed'&&(f.supervisor?.repeat_count||0)<3).map(f=>({kind:'finding',data:f}));
  if(stage==='results')return (state.gitlab?.checked&&state.gitlab?.result?.evidence?.length?[{kind:'gitlab',data:state.gitlab}]:[]).concat(state.findings.filter(f=>f.feedback!=='unreviewed'||(f.supervisor?.repeat_count||0)>=3).map(f=>({kind:'finding',data:f})).concat(state.capital_demo?.checked?[{kind:'capital',data:{...state.capital_demo,name:'Capital.com demo test result'}}]:[]));
@@ -77,8 +77,9 @@ function workflowRows(stage){const w=state.workflow||{programs:[],submissions:[]
 function modal(title){$('detailContent').replaceChildren(el('h2',title));if(!$('detail').open)$('detail').showModal();return $('detailContent');}
 function facts(root,pairs){const dl=el('dl',undefined,'facts');pairs.forEach(([k,v])=>{dl.append(el('dt',k),el('dd',String(v)));});root.append(dl);}
 function openProgram(p){const root=modal(p.name);root.append(el('span',money(p),'reward'),el('p','Listed by '+p.source+' · reward and availability need confirmation in the official policy.','muted'));
- facts(root,[['Directory status',!p.available?'Unavailable or removed':p.stale?'Cached / needs refresh':'Listed as open'],['Last directory observation',date(p.last_seen)],['Requirements',p.details.requirements.join('; ')||'Read the current program terms'],['Listed scope entries',p.details.scope_count],['Scan permission','Not verified. No target is created from this listing.']]);
+ facts(root,[['Directory status',!p.available?'Unavailable or removed':p.stale?'Cached / needs refresh':'Listed as open'],['Last directory observation',date(p.last_seen)],['Requirements',p.details.requirements.join('; ')||'Read the current program terms'],['Listed scope entries',p.details.scope_count],['Current testing',p.readiness?.label||'No testing configured'],['Scope','Limited to separately saved permissions; this listing grants none.']]);
  root.append(safeLink('Open official program policy ↗',p.url),el('br'),safeLink('View discovery source ↗',p.source_url));
+ if(p.readiness){root.append(el('h3','Readiness'),el('p',p.readiness.explanation));if(p.readiness.reviewed_on)root.append(el('small','Policy notes checked '+p.readiness.reviewed_on));p.readiness.sources.forEach(u=>root.append(safeLink('Read reviewed policy ↗',u)));}
  root.append(el('h3','What happens next'),el('p','Verify eligible web assets, exclusions, permitted automation and reporting route. A high maximum reward may apply to work this scanner cannot perform.'));
  if(p.policy_review){root.append(el('h3','Permission review'),el('p',p.policy_review.note),el('small','Reviewed '+p.policy_review.reviewed_on+'; check current terms before testing.'));p.policy_review.sources.forEach(u=>root.append(safeLink('Official source ↗',u),el('br')));}
  if(p.local_review)root.append(el('h3','Automatic review · local rules'),el('p',p.local_review.note));
@@ -110,14 +111,15 @@ function renderCasework(root,f){
  c.sources.forEach(u=>root.append(safeLink('Report guidance ↗',u),el('br')));
 }
 function openSubmission(s){const f=state.findings.find(f=>f.id===s.finding),root=modal(f?.title||'Submission record');facts(root,[['Channel',s.channel],['Receipt / reference',s.receipt],['Recorded at',date(s.at)],['Evidence source',s.origin==='hackerone_receipt'?'HackerOne returned this report ID. Acceptance and payment are not yet confirmed.':'User-recorded receipt; delivery and bounty acceptance are not independently verified']]);}
-function renderWorklist(){const stage=stages.find(s=>s[0]===currentStage);$('stageTitle').textContent=stage[1];$('stageHelp').textContent=stage[2];$('stageEyebrow').textContent='YOUR PROGRESS';$('currencyLabel').hidden=currentStage!=='queue';const query=$('search').value.toLowerCase();let rows=workflowRows(currentStage).filter(r=>JSON.stringify(r.data).toLowerCase().includes(query));const currency=$('currency').value;
+function renderWorklist(){const stage=stages.find(s=>s[0]===currentStage);$('stageTitle').textContent=stage[1];$('stageHelp').textContent=stage[2];$('stageEyebrow').textContent='YOUR PROGRESS';$('currencyLabel').hidden=currentStage!=='queue';$('readinessLabel').hidden=currentStage!=='queue';const query=$('search').value.toLowerCase();let rows=workflowRows(currentStage).filter(r=>JSON.stringify(r.data).toLowerCase().includes(query));const currency=$('currency').value;
  if(['queue','review'].includes(currentStage)&&currency!=='all')rows=rows.filter(r=>r.kind!=='program'||(currency==='unknown'?r.data.maximum===null:r.data.currency===currency));
+ if(currentStage==='queue'&&$('readiness').value&&$('readiness').value!=='all')rows=rows.filter(r=>r.data.readiness?.category===$('readiness').value);
  $('listCount').textContent=rows.length+(rows.length===1?' item':' items');$('worklist').replaceChildren();let group='';
  if(currentStage==='queue')$('worklist').append(el('p',state.workflow.reward_exchange?.date?'Currency comparison uses ECB rates dated '+state.workflow.reward_exchange.date+'. Original rewards are shown below.':'Exchange rates are loading. USD rewards appear first; other currencies are listed separately until rates are available.','muted'));
  if(!rows.length)$('worklist').append(el('p',currentStage==='sent'?'No reports have been sent.':currentStage==='results'?'No completed reviews yet. Possible issues are in Double-checking.':'No matching items in this stage.','empty'));
- rows.slice(0,visibleLimit).forEach(row=>{const p=row.data;const heading=p.stage==='review'&&p.available?'Priority shortlist · setup needed':p.reward_group;if(row.kind==='program'&&group!==heading){group=heading;$('worklist').append(el('h3',group,'group-title'));}
+ rows.slice(0,visibleLimit).forEach(row=>{const p=row.data;const heading=p.readiness?({configured:'Configured checks',setup:'Needs account or API setup',unknown:'Needs policy review',specialist:'Needs specialist environment',unavailable:'Unavailable or stale programs'}[p.readiness.category]):p.reward_group;if(row.kind==='program'&&group!==heading){group=heading;$('worklist').append(el('h3',group,'group-title'));}
  const card=el('button',undefined,'work-card');card.type='button';const left=el('div'),right=el('div',undefined,'work-meta');
- if(row.kind==='program'){left.append(el('strong',p.name),el('small',p.source+' · '+(!p.available?'Unavailable — do not test':p.stale?'Cached listing — verify':'Permission not checked')));if(p.stage==='review')left.append(el('small','Priority · setup needed before testing'));right.append(el('span',money(p),'reward'));if(p.reward_usd!=null&&p.currency!=='USD')right.append(el('small','≈ '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(p.reward_usd)+' USD'));card.onclick=()=>openProgram(p);}
+ if(row.kind==='program'){left.append(el('strong',p.name),el('small',p.source+' · '+(p.readiness?.label||(!p.available?'Unavailable — do not test':p.stale?'Cached listing — verify':'No testing configured'))));if(p.stage==='review')left.append(el('small','Shortlisted · coverage shown above'));right.append(el('span',money(p),'reward'));if(p.reward_usd!=null&&p.currency!=='USD')right.append(el('small','≈ '+new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(p.reward_usd)+' USD'));card.onclick=()=>openProgram(p);}
  else if(row.kind==='target'){left.append(el('strong',p.name),el('small',p.url));right.append(el('span',!p.enabled?'Disabled':p.expires*1000<Date.now()?'Scope expired':state.paused?'Paused':p.state||'Waiting','tag'),el('small','Next check: '+date(p.due)));card.onclick=()=>openTarget(p);}
  else if(row.kind==='gitlab'){left.append(el('strong','GitLab · '+p.project),el('small','Private project description test'));right.append(el('span',state.paused&&p.enabled?'Paused':p.status,'tag'),el('small','Last check: '+date(p.checked)));card.onclick=openGitlab;}
  else if(row.kind==='capital'){left.append(el('strong',p.name),el('small','Your demo account · watchlist access only'));right.append(el('span',state.paused?'Paused':p.status,'tag'),el('small',currentStage==='results'?'Last check: '+date(p.checked):'Next check: '+date(p.due)));card.onclick=openCapital;}
@@ -131,14 +133,16 @@ setInterval(()=>refresh().catch(e=>$('message').textContent=e.message),15000);
 
 function capitalActive(){const c=state.capital_demo;return !!(c?.enabled&&c.expires*1000>Date.now());}
 function openProgramQueue(){
- const q=state.program_queue,root=modal('Automatic program queue');if(!q){root.append(el('p','Queue status unavailable.'));return;}
+ const q=state.program_queue,root=modal('Scheduled checks and program readiness');if(!q){root.append(el('p','Queue status unavailable.'));return;}
+ facts(root,[['Programs with configured checks',state.workflow?.readiness_summary?.configured||0],['Programs with active checks',state.workflow?.readiness_summary?.active||0],['GitLab private-project check',gitlabActive()?state.gitlab.status:'Not active'],['Private JSON comparison profiles',(state.access_checks||[]).filter(p=>p.enabled&&p.expires*1000>Date.now()).length]]);
+ root.append(el('h3','Website header-check queue'));
  facts(root,[['Listed HackerOne programs',q.listed_h1],['Programs with active saved permissions',q.approved_programs],['Targets due',q.due_targets],['Next target',q.next_target||'None due'],['Completed limited checks',q.completed],['Last worker check-in',date(q.heartbeat)],['Confirmed payable findings',q.confirmed_payable],['Automatic report submission','Not performed by this queue']]);
  root.append(el('p',q.coverage),el('p','Programs without current saved scope and automation permission are skipped. Unknown HackerOne reward amounts are not guessed. The queue rotates between due programs and preserves each target’s rate limit.','muted'));
  root.append(el('h3','Recent checks'));
  const outcomes={running:'Running',observations:'Observations recorded · impact unverified',no_observation:'No issue detected in these limited checks',stopped:'Stopped · review permission or server response',error:'Request failed · coverage incomplete',interrupted:'Interrupted · coverage incomplete',inconclusive:'Inconclusive · expected coverage not completed'};
  if(!q.attempts.length)root.append(el('p','No checks recorded by this queue yet.'));
  for(const run of q.attempts){const row=el('article',undefined,'item');row.append(el('strong',run.name||'Saved target'),el('small',outcomes[run.outcome]||'Unknown outcome'),el('small',date(run.started)+' · '+run.observations+' observations'));root.append(row);}
- root.append(el('h3','HackerOne program screening'));
+ root.append(el('h3','HackerOne header-check eligibility'),el('p','The table below covers header targets only. Private-data connectors and their coverage are listed above.','muted'));
  if(!q.rows.length)root.append(el('p','No HackerOne directory entries available.'));
  for(const p of q.rows){const row=el('article',undefined,'item');row.append(el('strong',p.name),el('small',p.status),safeLink('Program policy ↗',p.policy));root.append(row);}
  if(q.rows_total>q.rows.length)root.append(el('p','Showing '+q.rows.length+' of '+q.rows_total+' programs. Use Found websites to search the complete cached directory.','muted'));
@@ -191,7 +195,7 @@ $('openPrivateAI').onclick=openPrivateAI;
 function renderSimpleStatus(){
  renderResearchStatus();
  const queue=state.program_queue;
- if(queue){$('programQueueStatus').textContent=(queue.paused?'Paused':!queue.healthy?'Worker status unavailable':queue.due_targets?'Rotating between approved programs':'Waiting for approved checks to become due')+' · '+queue.approved_programs+' programs with active saved permissions · '+queue.completed+' limited checks completed';$('programQueueCoverage').textContent=queue.coverage+' '+queue.permission_needed+' listed H1 programs currently blocked from this queue.';}
+ if(queue){const ready=state.workflow?.readiness_summary;$('programQueueStatus').textContent=(queue.paused?'Paused':!queue.healthy?'Worker status unavailable':ready?.active?'Scheduling configured checks':'Waiting for permitted test setup')+' · '+(ready?.active||0)+' programs with active configured checks · '+queue.completed+' header checks completed';$('programQueueCoverage').textContent='Header queue: '+queue.coverage+' '+queue.permission_needed+' listed H1 programs have no active header target. Private-data tests are shown separately.';}
  const sourceWatch=state.source_watch;
  if(sourceWatch){const active=sourceWatch.watches.filter(w=>w.enabled&&w.expires*1000>Date.now());
  $('sourceWatchSummary').textContent=(state.paused?'Paused · ':active.length?'Monitoring · ':'Not monitoring · ')+active.length+' approved repositories · '+sourceWatch.watches.reduce((n,w)=>n+w.reviews,0)+' commit reviews completed';
@@ -294,7 +298,7 @@ $('openValidation').onclick=openValidation;
 
 function openAccess(){
  const root=modal('Private data access tests');
- root.append(el('p','Tests one exact approved JSON API URL using your own test account and a unique marker in your own private test data. It sends up to four GET requests every 15 minutes. No crawling, object-ID guessing or account changes. A reproduced marker exposure still needs intended-access and impact review.','muted'));
+ root.append(el('p','Choose an anonymous comparison (up to four GETs) or a two-account comparison (up to six GETs, at most one per second), every 15 minutes. Only exact approved JSON URLs and your own synthetic records are used. Profiles run one at a time, rotating between programs. Reproduced marker exposure still needs account-identity, intended-access and impact review.','muted'));
  for(const profile of state.access_checks||[]){const target=state.targets.find(t=>t.id===profile.target),box=el('details');box.append(el('summary',(target?.name||'Target '+profile.target)+' · '+profile.status),el('p',target?.url||''),el('small','Last checked: '+date(profile.checked)+' · Scope expires: '+date(profile.expires)));
  for(const proof of profile.result.evidence||[])box.append(el('p',proof.step+': HTTP '+proof.status+' · test marker '+(proof.marker_present?'present':'absent')+' · '+proof.bytes+' bytes'),el('small','Response fingerprint: '+proof.sha256));
  if(profile.result.impact)box.append(el('p',profile.result.impact));
@@ -308,13 +312,24 @@ function openAccess(){
  const markerLabel=el('label','Unique marker saved in your private test record'),marker=el('input');marker.required=true;marker.minLength=24;marker.maxLength=160;marker.autocomplete='off';markerLabel.append(marker);
  const generate=el('button','Generate a test marker','secondary');generate.type='button';generate.onclick=()=>{const b=new Uint8Array(16);crypto.getRandomValues(b);marker.value='scopeguard_'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');};
  const authLabel=el('label','Authorization value for your test account'),auth=el('input');auth.type='password';auth.autocomplete='off';auth.required=true;auth.placeholder='Bearer … or Basic …';auth.maxLength=4096;authLabel.append(auth);
+ const modeLabel=el('label','Comparison'),mode=el('select');[['anonymous','Without login'],['two_account','With a second owned account']].forEach(([v,t])=>{const o=el('option',t);o.value=v;mode.append(o);});mode.value='anonymous';modeLabel.append(mode);
+ const peerBox=el('fieldset'),peerTargetLabel=el('label','Approved URL of account B own private record'),peerTarget=el('select');peerBox.hidden=true;
+ const peerEmpty=el('option','Choose account B resource');peerEmpty.value='';peerTarget.append(peerEmpty);
+ state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now()).forEach(t=>{const o=el('option',t.url);o.value=t.id;peerTarget.append(o);});peerTargetLabel.append(peerTarget);
+ const peerMarkerLabel=el('label','Distinct marker saved in account B private record'),peerMarker=el('input');peerMarker.minLength=24;peerMarker.maxLength=160;peerMarker.autocomplete='off';peerMarkerLabel.append(peerMarker);
+ const peerAuthLabel=el('label','Authorization value for account B'),peerAuth=el('input');peerAuth.type='password';peerAuth.autocomplete='off';peerAuth.maxLength=4096;peerAuthLabel.append(peerAuth);
+ const peerConfirm=el('label',undefined,'check'),peerOwned=el('input');peerOwned.type='checkbox';peerConfirm.append(peerOwned,document.createTextNode('I own two distinct accounts with no shared access to these records. Both exact URLs use the same origin and program policy. Six read-only GETs per 15 minutes are permitted.'));
+ peerBox.append(el('legend','Account B control'),peerTargetLabel,peerMarkerLabel,peerAuthLabel,peerConfirm);
+ mode.onchange=()=>{const enabled=mode.value==='two_account';peerBox.hidden=!enabled;[peerTarget,peerMarker,peerAuth,peerOwned].forEach(n=>n.required=enabled);};
  const rulesLabel=el('label','Program permission for this exact test'),rules=el('textarea');rules.required=true;rules.minLength=30;rules.maxLength=8000;rules.rows=3;rules.placeholder='Record the current policy allowing authenticated and anonymous GET comparisons at this rate.';rulesLabel.append(rules);
  const confirm=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;confirm.append(check,document.createTextNode('I have permission for this read-only test. The record and account are mine, the marker is synthetic, and the response should require login.'));
  const status=el('p');status.setAttribute('role','status');const submit=el('button','Connect and start checks');submit.type='submit';
- form.append(targetLabel,markerLabel,generate,el('p','Save the generated marker inside your private test record before connecting. Do not put it in the URL. Responses must be JSON and no larger than 64 KB.','muted'),authLabel,el('p','Credentials stay in a private file on your server and go only to this exact HTTPS host. They are never shown in results. Do not send passwords or tokens in chat.','muted'),rulesLabel,confirm,submit,status);
- form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/access-check',{target:Number(select.value),marker:marker.value,authorization:auth.value,rules:rules.value,permission:check.checked,own_data:check.checked,read_only:check.checked,private_expected:check.checked});auth.value='';openAccess();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+ form.append(modeLabel,targetLabel,markerLabel,generate,el('p','Save the generated marker inside your private test record before connecting. Do not put it in the URL. Responses must be JSON and no larger than 64 KB.','muted'),authLabel,peerBox,el('p','Credentials stay in a private file on your server and go only to this exact HTTPS host. They are never shown in results. Do not send passwords or tokens in chat.','muted'),rulesLabel,confirm,submit,status);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/access-check',{target:Number(select.value),marker:marker.value,authorization:auth.value,mode:mode.value,peer_target:Number(peerTarget.value),peer_marker:peerMarker.value,peer_authorization:peerAuth.value,two_accounts_owned:peerOwned.checked,six_requests_permitted:peerOwned.checked,rules:rules.value,permission:check.checked,own_data:check.checked,read_only:check.checked,private_expected:check.checked});auth.value='';peerAuth.value='';openAccess();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openAccess').onclick=openAccess;
+$('readiness').onchange=()=>{visibleLimit=40;renderWorklist();};
+$('openMethods').onclick=()=>{const root=modal('Testing methods and actual coverage');root.append(el('p','Methods are based on published OWASP and PortSwigger guidance. Available checks still need valid program scope and test setup. Research notes are not a claim of expert-level coverage.'));for(const m of state.workflow?.methods||[]){const box=el('article',undefined,'item');box.append(el('h3',m.title),el('strong',m.status),el('p',m.coverage));m.sources.forEach(u=>box.append(safeLink('Method reference ↗',u),el('br')));root.append(box);}};
 
 function openCapital(){
  const root=modal('Connect Capital.com demo');const c=state.capital_demo||{};
