@@ -1,5 +1,6 @@
 """Truthful runtime status and private, unverified local-model review receipts."""
 import http.client
+import hashlib
 import json
 import re
 import shutil
@@ -25,6 +26,9 @@ def init(c):
       CREATE TABLE IF NOT EXISTS research_status(id INTEGER PRIMARY KEY, checked INTEGER, due INTEGER, status TEXT, runs TEXT, ai_enabled INTEGER DEFAULT 0);
       INSERT OR IGNORE INTO research_status VALUES(1,0,0,'Waiting for GitHub status','[]',0);
       CREATE TABLE IF NOT EXISTS private_ai_reviews(run TEXT PRIMARY KEY, attempt TEXT, revision TEXT, started INTEGER, updated INTEGER, state TEXT, result TEXT);
+      CREATE TABLE IF NOT EXISTS private_ai_triage(run TEXT, part INTEGER, revision TEXT,
+        fingerprint TEXT, decision TEXT, reason TEXT, evidence TEXT, reviewed INTEGER,
+        PRIMARY KEY(run,part));
     ''')
 
 
@@ -154,6 +158,33 @@ def clean_result(data):
             'limitation':'Small local model. Synthetic calibration is not an expert benchmark. Suggestions may be wrong; no generated code is executed.'}
 
 
+def fingerprint(part):
+    return hashlib.sha256(json.dumps([part['file'], part['line'], part['analysis']], ensure_ascii=True).encode()).hexdigest()
+
+
+def triage(c, data):
+    """Owner review is separate from model output and tied to exact evidence."""
+    run = data.get('run')
+    part = data.get('part')
+    if not isinstance(run, str) or not re.fullmatch('[0-9]{1,20}', run) or type(part) is not int or not 0 <= part < 2:
+        raise ValueError('Choose an existing private review')
+    row = c.execute('SELECT * FROM private_ai_reviews WHERE run=?', (run,)).fetchone()
+    if not row or row['state'] != 'reviewed' or row['revision'] != data.get('revision'):
+        raise ValueError('Review revision changed; refresh before reviewing')
+    parts = json.loads(row['result']).get('reviews', [])
+    if part >= len(parts) or fingerprint(parts[part]) != data.get('fingerprint'):
+        raise ValueError('Review evidence changed; refresh before reviewing')
+    if data.get('decision') not in ('dismissed', 'needs_validation'):
+        raise ValueError('AI hypotheses cannot be promoted to confirmed bugs or approved reports')
+    for key in ('reason', 'evidence'):
+        if not isinstance(data.get(key), str) or not 30 <= len(data[key].strip()) <= 4000:
+            raise ValueError('Record a clear reason and the code or test evidence for this review')
+    c.execute('''INSERT INTO private_ai_triage VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(run,part)
+        DO UPDATE SET revision=excluded.revision,fingerprint=excluded.fingerprint,decision=excluded.decision,
+        reason=excluded.reason,evidence=excluded.evidence,reviewed=excluded.reviewed''',
+        (run,part,row['revision'],data['fingerprint'],data['decision'],data['reason'].strip(),data['evidence'].strip(),int(time.time())))
+
+
 def receive(c, claims, payload):
     if not isinstance(payload, dict) or payload.get('revision') != claims['sha']:
         raise ValueError('Receipt revision does not match workload identity')
@@ -173,6 +204,7 @@ def receive(c, claims, payload):
         c.execute('INSERT INTO private_ai_reviews VALUES(?,?,?,?,?,?,?) ON CONFLICT(run) DO UPDATE SET attempt=excluded.attempt,started=excluded.started,updated=excluded.updated,state=excluded.state,result=excluded.result',
                   (run,attempt,revision,now,now,'running','{}'))
         c.execute('DELETE FROM private_ai_reviews WHERE run NOT IN (SELECT run FROM private_ai_reviews ORDER BY started DESC LIMIT 30)')
+        c.execute('DELETE FROM private_ai_triage WHERE run NOT IN (SELECT run FROM private_ai_reviews)')
         return {'accepted':True}
     if payload.get('stage') != 'result' or not old or old['attempt'] != attempt or old['revision'] != revision or now-old['started'] > 1800:
         raise ValueError('No current authorized review lease')
@@ -189,6 +221,14 @@ def snapshot(c):
     for r in c.execute('SELECT * FROM private_ai_reviews ORDER BY started DESC LIMIT 10'):
         item = dict(r)
         item['result'] = json.loads(item['result'])
+        for i, part in enumerate(item['result'].get('reviews', [])):
+            part['fingerprint'] = fingerprint(part)
+            decision = c.execute('SELECT decision,reason,evidence,reviewed FROM private_ai_triage WHERE run=? AND part=? AND revision=? AND fingerprint=?',
+                                 (r['run'],i,r['revision'],part['fingerprint'])).fetchone()
+            part['triage'] = dict(decision) if decision else None
+        parts = item['result'].get('reviews', [])
+        item['triage_summary'] = {'dismissed':sum(bool(p['triage'] and p['triage']['decision']=='dismissed') for p in parts),
+                                 'pending':sum(not p['triage'] or p['triage']['decision']!='dismissed' for p in parts)}
         item['url'] = 'https://github.com/'+REPO+'/actions/runs/'+item['run']
         reports.append(item)
     return {'version':'private-research-1','checked':row['checked'],'fresh':bool(row['checked'] and time.time()-row['checked']<900),

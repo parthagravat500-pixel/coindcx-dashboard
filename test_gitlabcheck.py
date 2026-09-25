@@ -1,6 +1,7 @@
 import copy
 import json
 import sqlite3
+import ssl
 import tempfile
 import time
 import unittest
@@ -87,6 +88,96 @@ class GitLabTests(unittest.TestCase):
         r,calls=self.run_check([self.response(200,self.info),self.response(200,self.project)],lambda:next(permissions))
         self.assertEqual(len(calls),2)
         self.assertTrue(r['status'].startswith('Stopped:'))
+
+    def test_failure_diagnostics_retry_only_temporary_responses_without_private_text(self):
+        for status in (401,403,429,500,501,502,503,504):
+            r,calls=self.run_check([self.response(status)])
+            self.assertEqual(len(calls),1)
+            self.assertEqual(g.temporary_failure(r),status in g.TEMPORARY_HTTP)
+            self.assertFalse(r['reproduced'])
+        for exc,temporary in ((TimeoutError,True),(ConnectionResetError,True),(ssl.SSLError,False),(ValueError,False)):
+            def fail(*_):raise exc(self.config['token'])
+            r=g.compare(self.config,transport=fail,pace=lambda _:None)
+            self.assertEqual(g.temporary_failure(r),temporary)
+            self.assertNotIn(self.config['token'],json.dumps(r))
+
+    def test_transient_retries_back_off_persist_and_stop_after_two_retries(self):
+        g.configure(self.c,self.root,self.form)
+        now=int(time.time())
+        failure,_=self.run_check([self.response(503)])
+        with patch.object(g,'compare',side_effect=lambda *_:copy.deepcopy(failure)) as compare,patch.object(g.time,'time') as clock:
+            for attempt,delay in enumerate((900,1800,3600),1):
+                clock.return_value=now
+                g.tick(self.db,self.root,lambda *_:None)
+                s=g.snapshot(self.c)
+                self.assertEqual(s['due'],now+delay)
+                self.assertEqual(s['result']['transient_failures'],attempt)
+                self.assertEqual(bool(s['enabled']),attempt<=2)
+                g.init(self.c)
+                g.tick(self.db,self.root,lambda *_:None)
+                self.assertEqual(compare.call_count,attempt)
+                now+=delay
+            clock.return_value=now
+            g.tick(self.db,self.root,lambda *_:None)
+            self.assertEqual(compare.call_count,3)
+
+    def test_retry_after_is_honored_and_never_extends_permission(self):
+        now=int(time.time())
+        self.assertEqual(g.retry_after('3600',now),now+3600)
+        self.assertEqual(g.retry_after('Wed, 21 Oct 2015 07:28:00 GMT'),1445412480)
+        self.assertEqual(g.retry_after('invalid'),0)
+        g.configure(self.c,self.root,self.form)
+        original_expiry=g.snapshot(self.c)['expires']
+        failure,_=self.run_check([dict(self.response(503),retry_at=now+3600)])
+        with patch.object(g,'compare',return_value=failure),patch.object(g.time,'time',return_value=now):
+            g.tick(self.db,self.root,lambda *_:None)
+        s=g.snapshot(self.c)
+        self.assertEqual(s['due'],now+3600);self.assertTrue(s['enabled'])
+        self.c.execute('UPDATE gitlab_check SET due=0')
+        failure,_=self.run_check([dict(self.response(503),retry_at=10**90)])
+        with patch.object(g,'compare',return_value=failure),patch.object(g.time,'time',return_value=now):
+            g.tick(self.db,self.root,lambda *_:None)
+        s=g.snapshot(self.c)
+        self.assertFalse(s['enabled']);self.assertEqual(s['expires'],original_expiry)
+        self.assertFalse(s['retry_available'])
+
+    def stopped_legacy(self,status=503):
+        g.configure(self.c,self.root,self.form)
+        now=int(time.time())
+        r={'status':'Stopped: request failed or server asked us to stop; no conclusion',
+           'evidence':[self.response(status)],'verified_connection':False,'reproduced':False}
+        self.c.execute('UPDATE gitlab_check SET enabled=0,checked=?,due=?,result=?',
+                       (now-1000,now-100,json.dumps(r)))
+
+    def test_saved_recovery_reuses_token_project_and_existing_permission(self):
+        self.stopped_legacy()
+        before=g.secret_path(self.root).read_bytes()
+        expires=g.snapshot(self.c)['expires']
+        self.assertTrue(g.snapshot(self.c)['retry_available'])
+        g.retry_saved(self.c,self.root)
+        s=g.snapshot(self.c)
+        self.assertTrue(s['enabled']);self.assertFalse(s['retry_available'])
+        self.assertEqual(s['expires'],expires)
+        self.assertEqual(g.secret_path(self.root).read_bytes(),before)
+        self.assertNotIn(self.config['token'],json.dumps(s))
+
+    def test_saved_recovery_cannot_bypass_stop_cooldown_pause_expiry_or_missing_secret(self):
+        self.stopped_legacy()
+        for sql in ('UPDATE settings SET paused=1','UPDATE gitlab_check SET expires=0',
+                    'UPDATE gitlab_check SET enabled=1','UPDATE gitlab_check SET checked=9999999999',
+                    "UPDATE gitlab_check SET result='{}'", "UPDATE gitlab_check SET revision='changed'"):
+            self.c.execute('SAVEPOINT fixture')
+            self.c.execute(sql)
+            with self.assertRaises(ValueError):g.retry_saved(self.c,self.root)
+            self.c.execute('ROLLBACK TO fixture');self.c.execute('RELEASE fixture')
+        for status in (401,403,429,501):
+            r={'status':'Stopped: request failed or server asked us to stop; no conclusion','evidence':[self.response(status)]}
+            self.c.execute('UPDATE gitlab_check SET result=?',(json.dumps(r),))
+            with self.assertRaises(ValueError):g.retry_saved(self.c,self.root)
+        self.c.execute('UPDATE gitlab_check SET checked=0')
+        self.stopped_legacy()
+        g.secret_path(self.root).unlink()
+        with self.assertRaises(ValueError):g.retry_saved(self.c,self.root)
 
     def test_private_storage_snapshot_and_disconnect(self):
         g.configure(self.c,self.root,self.form)

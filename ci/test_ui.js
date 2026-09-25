@@ -27,6 +27,15 @@ setImmediate(()=>{
  vm.runInContext('renderResearchStatus();openPrivateAI()',context);
  assert.match(nodes.get('privateAIStatus').textContent,/Review received/);
  assert(nodes.get('detail').open);
+ state.research.ai_reviews[0].triage_summary={pending:0,dismissed:1};
+ state.research.ai_reviews[0].result.reviews[0].triage={decision:'dismissed',reason:'<script>private review</script>',evidence:'Test evidence only',reviewed:1};
+ vm.runInContext('renderResearchStatus();openPrivateAI()',context);
+ assert.match(nodes.get('privateAIStatus').textContent,/0 awaiting validation · 1 dismissed/);
+ vm.runInContext('openAIHypothesisReview(state.research.ai_reviews[0],0,state.research.ai_reviews[0].result.reviews[0])',context);
+ assert(nodes.get('detail').open);
+ state.gitlab={configured:true,enabled:0,expires:Date.now()/1000+3600,retry_available:true,result:{evidence:[]}};
+ vm.runInContext('openGitlab()',context);
+ assert(nodes.get('detailContent').children.some(n=>n.textContent==='Retry saved connection'));
  state.program_queue.rows=[{name:'<script>unsafe</script>',policy:'https://hackerone.com/example',status:'Skipped: permission needed',approved_urls:0}];
  state.program_queue.attempts=[{name:'Fixture',outcome:'no_observation',started:1,observations:0}];
  vm.runInContext('openProgramQueue()',context);

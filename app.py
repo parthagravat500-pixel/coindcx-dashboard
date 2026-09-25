@@ -328,6 +328,12 @@ def mutate(path, data):
             log(c,'GitLab project configured; connection verification queued.')
         elif path == '/api/gitlab/disconnect':
             gitlabcheck.disconnect(c,DATA)
+        elif path == '/api/gitlab/retry':
+            gitlabcheck.retry_saved(c,DATA)
+            log(c,'GitLab saved project recovery queued; existing permission and scope retained.')
+        elif path == '/api/research-triage':
+            research.triage(c,data)
+            log(c,'Private AI hypothesis review saved. No bug confirmation or report submission.')
         elif path == '/api/capital-demo/connect':
             capitaldemo.configure(c,DATA,data)
             log(c,'Capital.com demo test configured; awaiting worker.')

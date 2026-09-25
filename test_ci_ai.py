@@ -9,6 +9,10 @@ class PrivateAITests(unittest.TestCase):
         excerpts=ai_bridge.excerpts(Path(__file__).parent)
         self.assertEqual([x['file'] for x in excerpts],['app.py','ci_identity.py'])
         self.assertTrue(all(x['line']>0 and len(x['source'])<=8500 for x in excerpts))
+        self.assertIn('CSRF = secrets.token_urlsafe(32)',excerpts[0]['source'])
+        self.assertIn('def verify_token(',excerpts[0]['source'])
+        self.assertIn('def fetch_signing_keys(',excerpts[1]['source'])
+        self.assertIn('def verify_signature(',excerpts[1]['source'])
 
     def test_calibration_rejects_wrong_or_extra_answers(self):
         with patch.object(ai_review,'chat',return_value='{"a":"unsafe","b":"safe"}'):

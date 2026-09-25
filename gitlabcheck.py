@@ -11,12 +11,32 @@ import socket
 import ssl
 import tempfile
 import time
+from email.utils import parsedate_to_datetime
 from urllib.parse import quote, urlsplit
 from engine import public_addresses
 
 HOST = 'gitlab.com'
 INTERVAL = 900
 MAX_BODY = 65536
+TEMPORARY_HTTP = {500, 502, 503, 504}
+MAX_TRANSIENT_RETRIES = 2
+
+
+class ServerStop(Exception):
+    def __init__(self, status, retry_at=0):
+        self.status = status
+        self.retry_at = retry_at
+
+
+def retry_after(value, now=None):
+    """Honor Retry-After without keeping response text or shortening its delay."""
+    now = int(time.time()) if now is None else now
+    if not isinstance(value, str) or len(value) > 100:
+        return 0
+    try:
+        return now + int(value) if value.isdigit() else max(0, int(parsedate_to_datetime(value).timestamp()))
+    except (ValueError, TypeError, OverflowError):
+        return 0
 
 
 def init(c):
@@ -113,6 +133,7 @@ def fetch(path, token):
             except (ValueError, UnicodeError):
                 pass
         return {'status': response.status, 'data': value, 'bytes': len(body),
+                'retry_at': retry_after(response.getheader('Retry-After', '')),
                 'sha256': hashlib.sha256(body).hexdigest()}
     finally:
         conn.close()
@@ -122,7 +143,7 @@ def fetch(path, token):
 def compare(config, allowed=lambda: True, transport=fetch, pace=time.sleep):
     evidence = []
     result = {'evidence': evidence, 'verified_connection': False, 'reproduced': False,
-              'submission_ready': False, 'severity': 'Not assessed',
+              'submission_ready': False, 'severity': 'Not assessed', 'retryable': False,
               'limitation': 'One private project description only. A passed check is not a vulnerability. Exposure needs manual impact and program eligibility review.'}
     endpoint = '/api/v4/projects/' + quote(config['project'], safe='')
 
@@ -134,7 +155,7 @@ def compare(config, allowed=lambda: True, transport=fetch, pace=time.sleep):
         evidence.append({k: r[k] for k in ('status', 'bytes', 'sha256')})
         evidence[-1]['step'] = label
         if r['status'] == 429 or r['status'] >= 500:
-            raise RuntimeError('Rate limit or server error')
+            raise ServerStop(r['status'], r.get('retry_at', 0))
         return r
 
     def project(r, private=False):
@@ -175,8 +196,47 @@ def compare(config, allowed=lambda: True, transport=fetch, pace=time.sleep):
         if marker(again) and marker(last) and project(last, True) and owner(last) and len({r['data']['id'] for r in (first, anon, again, last)}) == 1:
             return dict(result, status='Needs review: private test text appeared without login twice', reproduced=True)
         return dict(result, status='Inconclusive: privacy or response changed; check stopped')
-    except Exception as exc:
-        return dict(result, status='Stopped: ' + ('paused, disconnected or permission expired' if isinstance(exc, InterruptedError) else 'request failed or server asked us to stop') + '; no conclusion')
+    except ServerStop as exc:
+        temporary = exc.status in TEMPORARY_HTTP
+        return dict(result, status='Stopped: HTTP ' + str(exc.status) +
+                    (' temporary server failure' if temporary else ' server response requires review') + '; no conclusion',
+                    failure_kind='temporary_http' if temporary else 'server_stop',
+                    retryable=temporary, retry_at=exc.retry_at)
+    except InterruptedError:
+        return dict(result, status='Stopped: paused, disconnected or permission expired; no conclusion', failure_kind='permission')
+    except ssl.SSLError:
+        return dict(result, status='Stopped: TLS verification or connection failed; review required', failure_kind='tls')
+    except (TimeoutError, ConnectionError, socket.gaierror):
+        return dict(result, status='Stopped: temporary network failure; no conclusion', failure_kind='network', retryable=True)
+    except Exception:
+        # Never retain exception text: network errors can contain private input.
+        return dict(result, status='Stopped: invalid or unexpected response; review required', failure_kind='unexpected')
+
+
+def temporary_failure(result):
+    if result.get('retryable') is True and result.get('failure_kind') in ('temporary_http', 'network'):
+        return True
+    # Older saved results did not distinguish an HTTP 503 from other failures.
+    evidence = result.get('evidence', [])
+    return (result.get('status') == 'Stopped: request failed or server asked us to stop; no conclusion'
+            and bool(evidence) and evidence[-1].get('status') in TEMPORARY_HTTP)
+
+
+def retry_saved(c, root):
+    s = snapshot(c)
+    if not s.get('retry_available'):
+        raise ValueError('Recovery is unavailable: wait for the cooldown, resume the dashboard, or review connection and permission details.')
+    row = c.execute('SELECT * FROM gitlab_check WHERE id=1').fetchone()
+    try:
+        config = json.loads(secret_path(root).read_text())
+        if config['revision'] != row['revision'] or config['project'] != row['project']:
+            raise ValueError('Connection changed')
+    except (OSError, ValueError, KeyError, TypeError):
+        raise ValueError('Saved connection is unavailable; reconnect your project.') from None
+    result = json.loads(row['result'])
+    result['transient_failures'] = 0
+    c.execute("UPDATE gitlab_check SET enabled=1,due=?,status='Recovery scheduled for your saved private project',result=? WHERE id=1",
+              (int(time.time()), json.dumps(result)))
 
 
 def tick(db, root, log):
@@ -204,11 +264,21 @@ def tick(db, root, log):
         result = {'status': 'Setup needed: reconnect your project', 'evidence': [], 'verified_connection': False,
                   'reproduced': False, 'submission_ready': False}
     complete = int(time.time())
-    enabled = int(result['status'].startswith('Passed:'))
+    failures = json.loads(row['result']).get('transient_failures', 0) + 1 if temporary_failure(result) else 0
+    retry_pending = bool(failures and failures <= MAX_TRANSIENT_RETRIES)
+    # A server delay beyond the permission window stops recovery altogether.
+    due = min(row['expires'], max(complete + INTERVAL * 2 ** min(max(failures - 1, 0), 2), result.get('retry_at', 0)))
+    retry_pending = retry_pending and due < row['expires']
+    result.update(transient_failures=failures, retry_pending=retry_pending)
+    if retry_pending:
+        result['status'] += '; delayed retry ' + str(failures) + ' of ' + str(MAX_TRANSIENT_RETRIES) + ' scheduled'
+    elif failures:
+        result['status'] += '; automatic recovery stopped'
+    enabled = int(result['status'].startswith('Passed:') or retry_pending)
     with db() as c:
         updated = c.execute('''UPDATE gitlab_check SET due=?,checked=?,status=?,result=?,enabled=?,runs=runs+1
             WHERE id=1 AND revision=? AND enabled=1''',
-            (complete + INTERVAL, complete, result['status'], json.dumps(result), enabled, row['revision']))
+            (due, complete, result['status'], json.dumps(result), enabled, row['revision']))
         if updated.rowcount:
             log(c, 'GitLab project check: ' + result['status'] + '. No report sent.')
 
@@ -223,6 +293,10 @@ def snapshot(c):
     if not r:
         return {'configured': False, 'connected': False, 'status': 'Needs your read-only token', 'runs': 0}
     result = json.loads(r['result'])
+    now = int(time.time())
+    retry_at = max(r['checked'] + INTERVAL, r['due'], result.get('retry_at', 0))
+    retry_available = bool(r['revision'] and not r['enabled'] and r['expires'] > now and now >= retry_at
+                           and not c.execute('SELECT paused FROM settings').fetchone()[0] and temporary_failure(result))
     return {**{k: r[k] for k in ('project', 'enabled', 'expires', 'due', 'checked', 'status', 'runs')},
             'configured': bool(r['revision']), 'connected': bool(r['revision'] and result.get('verified_connection')),
-            'result': result}
+            'retry_available': retry_available, 'retry_at': retry_at, 'result': result}

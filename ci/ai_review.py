@@ -67,7 +67,7 @@ def main():
             if not isinstance(inputs,list) or len(inputs)!=2:raise ValueError('Invalid coverage')
             for item in inputs:
                 if item['file'] not in ('app.py','ci_identity.py') or len(item['source'])>8500:raise ValueError('Unexpected source')
-                prompt='Review this excerpt from our own ScopeGuard app. Focus on authentication, authorization, request validation and unsafe trust boundaries. List at most two plausible security issues with line references, assumptions, missing evidence and a safe local regression-test idea. If none is supported, say so. No severity inflation, no exploit payloads. You have not seen the rest of the app.\nSOURCE DATA:\n'+item['source']
+                prompt='Review this target function and its supporting source from our own ScopeGuard app. Check the supplied callers, helpers and constants before alleging missing validation. Missing context is not proof of a missing check. Identify at most one issue only if the supplied code shows an attacker-controlled input reaching a security-sensitive operation without an effective control. Explain the exact source path, existing controls, benign alternatives, missing evidence and a safe local test idea. If that path is not supported, say no supported vulnerability. Do not turn fixed configuration into attacker input or treat an exception that rejects a request as an authorization bypass. No generated test code, exploit payloads, severity claims or payout predictions.\nSOURCE DATA:\n'+item['source']
                 result['reviews'].append({'file':item['file'],'line':item['line'],'analysis':chat(prompt)})
             result['status']='reviewed'
     except Exception:

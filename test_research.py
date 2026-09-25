@@ -48,7 +48,7 @@ class IdentityTests(unittest.TestCase):
         self.assertEqual(identity.verify_token(self.token(),self.keys,1100)['run_id'],'123')
 
     def test_wrong_claims_fail(self):
-        for key,value in [('repository','other/repo'),('aud','other'),('ref','refs/heads/main'),('sub','other'),
+        for key,value in [('iss','other'),('repository','other/repo'),('aud','other'),('ref','refs/heads/main'),('sub','other'),
                           ('sub','repo:'+identity.REPOSITORY+':ref:'+identity.BRANCH),
                           ('workflow_ref','other'),('repository_id','1'),('repository_owner_id','1'),
                           ('runner_environment','self-hosted'),('event_name','pull_request'),('exp',1001),
@@ -129,6 +129,34 @@ class ResearchTests(unittest.TestCase):
             self.assertTrue(all(research.admit_request() for _ in range(12)))
             self.assertFalse(research.admit_request())
 
+    def test_private_triage_is_bound_to_revision_and_exact_hypothesis(self):
+        self.enable();self.send('start');self.send('result',result=self.result())
+        part=research.snapshot(self.c)['ai_reviews'][0]['result']['reviews'][0]
+        decision=dict(run='123',part=0,revision='a'*40,fingerprint=part['fingerprint'],decision='dismissed',
+                      reason='Synthetic review: existing validation rejects this input.',
+                      evidence='Synthetic local regression exercised the rejecting control.')
+        for change in ({'revision':'b'*40},{'fingerprint':'0'*64},{'part':True},{'decision':'confirmed'},
+                       {'decision':'accepted'},{'reason':'because'},{'evidence':''}):
+            with self.subTest(change=change),self.assertRaises(ValueError):research.triage(self.c,{**decision,**change})
+        research.triage(self.c,decision);research.init(self.c)
+        review=research.snapshot(self.c)['ai_reviews'][0]
+        self.assertEqual(review['triage_summary'],{'dismissed':1,'pending':0})
+        self.assertEqual(review['result']['reviews'][0]['analysis'],part['analysis'])
+        self.assertEqual(review['result']['confirmed_bugs'],0);self.assertFalse(review['result']['submission_ready'])
+        changed=self.result();changed['reviews'][0]['analysis']='A different hypothesis requires its own evidence review.'
+        self.c.execute('UPDATE private_ai_reviews SET result=?',(json.dumps(research.clean_result(changed)),))
+        review=research.snapshot(self.c)['ai_reviews'][0]
+        self.assertIsNone(review['result']['reviews'][0]['triage'])
+        self.assertEqual(review['triage_summary'],{'dismissed':0,'pending':1})
+
+    def test_model_receipt_cannot_supply_an_owner_triage_decision(self):
+        result=self.result()
+        result['reviews'][0]['triage']={'decision':'dismissed','reason':'Model request'}
+        result['reviews'][0]['status']='Confirmed'
+        self.enable();self.send('start');self.send('result',result=result)
+        part=research.snapshot(self.c)['ai_reviews'][0]['result']['reviews'][0]
+        self.assertIsNone(part['triage']);self.assertEqual(part['status'],'Unverified AI hypothesis')
+
 
 class ReceiptHTTPTests(unittest.TestCase):
     def setUp(self):
@@ -158,6 +186,22 @@ class ReceiptHTTPTests(unittest.TestCase):
 
     def test_ai_configuration_still_requires_auth(self):
         self.assertEqual(self.request('/api/research-ai',{},'{"enabled":true}')[0],401)
+
+    def test_recovery_and_triage_require_owner_auth_and_csrf(self):
+        auth={'Authorization':'Basic '+base64.b64encode(('admin:'+app.TOKEN).encode()).decode()}
+        self.assertGreater(len(app.CSRF),30)
+        for path in ('/api/gitlab/retry','/api/research-triage'):
+            self.assertEqual(self.request(path,{})[0],401)
+            self.assertEqual(self.request(path,auth)[0],403)
+            self.assertEqual(self.request(path,{**auth,'X-CSRF-Token':'wrong'})[0],403)
+            self.assertEqual(self.request(path,{**auth,'X-CSRF-Token':app.CSRF})[0],400)
+
+    def test_actual_identity_validation_rejects_empty_or_malformed_bearer(self):
+        with patch.dict(research.KEY_CACHE,{'at':time.time(),'keys':[{'kid':'fixture'}]}):
+            for value in ('','malformed','a.b.c','a..c'):
+                status,body=self.request('/api/ci-review',{'Authorization':'Bearer '+value})
+                self.assertEqual(status,403);self.assertNotIn('Traceback',body)
+        with app.db() as c:self.assertEqual(c.execute('SELECT COUNT(*) FROM private_ai_reviews').fetchone()[0],0)
 
     def test_valid_identity_cannot_bypass_owner_pause(self):
         claims={'sha':'a'*40,'run_id':'123','run_attempt':'1'}

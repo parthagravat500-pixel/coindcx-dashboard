@@ -154,7 +154,7 @@ function renderResearchStatus(){
  $('runtimeStatus').textContent=runtime?('Latest run: '+(runtime.conclusion||runtime.status)+(r.fresh?'':' · status may be stale')):'Waiting for a verified GitHub run status.';
  $('runtimeDetails').textContent=runtime?'Owned-app regression tests in a network-isolated, read-only container. Tested revision '+runtime.revision.slice(0,8)+'. '+(runtime.revision===r.deployed_revision?'Matches the deployed revision.':'Does not match the deployed revision; do not assume deployment coverage.')+' Last status sync: '+date(r.checked):r.status;
  $('runtimeLink').replaceChildren(...(runtime?[safeLink('Open isolated test run ↗',runtime.url)]:[]));
- $('privateAIStatus').textContent=state.paused?'Paused':!r.ai_enabled?'Disabled':!r.identity_ready?'Waiting for secure runner connection':ai?(ai.state==='reviewed'?'Review received · unverified':ai.state==='running'?'Local model review running':ai.state.replaceAll('_',' ')):aiRun?.conclusion==='failure'?'Runner failed before review · open details':'Enabled · awaiting first review';
+ $('privateAIStatus').textContent=state.paused?'Paused':!r.ai_enabled?'Disabled':!r.identity_ready?'Waiting for secure runner connection':ai?(ai.state==='reviewed'?'Review received · '+(ai.triage_summary?ai.triage_summary.pending+' awaiting validation · '+ai.triage_summary.dismissed+' dismissed':'unverified'):ai.state==='running'?'Local model review running':ai.state.replaceAll('_',' ')):aiRun?.conclusion==='failure'?'Runner failed before review · open details':'Enabled · awaiting first review';
  $('privateAIDetails').textContent='Experimental local model, not expert AI. '+r.trigger+'. Results stay in this authenticated dashboard. '+r.cost+'.';
 }
 function openPrivateAI(){
@@ -166,8 +166,26 @@ function openPrivateAI(){
  for(const review of r.ai_reviews){const item=el('details');item.open=review===r.ai_reviews[0];item.append(el('summary',review.state+' · '+review.revision.slice(0,8)));
  facts(item,[['Started',date(review.started)],['Updated',date(review.updated)],['Source revision',review.revision],['Confirmed bugs',0]]);
  if(review.result.model){facts(item,[['Model',review.result.model],['Basic synthetic calibration',review.result.calibration_passed?'Passed (not an expert benchmark)':'Not passed']]);
- item.append(el('p',review.result.limitation,'muted'));for(const part of review.result.reviews||[]){item.append(el('h3',part.file+':'+part.line+' · '+part.status),el('p',part.analysis));}}
+ item.append(el('p',review.result.limitation,'muted'));for(const [index,part] of (review.result.reviews||[]).entries()){
+ const dismissed=part.triage?.decision==='dismissed';
+ item.append(el('h3',part.file+':'+part.line+' · '+(dismissed?'Dismissed after evidence review':'Needs validation · not a confirmed bug')));
+ if(part.triage)item.append(el('p',part.triage.reason),el('p','Evidence: '+part.triage.evidence),el('small','Reviewed '+date(part.triage.reviewed)));
+ const original=el('details');original.open=!dismissed;original.append(el('summary','Original AI hypothesis · may be incorrect'),el('p',part.analysis));item.append(original);
+ item.append(button('Review this hypothesis',()=>openAIHypothesisReview(review,index,part)));
+ }}
  item.append(safeLink('Open runner status ↗',review.url));root.append(item);}
+}
+function openAIHypothesisReview(review,index,part){
+ const root=modal('Review AI hypothesis');
+ root.append(el('p','Record what the source and tests establish. This review cannot confirm a bug, approve a payout or submit a report.'),el('p',part.file+':'+part.line+' · '+review.revision.slice(0,8)));
+ const form=el('form'),choice=el('select'),reason=el('textarea'),evidence=el('textarea');
+ for(const [value,label] of [['needs_validation','Needs validation'],['dismissed','Dismissed after evidence review']]){const o=el('option',label);o.value=value;choice.append(o);}
+ choice.value=part.triage?.decision||'needs_validation';reason.value=part.triage?.reason||'';evidence.value=part.triage?.evidence||'';
+ for(const [label,input] of [['Decision',choice],['Reason',reason],['Code and test evidence',evidence]]){const l=el('label',label);l.append(input);form.append(l);}
+ for(const input of [reason,evidence]){input.required=true;input.minLength=30;input.maxLength=4000;}
+ const submit=el('button','Save private review'),note=el('p');note.setAttribute('role','status');form.append(submit,note);
+ form.onsubmit=async event=>{event.preventDefault();submit.disabled=true;try{await change('/api/research-triage',{run:review.run,revision:review.revision,part:index,fingerprint:part.fingerprint,decision:choice.value,reason:reason.value,evidence:evidence.value});openPrivateAI();}catch(error){note.textContent=error.message;}finally{submit.disabled=false;}};
+ root.append(form);
 }
 $('openPrivateAI').onclick=openPrivateAI;
 function renderSimpleStatus(){
@@ -324,6 +342,7 @@ function openGitlab(){
  if(g.configured||g.checked){facts(root,[['Connection',g.connected?'Verified on last completed run':g.configured?'Saved; not yet verified':'Disconnected'],['Status',g.expires*1000<=Date.now()?'Permission expired':g.status],['Completed checks',g.runs],['Last checked',date(g.checked)],['Next check',gitlabActive()?(state.paused?'Paused':date(g.due)):'Stopped'],['Permission review due',date(g.expires)]]);
  for(const e of g.result?.evidence||[])root.append(el('p',e.step+': HTTP '+e.status),el('small','Response fingerprint: '+e.sha256));
  if(g.result?.limitation)root.append(el('p',g.result.limitation,'muted'));
+ if(g.retry_available)root.append(button('Retry saved connection',async()=>{await change('/api/gitlab/retry',{});openGitlab();}));
  if(g.configured)root.append(button('Disconnect and remove saved token',async()=>{await change('/api/gitlab/disconnect',{});openGitlab();}));}
  const steps=el('ol');['Keep your own test project Private. In its Settings → General, save the generated text below in Project description.','Create a GitLab personal access token named ScopeGuard. Set a short expiry and select only read_api. This can read projects your account can access, so use your dedicated test account.','Paste the token into this form, confirm the exact test is permitted, and connect. It checks the token and your project role before comparing access.'].forEach(t=>steps.append(el('li',t)));root.append(steps,safeLink('GitLab token setup instructions ↗','https://docs.gitlab.com/user/profile/personal_access_tokens/'));
  const form=el('form');const inputs={};
@@ -332,7 +351,7 @@ function openGitlab(){
  const gen=el('button','Generate test text','secondary');gen.type='button';gen.onclick=()=>{const b=crypto.getRandomValues(new Uint8Array(16));inputs.marker.value='scopeguard_'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');};form.append(gen,el('p','Copy the generated text into your private project description, then return here. Keep this setup form open.','muted'));
  const rl=el('label','Why is this exact GitLab.com test permitted?'),rules=el('textarea');rules.required=true;rules.minLength=30;rules.maxLength=4000;rules.placeholder='Record the current policy permission and why this needs production architecture instead of a local lab.';rl.append(rules);form.append(rl);
  const label=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;label.append(check,document.createTextNode('I own this private test project and use my HackerOne alias account. I checked the current rules and have permission for this read-only comparison, up to five requests every 15 minutes. The description contains synthetic test data only.'));
- const submit=el('button','Connect and verify'),note=el('p');note.setAttribute('role','status');form.append(label,el('p','The token stays in a restricted server file and is sent only to gitlab.com. Checks stop on errors, uncertain results, or suspected exposure. Review permission after seven days. Nothing is automatically reported.','muted'),submit,note);
+ const submit=el('button','Connect and verify'),note=el('p');note.setAttribute('role','status');form.append(label,el('p','The token stays in a restricted server file and is sent only to gitlab.com. Temporary network or server failures get at most two delayed retries, respecting server delays. Rate limits, permission errors, uncertain results and suspected exposure stop the checks. Review permission after seven days. Nothing is automatically reported.','muted'),submit,note);
  form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/gitlab/connect',{project:inputs.project.value,token:inputs.token.value,marker:inputs.marker.value,rules:rules.value,own_project:check.checked,policy_permission:check.checked,read_only:check.checked});inputs.token.value='';openGitlab();}catch(err){note.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openGitlab').onclick=openGitlab;

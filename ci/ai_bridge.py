@@ -57,17 +57,26 @@ def deliver(stage,result=None):
 
 
 def excerpts(root):
-    output=[]
-    for filename,function in [('app.py','do_POST'),('ci_identity.py','verify_token')]:
+    def section(filename,name):
         source=(root/filename).read_text()
         tree=ast.parse(source)
-        found=[node for node in ast.walk(tree) if isinstance(node,ast.FunctionDef) and node.name==function]
-        if len(found)!=1:raise ValueError('Expected one review function')
+        found=[node for node in ast.walk(tree) if (isinstance(node,ast.FunctionDef) and node.name==name)
+               or (isinstance(node,ast.Assign) and any(isinstance(t,ast.Name) and t.id==name for t in node.targets))]
+        if len(found)!=1:raise ValueError('Expected one fixed review definition')
         node=found[0]
         lines=source.splitlines()
-        text='\n'.join(f'{i+1}: {lines[i]}' for i in range(node.lineno-1,node.end_lineno))
+        return node.lineno,filename+'\n'+'\n'.join(f'{i+1}: {lines[i]}' for i in range(node.lineno-1,node.end_lineno))
+    constants=[('ci_identity.py',k) for k in ('ISSUER','AUDIENCE','REPOSITORY','BRANCH','WORKFLOW','SUBJECT')]
+    contexts={
+        'app.py':[('app.py','CSRF'),('app.py','authenticate'),('research.py','claims_for'),('ci_identity.py','verify_token')]+constants,
+        'ci_identity.py':constants+[('ci_identity.py','decode64'),('ci_identity.py','strict_object'),('ci_identity.py','verify_signature'),('research.py','claims_for'),('research.py','fetch_signing_keys')],
+    }
+    output=[]
+    for filename,function in [('app.py','do_POST'),('ci_identity.py','verify_token')]:
+        line,text=section(filename,function)
+        text+='\n\nSUPPORTING SOURCE FROM THIS SAME COMMIT\n'+'\n\n'.join(section(f,n)[1] for f,n in contexts[filename])
         if len(text)>8500:raise ValueError('Excerpt exceeds review budget')
-        output.append({'file':filename,'line':node.lineno,'source':text})
+        output.append({'file':filename,'line':line,'source':text})
     return output
 
 
