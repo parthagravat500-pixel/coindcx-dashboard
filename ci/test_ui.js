@@ -17,7 +17,8 @@ class Node {
 const html=fs.readFileSync('index.html','utf8'),nodes=new Map([...html.matchAll(/id="([^"]+)"/g)].map(m=>[m[1],new Node()]));
 const document={getElementById:id=>{if(!nodes.has(id))throw Error('Missing DOM id '+id);return nodes.get(id);},createElement:tag=>new Node(tag),createTextNode:text=>String(text),querySelectorAll:()=>[]};
 const state=JSON.parse(fs.readFileSync(0,'utf8'));
-const context=vm.createContext({document,URL,Date,console,setInterval:()=>{},confirm:()=>false,fetch:async()=>({ok:true,json:async()=>state})});
+const requests=[];
+const context=vm.createContext({document,URL,URLSearchParams,location:{hash:''},Date,console,setInterval:()=>{},confirm:()=>false,fetch:async(path,options={})=>{requests.push({path,method:options.method||'GET'});return {ok:true,json:async()=>state};}});
 vm.runInContext(fs.readFileSync('ui.js','utf8'),context);
 setImmediate(()=>{
  assert.equal(nodes.get('message').textContent,'');
@@ -56,6 +57,26 @@ setImmediate(()=>{
  assert(peerForm);
  assert.equal(descendants(peerForm).filter(n=>n.type==='password'&&n.required).length,1);
  assert(descendants(peerForm).some(n=>n.textContent==='Connect second account'));
+ const marker='scopeguard_'+'a'.repeat(32),setupHash='#gitlab-peer?project=fixture-b%2Fprivate-b&marker='+marker;
+ context.location.hash=setupHash;
+ vm.runInContext('openGitlabSetupFromLink()',context);
+ assert.equal(nodes.get('detailContent').children[0].textContent,'Finish your GitLab connection');
+ const setupForm=descendants(nodes.get('detailContent')).find(n=>n['aria-label']==='Connect second GitLab account');
+ assert(descendants(setupForm).some(n=>n.value==='https://gitlab.com/fixture-b/private-b'));
+ assert(descendants(setupForm).some(n=>n.value===marker));
+ assert.equal(descendants(setupForm).find(n=>n.type==='password').value,'');
+ assert(!descendants(setupForm).find(n=>n.type==='checkbox').checked);
+ assert.match(descendants(setupForm).find(n=>n.tagName==='textarea').value,/fixture-a\/private-a and fixture-b\/private-b/);
+ assert(requests.every(r=>r.method==='GET'),'Opening a setup link must never submit a connection.');
+ vm.runInContext('openGitlabSetupFromLink()',context);
+ assert(descendants(nodes.get('detailContent')).includes(setupForm),'Refresh must not replace an in-progress setup form.');
+ for(const badHash of [setupHash+'&token=secret',setupHash+'&project=other%2Fproject',setupHash.replace('fixture-b%2Fprivate-b','https%3A%2F%2Fevil.example%2Fx'),setupHash.replace(marker,'wrong')]){
+  assert.equal(vm.runInContext('parseGitlabSetupLink('+JSON.stringify(badHash)+')',context),null);
+ }
+ state.gitlab.peer={configured:true,project:'saved/peer',expires:Date.now()/1000+3600,result:{evidence:[]}};
+ vm.runInContext('gitlabSetupOpened=false;gitlabSetupDraft=null;openGitlabSetupFromLink()',context);
+ assert.equal(nodes.get('detailContent').children[0].textContent,'Your private GitLab project');
+ assert(!descendants(nodes.get('detailContent')).some(n=>n.value==='https://gitlab.com/fixture-b/private-b'),'A setup link must not override an existing connection.');
  vm.runInContext('openAccess()',context);
  const mode=descendants(nodes.get('detailContent')).find(n=>n.tagName==='select'&&n.children.some(o=>o.value==='two_account'));
  assert(mode);mode.value='two_account';mode.onchange();

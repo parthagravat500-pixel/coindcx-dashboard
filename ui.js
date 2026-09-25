@@ -1,5 +1,5 @@
 'use strict';
-let state;
+let state, gitlabSetupDraft=null, gitlabSetupOpened=false;
 const $ = id => document.getElementById(id);
 function el(tag, text, cls) { const n = document.createElement(tag); if(text !== undefined) n.textContent = text; if(cls) n.className = cls; return n; }
 function button(text, action) { const b = el('button', text, 'secondary'); b.onclick = async () => {b.disabled=true;try{await action();}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};return b; }
@@ -50,7 +50,7 @@ function renderLegacy() {
   });
   $('events').replaceChildren(...state.events.map(e=>el('div',new Date(e.at*1000).toLocaleString()+' · '+e.message)));
 }
-async function refresh(){const r=await fetch('/api/state');if(!r.ok)throw Error('Connection or login failed. Refresh to sign in.');state=await r.json();render();}
+async function refresh(){const r=await fetch('/api/state');if(!r.ok)throw Error('Connection or login failed. Refresh to sign in.');state=await r.json();render();openGitlabSetupFromLink();}
 $('pause').onclick=()=>{if(state)change('/api/pause',{paused:!state.paused}).catch(e=>$('message').textContent=e.message);};
 $('targetForm').onsubmit=async e=>{e.preventDefault();const form=e.target;const f=new FormData(form);const b=form.querySelector('button');b.disabled=true;try{await change('/api/targets',{name:f.get('name'),url:f.get('url'),policy:f.get('policy'),rules:f.get('rules'),interval:Number(f.get('hours'))*3600,expires:Math.floor(Date.now()/1000)+Number(f.get('days'))*86400-5,authorized:f.has('authorized'),automation_allowed:f.has('automation_allowed'),cors:f.has('cors')});form.reset();}catch(err){$('message').textContent=err.message;}finally{b.disabled=false;}};
 refresh().catch(e=>$('message').textContent=e.message);
@@ -350,6 +350,24 @@ function openCapital(){
 }
 $('openCapital').onclick=openCapital;
 
+function parseGitlabSetupLink(hash){
+ const prefix='#gitlab-peer?';if(typeof hash!=='string'||!hash.startsWith(prefix)||hash.length>700)return null;
+ const params=new URLSearchParams(hash.slice(prefix.length));
+ if([...params.keys()].length!==2||params.getAll('project').length!==1||params.getAll('marker').length!==1)return null;
+ const project=params.get('project'),marker=params.get('marker');
+ if(project.length>250||! /^[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_-][A-Za-z0-9_.-]*)+$/.test(project)||! /^scopeguard_[a-f0-9]{32}$/.test(marker))return null;
+ return {project,marker};
+}
+function openGitlabSetupFromLink(){
+ if(gitlabSetupOpened||typeof location==='undefined')return;
+ const draft=parseGitlabSetupLink(location.hash);if(!draft)return;
+ gitlabSetupOpened=true;
+ if(state.gitlab?.peer?.configured){openGitlab();return;}
+ gitlabSetupDraft=draft;
+ const root=modal('Finish your GitLab connection');
+ root.append(el('p','Your project details are filled in below. Paste the second account’s read-only token, review the permission checkbox, then tap Connect second account.'));
+ gitlabPeerSetup(root,state.gitlab||{});
+}
 function gitlabPeerSetup(root,g){
  const p=g.peer||{};root.append(el('h3','Second GitLab account'));
  root.append(el('p','Uses the first account already saved on this server. Checks that the two read-only tokens belong to different users, verifies both private project controls, then compares account B access to account A. At most eight GETs, one per second, every 15 minutes. The original anonymous check remains separate.','muted'));
@@ -360,12 +378,16 @@ function gitlabPeerSetup(root,g){
  if(!g.connected||!g.enabled||g.expires*1000<=Date.now()){root.append(el('p','An active verified first-account connection is required.'));return;}
  const form=el('form'),inputs={};form.setAttribute('aria-label','Connect second GitLab account');
  for(const [key,label,type] of [['project','Second private GitLab project link','text'],['marker','Marker saved in the second project description','text'],['token','Second GitLab token — read_api only','password']]){const l=el('label',label),i=el('input');i.type=type;i.required=true;i.autocomplete='off';i.maxLength=key==='marker'?43:512;l.append(i);inputs[key]=i;form.append(l);}
- inputs.project.value=p.project?'https://gitlab.com/'+p.project:'';
+ const draft=p.configured?null:gitlabSetupDraft;
+ inputs.project.value=draft?'https://gitlab.com/'+draft.project:p.project?'https://gitlab.com/'+p.project:'';
+ if(draft)inputs.marker.value=draft.marker;
+ inputs.token.placeholder='Paste the token copied from GitLab';
  const generate=el('button','Generate second-account marker','secondary');generate.type='button';generate.onclick=()=>{const b=crypto.getRandomValues(new Uint8Array(16));inputs.marker.value='scopeguard_'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');};form.append(generate);
  const rl=el('label','Permission for this two-account GitLab.com test'),rules=el('textarea');rules.required=true;rules.minLength=30;rules.maxLength=4000;rl.append(rules);form.append(rl);
+ if(draft)rules.value='Requested production comparison under https://hackerone.com/gitlab: two separately owned private test projects, '+g.project+' and '+draft.project+'. Both test accounts must have verified HackerOne email aliases and no shared membership. Compare only synthetic project descriptions with at most eight read-only API GETs, one per second, every 15 minutes. No discovery, writes, third-party data or automatic reports. Stop on failed controls, uncertain responses or rate limits. Current permission and the need for this GitLab.com comparison must be confirmed below.';
  const label=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;label.append(check,document.createTextNode('I own two different test accounts with the required HackerOne email aliases and no shared access to these private projects. Current rules permit this exact production test and up to eight read-only GETs every 15 minutes. Only synthetic descriptions are used.'));
  const submit=el('button','Connect second account'),note=el('p');submit.type='submit';note.setAttribute('role','status');form.append(label,el('p','Only the second token is entered here. The first token is never returned to the browser. Scope expires with the first account authorization. Same-account credentials, failed controls, rate limits and uncertain results stop this comparison.','muted'),submit,note);
- form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/gitlab/connect',{mode:'two_account',project:inputs.project.value,token:inputs.token.value,marker:inputs.marker.value,rules:rules.value,own_project:check.checked,policy_permission:check.checked,read_only:check.checked,two_accounts_owned:check.checked});inputs.token.value='';openGitlab();}catch(err){note.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/gitlab/connect',{mode:'two_account',project:inputs.project.value,token:inputs.token.value,marker:inputs.marker.value,rules:rules.value,own_project:check.checked,policy_permission:check.checked,read_only:check.checked,two_accounts_owned:check.checked});inputs.token.value='';gitlabSetupDraft=null;openGitlab();}catch(err){note.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 
 function openGitlab(){
