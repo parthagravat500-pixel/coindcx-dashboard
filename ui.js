@@ -350,6 +350,24 @@ function openCapital(){
 }
 $('openCapital').onclick=openCapital;
 
+function gitlabPeerSetup(root,g){
+ const p=g.peer||{};root.append(el('h3','Second GitLab account'));
+ root.append(el('p','Uses the first account already saved on this server. Checks that the two read-only tokens belong to different users, verifies both private project controls, then compares account B access to account A. At most eight GETs, one per second, every 15 minutes. The original anonymous check remains separate.','muted'));
+ if(p.configured||p.checked){facts(root,[['Second project',p.project],['Status',p.expires*1000<=Date.now()?'Permission expired':p.status],['Completed checks',p.runs],['Last checked',date(p.checked)]]);
+ for(const e of p.result?.evidence||[])root.append(el('p',e.step+': HTTP '+e.status),el('small','Response fingerprint: '+e.sha256));
+ if(p.result?.limitation)root.append(el('p',p.result.limitation,'muted'));
+ if(p.configured)root.append(button('Disconnect second account',async()=>{await change('/api/gitlab/connect',{mode:'remove_peer'});openGitlab();}));}
+ if(!g.connected||!g.enabled||g.expires*1000<=Date.now()){root.append(el('p','An active verified first-account connection is required.'));return;}
+ const form=el('form'),inputs={};form.setAttribute('aria-label','Connect second GitLab account');
+ for(const [key,label,type] of [['project','Second private GitLab project link','text'],['marker','Marker saved in the second project description','text'],['token','Second GitLab token — read_api only','password']]){const l=el('label',label),i=el('input');i.type=type;i.required=true;i.autocomplete='off';i.maxLength=key==='marker'?43:512;l.append(i);inputs[key]=i;form.append(l);}
+ inputs.project.value=p.project?'https://gitlab.com/'+p.project:'';
+ const generate=el('button','Generate second-account marker','secondary');generate.type='button';generate.onclick=()=>{const b=crypto.getRandomValues(new Uint8Array(16));inputs.marker.value='scopeguard_'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join('');};form.append(generate);
+ const rl=el('label','Permission for this two-account GitLab.com test'),rules=el('textarea');rules.required=true;rules.minLength=30;rules.maxLength=4000;rl.append(rules);form.append(rl);
+ const label=el('label',undefined,'check'),check=el('input');check.type='checkbox';check.required=true;label.append(check,document.createTextNode('I own two different test accounts with the required HackerOne email aliases and no shared access to these private projects. Current rules permit this exact production test and up to eight read-only GETs every 15 minutes. Only synthetic descriptions are used.'));
+ const submit=el('button','Connect second account'),note=el('p');submit.type='submit';note.setAttribute('role','status');form.append(label,el('p','Only the second token is entered here. The first token is never returned to the browser. Scope expires with the first account authorization. Same-account credentials, failed controls, rate limits and uncertain results stop this comparison.','muted'),submit,note);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/gitlab/connect',{mode:'two_account',project:inputs.project.value,token:inputs.token.value,marker:inputs.marker.value,rules:rules.value,own_project:check.checked,policy_permission:check.checked,read_only:check.checked,two_accounts_owned:check.checked});inputs.token.value='';openGitlab();}catch(err){note.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
+}
+
 function openGitlab(){
  const root=modal('Your private GitLab project'),g=state.gitlab||{};
  root.append(el('p','This checks whether synthetic text in your private project description is exposed without login. It does not need a README or any code files.'));
@@ -359,6 +377,7 @@ function openGitlab(){
  if(g.result?.limitation)root.append(el('p',g.result.limitation,'muted'));
  if(g.retry_available)root.append(button('Retry saved connection',async()=>{await change('/api/gitlab/retry',{});openGitlab();}));
  if(g.configured)root.append(button('Disconnect and remove saved token',async()=>{await change('/api/gitlab/disconnect',{});openGitlab();}));}
+ if(g.configured)gitlabPeerSetup(root,g);
  const steps=el('ol');['Keep your own test project Private. In its Settings → General, save the generated text below in Project description.','Create a GitLab personal access token named ScopeGuard. Set a short expiry and select only read_api. This can read projects your account can access, so use your dedicated test account.','Paste the token into this form, confirm the exact test is permitted, and connect. It checks the token and your project role before comparing access.'].forEach(t=>steps.append(el('li',t)));root.append(steps,safeLink('GitLab token setup instructions ↗','https://docs.gitlab.com/user/profile/personal_access_tokens/'));
  const form=el('form');const inputs={};
  for(const [key,label,type] of [['project','Your GitLab project link','text'],['marker','Test text to save in the project description','text'],['token','Private GitLab token — read_api only','password']]){const l=el('label',label),i=el('input');i.type=type;i.required=true;i.autocomplete='off';i.maxLength=key==='marker'?43:512;l.append(i);inputs[key]=i;form.append(l);}

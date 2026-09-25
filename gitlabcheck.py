@@ -14,6 +14,7 @@ import time
 from email.utils import parsedate_to_datetime
 from urllib.parse import quote, urlsplit
 from engine import public_addresses
+import gitlabpair
 
 HOST = 'gitlab.com'
 INTERVAL = 900
@@ -44,6 +45,7 @@ def init(c):
         id INTEGER PRIMARY KEY CHECK(id=1), revision TEXT, project TEXT,
         enabled INTEGER, expires INTEGER, due INTEGER, checked INTEGER,
         status TEXT, result TEXT, runs INTEGER DEFAULT 0)''')
+    gitlabpair.init(c)
 
 
 def project_path(value):
@@ -67,6 +69,12 @@ def secret_path(root):
 
 
 def configure(c, root, data):
+    if data.get('mode') == 'two_account':
+        return gitlabpair.configure(c, root, data)
+    if data.get('mode') == 'remove_peer':
+        return gitlabpair.disconnect(c, root)
+    if data.get('mode') not in (None, 'anonymous'):
+        raise ValueError('Choose the existing anonymous check or a two-account connection.')
     if not all(data.get(k) is True for k in ('own_project', 'policy_permission', 'read_only')):
         raise ValueError('Confirm ownership, current permission and the read-only test.')
     project = project_path(data.get('project'))
@@ -106,6 +114,7 @@ def configure(c, root, data):
         ON CONFLICT(id) DO UPDATE SET revision=excluded.revision,project=excluded.project,
         enabled=1,expires=excluded.expires,due=0,status=excluded.status,result='{}' ''',
         (revision, project, now + 7 * 86400))
+    gitlabpair.disconnect(c, root)
 
 
 def fetch(path, token):
@@ -239,7 +248,7 @@ def retry_saved(c, root):
               (int(time.time()), json.dumps(result)))
 
 
-def tick(db, root, log):
+def primary_tick(db, root, log):
     now = int(time.time())
     with db() as c:
         if c.execute('SELECT paused FROM settings').fetchone()[0]:
@@ -283,15 +292,22 @@ def tick(db, root, log):
             log(c, 'GitLab project check: ' + result['status'] + '. No report sent.')
 
 
+def tick(db, root, log):
+    primary_tick(db, root, log)
+    gitlabpair.tick(db, root, log)
+
+
 def disconnect(c, root):
     c.execute("UPDATE gitlab_check SET enabled=0,revision='',status='Disconnected' WHERE id=1")
     secret_path(root).unlink(missing_ok=True)
+    gitlabpair.disconnect(c, root)
 
 
 def snapshot(c):
     r = c.execute('SELECT * FROM gitlab_check WHERE id=1').fetchone()
     if not r:
-        return {'configured': False, 'connected': False, 'status': 'Needs your read-only token', 'runs': 0}
+        return {'configured': False, 'connected': False, 'status': 'Needs your read-only token', 'runs': 0,
+                'peer': gitlabpair.snapshot(c)}
     result = json.loads(r['result'])
     now = int(time.time())
     retry_at = max(r['checked'] + INTERVAL, r['due'], result.get('retry_at', 0))
@@ -299,4 +315,5 @@ def snapshot(c):
                            and not c.execute('SELECT paused FROM settings').fetchone()[0] and temporary_failure(result))
     return {**{k: r[k] for k in ('project', 'enabled', 'expires', 'due', 'checked', 'status', 'runs')},
             'configured': bool(r['revision']), 'connected': bool(r['revision'] and result.get('verified_connection')),
-            'retry_available': retry_available, 'retry_at': retry_at, 'result': result}
+            'retry_available': retry_available, 'retry_at': retry_at, 'result': result,
+            'peer': gitlabpair.snapshot(c)}

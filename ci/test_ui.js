@@ -50,6 +50,13 @@ setImmediate(()=>{
  assert.equal(nodes.get('listCount').textContent,'1 item');
  vm.runInContext('openProgram(state.workflow.programs[0]);openAccess()',context);
  const descendants=n=>[n,...(n.children||[]).filter(x=>x&&typeof x==='object').flatMap(descendants)];
+ state.gitlab={configured:true,connected:true,enabled:1,expires:Date.now()/1000+3600,project:'fixture-a/private-a',result:{evidence:[]},peer:{configured:false}};
+ vm.runInContext('openGitlab()',context);
+ const peerForm=descendants(nodes.get('detailContent')).find(n=>n['aria-label']==='Connect second GitLab account');
+ assert(peerForm);
+ assert.equal(descendants(peerForm).filter(n=>n.type==='password'&&n.required).length,1);
+ assert(descendants(peerForm).some(n=>n.textContent==='Connect second account'));
+ vm.runInContext('openAccess()',context);
  const mode=descendants(nodes.get('detailContent')).find(n=>n.tagName==='select'&&n.children.some(o=>o.value==='two_account'));
  assert(mode);mode.value='two_account';mode.onchange();
  assert.equal(descendants(nodes.get('detailContent')).find(n=>n.tagName==='fieldset').hidden,false);
