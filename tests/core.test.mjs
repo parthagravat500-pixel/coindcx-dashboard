@@ -1,3 +1,4 @@
+import "./context.test.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {mkdtempSync,rmSync} from "node:fs";
@@ -10,6 +11,7 @@ import {isEligibleCryptoPair} from "../lib/universe.ts";
 import {parseFeed,newsBlocks} from "../lib/news.ts";
 import {Store} from "../engine/store.mjs";
 const inst={step:.001,tick:.01,minimum:.001,minNotional:5,maxQuantity:1000,feeRate:.00075,contractValue:1,active:true};
+function observedState(now){const s=initialState(now);s.newsHealth={ok:true,checkedAt:now,sources:5,message:"fixture"};s.online={checkedAt:now,searchSources:[{name:"Google Trends US",url:"https://trends.google.com/trending?geo=US",ok:true,checkedAt:now,message:"fixture"}],searches:[],sentiment:null,sentimentHealth:{name:"Alternative.me",url:"https://alternative.me",ok:false,checkedAt:now,message:"fixture"}};return s;}
 test("crypto admission rejects metals, stock proxies, stablecoins and unreviewed assets",()=>{
  for(const asset of ["BTC","ETH","SOL","XRP","BNB","ZEC"])assert.equal(isEligibleCryptoPair("B-"+asset+"_USDT"),true);
  for(const pair of ["B-XAU_USDT","B-XAG_USDT","B-PAXG_USDT","B-TSLA_USDT","B-NAS100_USDT","B-USDC_USDT","B-UNKNOWN_USDT","BTC_USDT","B-BTC_INR"])assert.equal(isEligibleCryptoPair(pair),false,pair);
@@ -17,7 +19,7 @@ test("crypto admission rejects metals, stock proxies, stablecoins and unreviewed
 test("paper admission blocks an ineligible saved instrument without blocking eligible crypto",()=>{
  const now=Date.now();
  for(const pair of ["B-XAU_USDT","B-UNKNOWN_USDT","B-BTC_USDT"]){
-  const s=initialState(now);s.settings.running=true;s.settings.newsGuard=false;
+  const s=observedState(now);s.settings.running=true;s.settings.newsGuard=false;
   s.markets=[{pair,price:100,bid:99.99,ask:100.01,spreadBps:2,updatedAt:now,history:[],instrument:inst,signal:{action:"LONG",entry:100,stop:98,target:103.6,strategy:"test",regime:"Uptrend",reason:"test",barTime:now-60000}}];
   advancePaper(s,now);assert.equal(s.portfolio.trades.length,pair==="B-BTC_USDT"?1:0);
  }
@@ -56,8 +58,8 @@ test("malformed candles are discarded and duplicates are unique",()=>{const row=
 test("paper closing accounts for entry and exit fees exactly once",()=>{const s=initialState();const t=trade({openedAt:Date.now(),fees:.075});s.portfolio.balance=999.925;s.portfolio.trades=[t];closePaper(s,t,110,"Test");assert.equal(Number(t.pnl.toFixed(4)),9.8425);assert.equal(Number(s.portfolio.balance.toFixed(4)),1009.8425);const balance=s.portfolio.balance;closePaper(s,t,120,"Repeated");assert.equal(s.portfolio.balance,balance);});
 test("drawdown halts persist across a date boundary and reload",()=>{const now=Date.now(),s=initialState(now);s.portfolio.balance=900;riskCheck(s,now);assert.ok(s.portfolio.halted);const restored=JSON.parse(JSON.stringify(s));riskCheck(restored,now+86400000);assert.ok(restored.portfolio.halted);assert.equal(restored.settings.running,false);});
 test("paper mode has no exchange-order API dependency",()=>{const s=initialState();s.settings.running=true;advancePaper(s);assert.equal(s.portfolio.trades.length,0);assert.equal(liveGates(s).every(g=>g.pass),false);});
-test("same signal candle cannot create a duplicate entry",()=>{const now=Date.now(),s=initialState(now);s.settings.running=true;s.settings.newsGuard=false;const m={pair:"B-BTC_USDT",symbol:"BTC",price:100,bid:99.99,ask:100.01,spreadBps:2,turnover:1000000,change:1,funding:0,updatedAt:now,history:[],instrument:inst,signal:{action:"LONG",entry:100,stop:98,target:103.6,strategy:"test",regime:"Uptrend",reason:"test",barTime:Math.floor(now/60000)*60000-60000}};s.markets=[m];advancePaper(s,now);advancePaper(s,now+1000);assert.equal(s.portfolio.trades.length,1);});
-test("stale quotes cannot open a position",()=>{const now=Date.now(),s=initialState(now);s.settings.running=true;s.settings.newsGuard=false;s.markets=[{pair:"B-BTC_USDT",price:100,bid:99.99,ask:100.01,spreadBps:2,updatedAt:now-60000,history:[],instrument:inst,signal:{action:"LONG",entry:100,stop:98,target:103.6,strategy:"test",regime:"Uptrend",reason:"test",barTime:now-60000}}];advancePaper(s,now);assert.equal(s.portfolio.trades.length,0);assert.match(s.portfolio.events[0].message,/stale/);});
+test("same signal candle cannot create a duplicate entry",()=>{const now=Date.now(),s=observedState(now);s.settings.running=true;s.settings.newsGuard=false;const m={pair:"B-BTC_USDT",symbol:"BTC",price:100,bid:99.99,ask:100.01,spreadBps:2,turnover:1000000,change:1,funding:0,updatedAt:now,history:[],instrument:inst,signal:{action:"LONG",entry:100,stop:98,target:103.6,strategy:"test",regime:"Uptrend",reason:"test",barTime:Math.floor(now/60000)*60000-60000}};s.markets=[m];advancePaper(s,now);advancePaper(s,now+1000);assert.equal(s.portfolio.trades.length,1);});
+test("stale quotes cannot open a position",()=>{const now=Date.now(),s=observedState(now);s.settings.running=true;s.settings.newsGuard=false;s.markets=[{pair:"B-BTC_USDT",price:100,bid:99.99,ask:100.01,spreadBps:2,updatedAt:now-60000,history:[],instrument:inst,signal:{action:"LONG",entry:100,stop:98,target:103.6,strategy:"test",regime:"Uptrend",reason:"test",barTime:now-60000}}];advancePaper(s,now);assert.equal(s.portfolio.trades.length,0);assert.match(s.portfolio.events[0].message,/stale/);});
 test("risk settings reject unsafe and nonnumeric values",()=>{assert.throws(()=>validSettings({leverage:20}));assert.throws(()=>validSettings({riskPct:NaN}));assert.throws(()=>validSettings({maxPositions:5}));assert.throws(()=>validSettings({dailyLimitPct:10}));});
 test("India day boundary and Monday week are explicit",()=>{assert.equal(utcDayKeys(Date.parse("2026-09-25T18:30:00Z")).day,"2026-09-26");assert.equal(utcDayKeys(Date.parse("2026-09-27T18:30:00Z")).week,"2026-09-28");});
 test("RSS strips markup, blocks unsafe links and rejects future or undated stories",()=>{const now=Date.parse("2026-09-26T00:00:00Z"),date=new Date(now-1000).toUTCString(),xml="<rss><item><title><![CDATA[BTC &amp; network outage]]></title><link>https://example.org/news</link><pubDate>"+date+"</pubDate></item><item><title>Bad</title><link>javascript:alert(1)</link><pubDate>"+date+"</pubDate></item><item><title>Undated</title><link>https://example.org/x</link></item></rss>";const news=parseFeed(xml,"Official",true,now);assert.equal(news.length,1);assert.equal(news[0].title,"BTC & network outage");assert.equal(news[0].assets[0],"BTC");assert.equal(newsBlocks(news,now),true);assert.equal(newsBlocks(news.map(n=>({...n,verified:false})),now),false);});

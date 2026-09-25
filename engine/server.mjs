@@ -5,6 +5,7 @@ import {CoinDCX,ProtectedExecution} from "./execution.mjs";
 import {initialState,advancePaper,event,closePaper,liveGates} from "../lib/paper.ts";
 import {marketSnapshot,candles,instrument} from "../lib/exchange.ts";
 import {fetchNews} from "../lib/news.ts";
+import {fetchOnline} from "../lib/online.ts";
 import {validSettings} from "../lib/strategy.ts";
 import {runBacktest} from "../lib/backtest.ts";
 const token=process.env.ENGINE_TOKEN||"";
@@ -30,11 +31,17 @@ async function scan(){
  try{
   const held=state.portfolio.trades.filter(t=>t.status==="OPEN").map(t=>t.pair);
   const rotate=!state.markets.length||Date.now()-(state.universeSelectedAt||0)>86400000;
-  const marketPromise=marketSnapshot(state.markets,held,rotate);
-  const newsPromise=Date.now()-state.newsHealth.checkedAt>60000?fetchNews(state.news):null;
-  state.markets=await marketPromise;if(rotate)state.universeSelectedAt=Date.now();state.marketError=null;
-  if(newsPromise){const news=await newsPromise;state.news=news.items;state.newsHealth=news.health;}
+  const refreshNews=Date.now()-state.newsHealth.checkedAt>60000;
+  const refreshOnline=!state.online||Date.now()-state.online.checkedAt>10*60000;
+  // Settle source requests independently: a market failure must not suppress news
+  // updates, and no abandoned promise may become an unhandled rejection.
+  const [markets,news,online]=await Promise.allSettled([marketSnapshot(state.markets,held,rotate),refreshNews?fetchNews(state.news):Promise.resolve(null),refreshOnline?fetchOnline(state.online):Promise.resolve(null)]);
+  if(news.status==="fulfilled"&&news.value){state.news=news.value.items;state.newsHealth=news.value.health;}
+  if(online.status==="fulfilled"&&online.value)state.online=online.value;
+  if(markets.status==="rejected")throw markets.reason;
+  state.markets=markets.value;if(rotate)state.universeSelectedAt=Date.now();state.marketError=null;
   advancePaper(state);
+  if(refreshNews)console.log("context_scan",JSON.stringify({version:"context-v1",news:state.newsHealth.sources,newsReady:state.newsHealth.ok,searchSources:state.online?.searchSources.filter(s=>s.ok).length||0,sentimentReady:state.online?.sentimentHealth.ok||false,assessed:state.markets.length,coverage:state.markets.map(m=>m.assessment?.coverage),running:state.settings.running}));
  }catch(error){state.marketError="Market data is unavailable or stale; new entries are blocked.";event(state.portfolio,"DATA",state.marketError);console.error("scan_failed",error instanceof Error?error.name:"Error");}
  finally{state.worker.lastHeartbeat=Date.now();save();busy=false;}
 }

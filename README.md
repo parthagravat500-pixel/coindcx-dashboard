@@ -1,20 +1,21 @@
-# DCX Pilot worker
+# DCX Pilot paper engine
 
-CoinDCX futures research and paper execution for up to five eligible USDT instruments. No established predictive edge or guaranteed returns.
+CoinDCX futures paper research and simulation for up to five liquid cryptocurrency contracts. The public branch contains generated worker source only. New real-money orders are disabled.
 
-Requires Node 22.13+, one process, and persistent storage. Run `npm test`, then `npm start`.
+The engine combines live prices, closed candles, volume, spread and funding with five news feeds, India/US Google trending-search samples, and Alternative.me daily Bitcoin sentiment. Decision evidence is recorded with paper entries. See [engine/CONTEXT.md](engine/CONTEXT.md) for the exact source scope, polling cadence and decision rules. This is deterministic software; it does not self-train, read every website or guarantee profit.
 
-Configure ENGINE_TOKEN (at least 32 random characters), APP_ENCRYPTION_KEY (64 hexadecimal characters), DATA_DIR, PORT, ALWAYS_ON=true, and PERSISTENT_STORAGE=true. Supply secrets through the hosting platform, never through Git.
+Run with Node 22.13 or later:
 
-Paper observation starts automatically. Entries require fresh market data and risk checks. The API requires the server-side bearer token except for /healthz. Records and encrypted exchange credentials are persisted separately from source in SQLite. Existing paper run preferences survive restart.
+    node --experimental-strip-types engine/launch.mjs
 
-New real-money orders are disabled. The protected execution adapter has mock tests but is not integrated for live entry or exchange-verified. Independent strategy qualification, live accounting, a user capital allocation, and exchange protection testing are required before live integration.
+Set ENGINE_TOKEN (at least 32 characters), APP_ENCRYPTION_KEY (64 hexadecimal characters), DATA_DIR, and PORT securely. Keep the same token in the private dashboard's server configuration. Never publish these values. The worker requires a Bearer token for state, actions and exports; only /healthz is public.
 
-render.yaml defines one Starter service in Singapore with a 1 GB persistent disk. Base cost was approved at approximately US$7.25/month before taxes and extra usage. The deployment is not active merely because this file exists.
+Use a single always-on instance and an actual persistent disk mounted at DATA_DIR. The launcher checks the mount and otherwise stays in SETUP without opening a ledger or accepting actions. SQLite retains the paper ledger, risk halts and run preference across restarts. Back up SQLite consistently, including WAL state, using its backup API.
 
-Research limitations: fixed baseline rules, current-universe selection bias, short recent-data diagnostics, simulated fills and funding reserve, no historical order-book or event-time news replay. RSS events act as an entry risk guard, not a verified directional prediction.
+Run the worker verification gate:
 
-Production startup checks the actual mounted data path. Without the disk, the service stays in SETUP mode: health checks work, all trading actions are rejected, and the trading engine is not imported. Attaching a disk at DATA_DIR and redeploying allows the paper engine to start.
+    node --experimental-strip-types --test tests/core.test.mjs tests/execution.test.mjs tests/server.test.mjs tests/launch.test.mjs
 
-## Crypto-only eligibility
-The worker ranks up to five liquid USDT futures from the explicit cryptocurrency allowlist in lib/universe.ts. Metals, equities, indices, stablecoins and unreviewed listings cannot open new positions. Saved unheld quotes are rechecked immediately. Held instruments remain available for exit supervision. This is a liquidity selection, not a market-cap ranking.
+Core tests import the context tests, so source and failure-handling cases are part of the Render build gate. Fixtures are synthetic and are not performance evidence. The existing backtest remains a price-only diagnostic; it does not validate the new news/attention layer. Exchange protection code is mock-tested and remains disabled for new live entries.
+
+The approved deployment uses a Render Starter service with a 1 GB disk. Do not create extra paid resources or change other applications. Keep the dashboard private and credentials server-only.
