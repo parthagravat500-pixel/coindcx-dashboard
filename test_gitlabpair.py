@@ -80,6 +80,22 @@ class PairTests(unittest.TestCase):
             self.assertFalse(result['reproduced'])
             self.assertLessEqual(transport.call_count, 2)
 
+    def test_rejected_token_identifies_account_without_project_reads_or_secrets(self):
+        for account, status, responses in (
+                ('A', 401, [self.response({}, 401)]),
+                ('B', 401, [self.token_info(1), self.response({}, 401)]),
+                ('B', 403, [self.token_info(1), self.response({}, 403)])):
+            with self.subTest(account=account, status=status):
+                result, transport, _ = self.run_compare(responses)
+                self.assertTrue(result['authentication_failed'])
+                self.assertEqual(result['failed_account'], account)
+                self.assertIn('HTTP ' + str(status), result['status'])
+                self.assertFalse(result['verified_connection'])
+                self.assertFalse(result['reproduced'])
+                self.assertEqual(transport.call_count, len(responses))
+                self.assertNotIn(self.owner['token'], json.dumps(result))
+                self.assertNotIn(self.peer['token'], json.dumps(result))
+
     def test_repeated_exposure_is_candidate_only_with_eight_request_cap(self):
         responses = [self.token_info(1), self.token_info(2), self.project(), self.project('B'),
                      self.project(role=0), self.project(role=0), self.project(), self.project('B')]

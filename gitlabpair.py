@@ -117,11 +117,15 @@ def compare(owner, peer, allowed=lambda: True, transport=None, pace=time.sleep):
         for label, config in [('A', owner), ('B', peer)]:
             r = request('/api/v4/personal_access_tokens/self', config['token'])
             evidence.append(dict(step='Verify account ' + label + ' read-only token', **{k: r[k] for k in ('status', 'bytes', 'sha256')}))
+            if r['status'] in (401, 403):
+                return dict(result, status='Setup needed: GitLab rejected account ' + label +
+                            ' token (HTTP ' + str(r['status']) + '); check the complete active read_api-only token',
+                            failed_account=label, authentication_failed=True)
             info = r.get('data')
             if (r['status'] != 200 or not isinstance(info, dict) or info.get('active') is not True
                     or info.get('revoked') is not False or info.get('scopes') != ['read_api']
                     or type(info.get('user_id')) is not int or info['user_id'] <= 0):
-                return dict(result, status='Setup needed: both accounts require active read_api-only personal tokens')
+                return dict(result, status='Setup needed: account ' + label + ' requires an active read_api-only personal token')
             identities.append(info['user_id'])
         if identities[0] == identities[1]:
             return dict(result, status='Setup needed: the two tokens identify the same GitLab account')

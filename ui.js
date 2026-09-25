@@ -358,11 +358,14 @@ function parseGitlabSetupLink(hash){
  if(project.length>250||! /^[A-Za-z0-9_-][A-Za-z0-9_.-]*(?:\/[A-Za-z0-9_-][A-Za-z0-9_.-]*)+$/.test(project)||! /^scopeguard_[a-f0-9]{32}$/.test(marker))return null;
  return {project,marker};
 }
+function gitlabDraftCanApply(peer,draft){
+ return Boolean(draft&&(!peer.configured||(!peer.enabled&&!peer.connected&&peer.project===draft.project)));
+}
 function openGitlabSetupFromLink(){
  if(gitlabSetupOpened||typeof location==='undefined')return;
  const draft=parseGitlabSetupLink(location.hash);if(!draft)return;
  gitlabSetupOpened=true;
- if(state.gitlab?.peer?.configured){openGitlab();return;}
+ if(!gitlabDraftCanApply(state.gitlab?.peer||{},draft)){openGitlab();return;}
  gitlabSetupDraft=draft;
  const root=modal('Finish your GitLab connection');
  root.append(el('p','Your project details are filled in below. Paste the second account’s read-only token, review the permission checkbox, then tap Connect second account.'));
@@ -371,14 +374,16 @@ function openGitlabSetupFromLink(){
 function gitlabPeerSetup(root,g){
  const p=g.peer||{};root.append(el('h3','Second GitLab account'));
  root.append(el('p','Uses the first account already saved on this server. Checks that the two read-only tokens belong to different users, verifies both private project controls, then compares account B access to account A. At most eight GETs, one per second, every 15 minutes. The original anonymous check remains separate.','muted'));
- if(p.configured||p.checked){facts(root,[['Second project',p.project],['Status',p.expires*1000<=Date.now()?'Permission expired':p.status],['Completed checks',p.runs],['Last checked',date(p.checked)]]);
+ const rejected=(p.result?.evidence||[]).find(e=>/^Verify account [AB] read-only token$/.test(e.step)&&[401,403].includes(e.status));
+ const tokenStatus=rejected?'GitLab rejected '+(rejected.step.includes('account B')?'the second':'the first')+' account token (HTTP '+rejected.status+'). Check the complete active read_api-only token.':'';
+ if(p.configured||p.checked){facts(root,[['Second project',p.project],['Status',p.expires*1000<=Date.now()?'Permission expired':tokenStatus||p.status],['Completed checks',p.runs],['Last checked',date(p.checked)]]);
  for(const e of p.result?.evidence||[])root.append(el('p',e.step+': HTTP '+e.status),el('small','Response fingerprint: '+e.sha256));
  if(p.result?.limitation)root.append(el('p',p.result.limitation,'muted'));
  if(p.configured)root.append(button('Disconnect second account',async()=>{await change('/api/gitlab/connect',{mode:'remove_peer'});openGitlab();}));}
  if(!g.connected||!g.enabled||g.expires*1000<=Date.now()){root.append(el('p','An active verified first-account connection is required.'));return;}
  const form=el('form'),inputs={};form.setAttribute('aria-label','Connect second GitLab account');
  for(const [key,label,type] of [['project','Second private GitLab project link','text'],['marker','Marker saved in the second project description','text'],['token','Second GitLab token — read_api only','password']]){const l=el('label',label),i=el('input');i.type=type;i.required=true;i.autocomplete='off';i.maxLength=key==='marker'?43:512;l.append(i);inputs[key]=i;form.append(l);}
- const draft=p.configured?null:gitlabSetupDraft;
+ const draft=gitlabDraftCanApply(p,gitlabSetupDraft)?gitlabSetupDraft:null;
  inputs.project.value=draft?'https://gitlab.com/'+draft.project:p.project?'https://gitlab.com/'+p.project:'';
  if(draft)inputs.marker.value=draft.marker;
  inputs.token.placeholder='Paste the token copied from GitLab';

@@ -77,6 +77,18 @@ setImmediate(()=>{
  vm.runInContext('gitlabSetupOpened=false;gitlabSetupDraft=null;openGitlabSetupFromLink()',context);
  assert.equal(nodes.get('detailContent').children[0].textContent,'Your private GitLab project');
  assert(!descendants(nodes.get('detailContent')).some(n=>n.value==='https://gitlab.com/fixture-b/private-b'),'A setup link must not override an existing connection.');
+ state.gitlab.peer={configured:true,connected:false,enabled:0,project:'fixture-b/private-b',expires:Date.now()/1000+3600,result:{evidence:[{step:'Verify account B read-only token',status:401}]}};
+ vm.runInContext('gitlabSetupOpened=false;gitlabSetupDraft=null;openGitlabSetupFromLink()',context);
+ assert.equal(nodes.get('detailContent').children[0].textContent,'Finish your GitLab connection');
+ assert(descendants(nodes.get('detailContent')).some(n=>n.value===marker),'A failed connection to the same project can use its prepared details.');
+ assert(descendants(nodes.get('detailContent')).some(n=>String(n.textContent).includes('second account token (HTTP 401)')));
+ assert.equal(descendants(nodes.get('detailContent')).find(n=>n.type==='password').value,'');
+ assert(!descendants(nodes.get('detailContent')).find(n=>n.type==='checkbox').checked);
+ state.gitlab.peer.connected=true;state.gitlab.peer.enabled=1;
+ vm.runInContext('gitlabSetupOpened=false;gitlabSetupDraft=null;openGitlabSetupFromLink()',context);
+ assert.equal(nodes.get('detailContent').children[0].textContent,'Your private GitLab project');
+ assert(!descendants(nodes.get('detailContent')).some(n=>n.value===marker),'An active connection must ignore prepared replacement details.');
+ assert(requests.every(r=>r.method==='GET'),'Repair links must not submit or restart a check.');
  vm.runInContext('openAccess()',context);
  const mode=descendants(nodes.get('detailContent')).find(n=>n.tagName==='select'&&n.children.some(o=>o.value==='two_account'));
  assert(mode);mode.value='two_account';mode.onchange();
