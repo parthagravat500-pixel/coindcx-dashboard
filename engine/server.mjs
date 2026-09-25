@@ -22,7 +22,7 @@ const leader=new DatabaseSync(directory+"/leader.sqlite");
 leader.exec("PRAGMA busy_timeout=0; CREATE TABLE IF NOT EXISTS leader(id INTEGER PRIMARY KEY); BEGIN EXCLUSIVE;");
 event(state.portfolio,"SYSTEM","Worker started. Durable paper state restored; real-money execution remains locked.");
 function save(){state.version++;store.set("desk",state);}
-function authorize(req){const candidate=req.headers.authorization||"",expected="Bearer "+token;return candidate.length===expected.length&&timingSafeEqual(Buffer.from(candidate),Buffer.from(expected));}
+function authorize(req){const candidate=Buffer.from(req.headers.authorization||""),expected=Buffer.from("Bearer "+token);return candidate.length===expected.length&&timingSafeEqual(candidate,expected);}
 function send(res,status,data){res.writeHead(status,{"Content-Type":"application/json","Cache-Control":"no-store","X-Content-Type-Options":"nosniff"});res.end(JSON.stringify(data));}
 function safeState(){return {state,gates:liveGates(state),liveExecution:{enabled:false,reason:"Exchange verification and independent strategy qualification remain pending"}};}
 async function scan(){

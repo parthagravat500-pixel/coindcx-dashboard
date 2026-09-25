@@ -22,6 +22,8 @@ test('worker authenticates, persists settings across restart, exports no credent
   await launch();
   assert.equal((await call('/healthz',null,false)).status,200);
   assert.equal((await call('/v1/state',null,false)).status,401);
+  // A same-character-length, different-byte-length header must not crash the process.
+  assert.equal((await fetch('http://127.0.0.1:'+port+'/v1/state',{headers:{Authorization:'Bearer '+'é'.repeat(token.length)}})).status,401);
   let r=await call('/v1/action',{action:'settings',settings:{riskPct:.1,paperCapital:750}});assert.equal(r.status,200);assert.equal((await r.json()).state.portfolio.balance,750);
   r=await call('/v1/action',{action:'start'});assert.equal((await r.json()).state.settings.running,true);
   await stop();await launch();
