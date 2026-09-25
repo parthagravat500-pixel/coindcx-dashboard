@@ -27,5 +27,10 @@ setImmediate(()=>{
  vm.runInContext('renderResearchStatus();openPrivateAI()',context);
  assert.match(nodes.get('privateAIStatus').textContent,/Review received/);
  assert(nodes.get('detail').open);
+ state.program_queue.rows=[{name:'<script>unsafe</script>',policy:'https://hackerone.com/example',status:'Skipped: permission needed',approved_urls:0}];
+ state.program_queue.attempts=[{name:'Fixture',outcome:'no_observation',started:1,observations:0}];
+ vm.runInContext('openProgramQueue()',context);
+ assert(nodes.get('openProgramQueue').onclick);
+ assert(nodes.get('detail').open);
  console.log('Dashboard DOM smoke test passed: valid IDs, initial render, private review rendering, text-only analysis.');
 });

@@ -130,6 +130,20 @@ $('search').oninput=()=>{visibleLimit=40;renderWorklist();};$('currency').onchan
 setInterval(()=>refresh().catch(e=>$('message').textContent=e.message),15000);
 
 function capitalActive(){const c=state.capital_demo;return !!(c?.enabled&&c.expires*1000>Date.now());}
+function openProgramQueue(){
+ const q=state.program_queue,root=modal('Automatic program queue');if(!q){root.append(el('p','Queue status unavailable.'));return;}
+ facts(root,[['Listed HackerOne programs',q.listed_h1],['Programs with active saved permissions',q.approved_programs],['Targets due',q.due_targets],['Next target',q.next_target||'None due'],['Completed limited checks',q.completed],['Last worker check-in',date(q.heartbeat)],['Confirmed payable findings',q.confirmed_payable],['Automatic report submission','Not performed by this queue']]);
+ root.append(el('p',q.coverage),el('p','Programs without current saved scope and automation permission are skipped. Unknown HackerOne reward amounts are not guessed. The queue rotates between due programs and preserves each target’s rate limit.','muted'));
+ root.append(el('h3','Recent checks'));
+ const outcomes={running:'Running',observations:'Observations recorded · impact unverified',no_observation:'No issue detected in these limited checks',stopped:'Stopped · review permission or server response',error:'Request failed · coverage incomplete',interrupted:'Interrupted · coverage incomplete',inconclusive:'Inconclusive · expected coverage not completed'};
+ if(!q.attempts.length)root.append(el('p','No checks recorded by this queue yet.'));
+ for(const run of q.attempts){const row=el('article',undefined,'item');row.append(el('strong',run.name||'Saved target'),el('small',outcomes[run.outcome]||'Unknown outcome'),el('small',date(run.started)+' · '+run.observations+' observations'));root.append(row);}
+ root.append(el('h3','HackerOne program screening'));
+ if(!q.rows.length)root.append(el('p','No HackerOne directory entries available.'));
+ for(const p of q.rows){const row=el('article',undefined,'item');row.append(el('strong',p.name),el('small',p.status),safeLink('Program policy ↗',p.policy));root.append(row);}
+ if(q.rows_total>q.rows.length)root.append(el('p','Showing '+q.rows.length+' of '+q.rows_total+' programs. Use Found websites to search the complete cached directory.','muted'));
+}
+$('openProgramQueue').onclick=openProgramQueue;
 function gitlabActive(){const g=state.gitlab;return !!(g?.configured&&g.enabled&&g.expires*1000>Date.now());}
 function renderResearchStatus(){
  const r=state.research;
@@ -158,6 +172,8 @@ function openPrivateAI(){
 $('openPrivateAI').onclick=openPrivateAI;
 function renderSimpleStatus(){
  renderResearchStatus();
+ const queue=state.program_queue;
+ if(queue){$('programQueueStatus').textContent=(queue.paused?'Paused':!queue.healthy?'Worker status unavailable':queue.due_targets?'Rotating between approved programs':'Waiting for approved checks to become due')+' · '+queue.approved_programs+' programs with active saved permissions · '+queue.completed+' limited checks completed';$('programQueueCoverage').textContent=queue.coverage+' '+queue.permission_needed+' listed H1 programs currently blocked from this queue.';}
  const sourceWatch=state.source_watch;
  if(sourceWatch){const active=sourceWatch.watches.filter(w=>w.enabled&&w.expires*1000>Date.now());
  $('sourceWatchSummary').textContent=(state.paused?'Paused · ':active.length?'Monitoring · ':'Not monitoring · ')+active.length+' approved repositories · '+sourceWatch.watches.reduce((n,w)=>n+w.reviews,0)+' commit reviews completed';

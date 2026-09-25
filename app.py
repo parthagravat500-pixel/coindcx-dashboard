@@ -26,6 +26,7 @@ import casework
 import connections
 import reporting
 import research
+import programqueue
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -75,6 +76,7 @@ def init():
         reporting.init(c)
         workqueue.init(c)
         research.init(c)
+        programqueue.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -92,18 +94,23 @@ def allowed(target_id):
 
 def tick():
     with db() as c:
+        programqueue.heartbeat(c, int(time.time()))
         if c.execute('SELECT paused FROM settings').fetchone()[0]:
             return
-        t = c.execute('SELECT * FROM targets WHERE enabled=1 AND expires>? AND due<=? ORDER BY due,id LIMIT 1', (time.time(), time.time())).fetchone()
+        t = programqueue.next_target(c)
     if not t:
         return
+    attempt = None
     # Lock serializes operator pause/revoke with dispatch; a request already sent may finish.
     try:
         with LOCK:
             if not allowed(t['id']):
                 return
             with db() as c:
+                if programqueue.directory_gate(c,t['policy'],int(time.time())):
+                    return
                 c.execute('UPDATE targets SET due=?,state=? WHERE id=?', (int(time.time()) + t['interval'], 'Checking', t['id']))
+                attempt = programqueue.begin(c,t,int(time.time()))
                 log(c, 'HEAD check started for target ' + str(t['id']))
             observation = observe(t['url'])
         cors = None
@@ -116,10 +123,12 @@ def tick():
         now = int(time.time())
         with db() as c:
             if status in (401, 403, 429) or status >= 500:
+                programqueue.finish(c,attempt,'stopped')
                 c.execute('UPDATE targets SET enabled=0,state=? WHERE id=?', ('Stopped: HTTP ' + str(status) + '; review program rules before enabling', t['id']))
                 log(c, 'Automatic stop for target ' + str(t['id']) + ': HTTP ' + str(status))
                 return
-            for f in findings(observation, cors):
+            leads = findings(observation, cors)
+            for f in leads:
                 key = hashlib.sha256((str(t['id']) + ':' + f['rule']).encode()).hexdigest()[:24]
                 evidence = json.dumps({'observation': observation, 'cors_observation': cors, 'note': f['evidence']})
                 c.execute('''INSERT INTO findings(id,target,rule,title,evidence,severity,impact,first_seen,last_seen)
@@ -127,9 +136,12 @@ def tick():
                           (key, t['id'], f['rule'], f['title'], evidence, f['severity'], f['impact'], now, now))
                 supervisor.record(c, key, now)
             c.execute('UPDATE targets SET state=?,failures=0 WHERE id=?', ('Checked HTTP ' + str(status) + ' at ' + time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime(now)), t['id']))
+            complete = 200 <= status < 300 and (not t['cors'] or cors is not None)
+            programqueue.finish(c,attempt,('observations' if leads else 'no_observation') if complete else 'inconclusive',len(leads))
             log(c, 'Check completed for target ' + str(t['id']))
     except Exception as e:
         with db() as c:
+            programqueue.finish(c,attempt,'error')
             count = t['failures'] + 1
             c.execute('UPDATE targets SET failures=?,due=?,enabled=CASE WHEN ?>=3 THEN 0 ELSE enabled END,state=? WHERE id=?',
                       (count, int(time.time()) + min(86400, t['interval'] * 2 ** count), count, 'Check failed (' + type(e).__name__ + '). Review URL, network and TLS; stopped after 3 failures.', t['id']))
@@ -279,6 +291,7 @@ def snapshot():
                 'workflow': workflow.snapshot(c),
                 'connection': connections.status(),
                 'background': workqueue.snapshot(c),
+                'program_queue': programqueue.snapshot(c),
                 'source_audits': sourceaudit.snapshot(c),
                 'project_audits': projectaudit.snapshot(c),
                 'source_watch': sourcewatch.snapshot(c),
