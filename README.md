@@ -15,3 +15,6 @@ render.yaml defines one Starter service in Singapore with a 1 GB persistent disk
 Research limitations: fixed baseline rules, current-universe selection bias, short recent-data diagnostics, simulated fills and funding reserve, no historical order-book or event-time news replay. RSS events act as an entry risk guard, not a verified directional prediction.
 
 Production startup checks the actual mounted data path. Without the disk, the service stays in SETUP mode: health checks work, all trading actions are rejected, and the trading engine is not imported. Attaching a disk at DATA_DIR and redeploying allows the paper engine to start.
+
+## Crypto-only eligibility
+The worker ranks up to five liquid USDT futures from the explicit cryptocurrency allowlist in lib/universe.ts. Metals, equities, indices, stablecoins and unreviewed listings cannot open new positions. Saved unheld quotes are rechecked immediately. Held instruments remain available for exit supervision. This is a liquidity selection, not a market-cap ranking.

@@ -5,10 +5,43 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {DEFAULT_SETTINGS,sizeTrade,exitPrice,signal,validSettings,utcDayKeys} from "../lib/strategy.ts";
 import {initialState,advancePaper,closePaper,riskCheck,liveGates} from "../lib/paper.ts";
-import {normalizeCandles,signedRead} from "../lib/exchange.ts";
+import {normalizeCandles,signedRead,marketSnapshot} from "../lib/exchange.ts";
+import {isEligibleCryptoPair} from "../lib/universe.ts";
 import {parseFeed,newsBlocks} from "../lib/news.ts";
 import {Store} from "../engine/store.mjs";
 const inst={step:.001,tick:.01,minimum:.001,minNotional:5,maxQuantity:1000,feeRate:.00075,contractValue:1,active:true};
+test("crypto admission rejects metals, stock proxies, stablecoins and unreviewed assets",()=>{
+ for(const asset of ["BTC","ETH","SOL","XRP","BNB","ZEC"])assert.equal(isEligibleCryptoPair("B-"+asset+"_USDT"),true);
+ for(const pair of ["B-XAU_USDT","B-XAG_USDT","B-PAXG_USDT","B-TSLA_USDT","B-NAS100_USDT","B-USDC_USDT","B-UNKNOWN_USDT","BTC_USDT","B-BTC_INR"])assert.equal(isEligibleCryptoPair(pair),false,pair);
+});
+test("paper admission blocks an ineligible saved instrument without blocking eligible crypto",()=>{
+ const now=Date.now();
+ for(const pair of ["B-XAU_USDT","B-UNKNOWN_USDT","B-BTC_USDT"]){
+  const s=initialState(now);s.settings.running=true;s.settings.newsGuard=false;
+  s.markets=[{pair,price:100,bid:99.99,ask:100.01,spreadBps:2,updatedAt:now,history:[],instrument:inst,signal:{action:"LONG",entry:100,stop:98,target:103.6,strategy:"test",regime:"Uptrend",reason:"test",barTime:now-60000}}];
+  advancePaper(s,now);assert.equal(s.portfolio.trades.length,pair==="B-BTC_USDT"?1:0);
+ }
+});
+test("a pinned gold quote is removed immediately and cannot displace the five crypto contracts",async()=>{
+ const now=Date.now(),pairs=["B-XAU_USDT","B-BTC_USDT","B-ETH_USDT","B-SOL_USDT","B-XRP_USDT","B-BNB_USDT"],calls=[];
+ const bars=Array.from({length:360},(_,i)=>({time:(Math.floor(now/60000)-360+i)*60000,open:100,high:101,low:99,close:100,volume:10}));
+ const originalFetch=globalThis.fetch;
+ globalThis.fetch=async input=>{
+  const url=String(input);calls.push(url);let payload;
+  if(url.includes("/current_prices/"))payload={ts:now,prices:Object.fromEntries(pairs.map((p,i)=>[p,{ls:100,v:100000000/(i+1),btST:now,pc:0,fr:0}]))};
+  else if(url.includes("/active_instruments"))payload=pairs;
+  else if(url.includes("/orderbook/"))payload={ts:now,bids:{"99.99":"10"},asks:{"100.01":"10"}};
+  else if(url.includes("/candlesticks"))payload={data:bars};
+  else if(url.includes("/instrument?"))payload={instrument:{unit_contract_value:1,quantity_increment:.001,price_increment:.01,min_quantity:.001,min_trade_size:.001,min_notional:5,max_quantity:1000,max_market_order_quantity:1000,taker_fee:.075,status:"active"}};
+  else throw Error("Unexpected fixture request");
+  return new Response(JSON.stringify(payload),{headers:{"Content-Type":"application/json"}});
+ };
+ try{
+  const markets=await marketSnapshot([{pair:"B-XAU_USDT",history:bars,instrument:inst}],[],false);
+  assert.equal(markets.length,5);assert.ok(markets.every(m=>isEligibleCryptoPair(m.pair)));
+  assert.ok(!calls.some(url=>url.includes("B-XAU_USDT")));
+ }finally{globalThis.fetch=originalFetch;}
+});
 function trade(extra={}){return {id:"t",pair:"B-BTC_USDT",side:"LONG",quantity:1,entry:100,stop:95,target:109,openedAt:0,closedAt:undefined,pnl:0,fees:.075,funding:0,plannedRisk:5,status:"OPEN",lastBarTime:0,lastFundingAt:0,strategy:"test",...extra};}
 test("position sizing respects the total budget including conservative costs",()=>{const r=sizeTrade(1000,100,98,inst,DEFAULT_SETTINGS,1000);assert.ok(r.quantity>0);assert.ok(r.risk<=2.5);assert.ok(r.quantity*2<2.5);});
 test("minimum notional never forces an oversized trade",()=>{const r=sizeTrade(10,60000,59000,{...inst,step:.001,minimum:.001,minNotional:50},DEFAULT_SETTINGS,10);assert.equal(r.quantity,0);});
