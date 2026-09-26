@@ -1,3 +1,19 @@
+## Simple dashboard
+
+The phone-friendly home page shows the next permitted test, saved results, tests
+on hold and recent real work. Program browsing, connection forms and specialist
+controls stay in the closed advanced section. Reading results never starts a
+test or sends a report. ScopeGuard self-checks are explicitly included in the
+finished-check count; code reviews and policy reviews have separate counters.
+
+Automatic workflow totals are stored independently of the last 200 journal
+entries, survive restarts and are imported from retained history once. Failed,
+inconclusive, skipped and interrupted attempts are not completed checks. Earlier
+standalone workers and deleted history are not reconstructed or added. Stopped
+tests get fixed plain-language explanations without repeating server text.
+A failed or timed-out dashboard refresh removes live activity claims and disables
+the main pause control until a fresh authenticated response arrives.
+
 ## Automatic runtime workflow
 
 The existing research switch now starts one durable selector for saved header

@@ -1,5 +1,5 @@
 'use strict';
-let state, gitlabSetupDraft=null, gitlabSetupOpened=false;
+let state, gitlabSetupDraft=null, gitlabSetupOpened=false, liveConnected=false, refreshVersion=0;
 const $ = id => document.getElementById(id);
 function el(tag, text, cls) { const n = document.createElement(tag); if(text !== undefined) n.textContent = text; if(cls) n.className = cls; return n; }
 function button(text, action) { const b = el('button', text, 'secondary'); b.onclick = async () => {b.disabled=true;try{await action();}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};return b; }
@@ -51,8 +51,10 @@ function renderLegacy() {
   $('events').replaceChildren(...state.events.map(e=>el('div',new Date(e.at*1000).toLocaleString()+' · '+e.message)));
 }
 async function refresh(){
- try{const r=await fetch('/api/state');if(!r.ok)throw Error('Connection or login failed. Refresh to sign in.');state=await r.json();render();$('summaryUpdated').textContent='Dashboard data updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'.';openGitlabSetupFromLink();}
- catch(error){$('status').textContent='● Connection needs attention';$('summaryUpdated').textContent=state?'Connection lost. The figures below are from the last successful update.':'Unable to load live progress. Refresh and sign in to the dashboard.';throw error;}
+ const version=++refreshVersion,controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),12000);
+ try{const r=await fetch('/api/state',{signal:controller.signal,cache:'no-store'});if(!r.ok)throw Error('Connection or login failed. Refresh to sign in.');const latest=await r.json();if(version!==refreshVersion)return;state=latest;render();if(!liveConnected)$('message').textContent='';liveConnected=true;$('masterPause').disabled=false;$('summaryUpdated').textContent='Updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'. Refreshes automatically.';openGitlabSetupFromLink();}
+ catch(error){if(version!==refreshVersion)return;liveConnected=false;renderHomeOffline();throw error.name==='AbortError'?Error('The dashboard took too long to respond. It will retry automatically.'):error;}
+ finally{clearTimeout(timeout);}
 }
 $('pause').onclick=()=>{if(state)change('/api/pause',{paused:!state.paused}).catch(e=>$('message').textContent=e.message);};
 $('targetForm').onsubmit=async e=>{e.preventDefault();const form=e.target;const f=new FormData(form);const b=form.querySelector('button');b.disabled=true;try{await change('/api/targets',{name:f.get('name'),url:f.get('url'),policy:f.get('policy'),rules:f.get('rules'),interval:Number(f.get('hours'))*3600,expires:Math.floor(Date.now()/1000)+Number(f.get('days'))*86400-5,authorized:f.has('authorized'),automation_allowed:f.has('automation_allowed'),cors:f.has('cors')});form.reset();}catch(err){$('message').textContent=err.message;}finally{b.disabled=false;}};
@@ -374,7 +376,95 @@ function renderSimpleStatus(){
  const running=w.enabled||!state.paused;
  $('masterPause').textContent=running?'Pause everything':'Resume';
  renderProgressSummary();
+ renderHome();
 }
+
+function homeTaskName(job){
+ const kind=job.kind||String(job.key||job.job||'').split(':')[0];
+ const name=({'headers':'Basic website check','access':'Private-data test','gitlab':'GitLab private-project test','gitlab_pair':'GitLab two-account test','owned_validation':'ScopeGuard protection check'})[kind]||'Saved test';
+ const id=Number(String(job.key||job.job||'').split(':')[1]),target=(state.targets||[]).find(t=>t.id===id);
+ return target&&['headers','access'].includes(kind)?target.name+' · '+name:name;
+}
+function homeRow(title,detail,badge,tone){
+ const row=el('div',undefined,'home-row'),body=el('div');body.append(el('strong',title),el('small',detail));row.append(body);
+ if(badge){const tag=el('span',badge,'home-badge');tag.dataset.tone=tone||'';row.append(tag);}return row;
+}
+function homeBlockers(){
+ const groups=new Map();
+ for(const job of state.autopilot?.jobs||[]){if(!job.blocker)continue;const reason=job.blocker_detail||job.blocker;groups.set(reason,(groups.get(reason)||0)+1);}
+ return [...groups].map(([reason,count])=>({reason,count}));
+}
+function homeHistory(){
+ const outcomes={boundary_held:'Access stayed private in this check.',reproduced_boundary:'A possible exposure was repeated. Evidence is saved for review.',observations:'Basic observations saved. Security impact is unproven.',no_observation:'Basic check finished with no observation recorded.',inconclusive:'Could not reach a conclusion.',stopped:'Stopped to respect the website’s response.',failed:'Failed. Further attempts follow the retry and permission rules.',interrupted:'Interrupted. No completed result claimed.',skipped:'Skipped. No test result claimed.',running:'Check in progress.'};
+ const rows=(state.autopilot?.recent_runs||[]).map(r=>({title:homeTaskName(r),detail:outcomes[r.outcome]||'Outcome needs review.',at:r.finished||r.started}));
+ for(const p of state.automatic_research?.projects||[])if(p.checked)rows.push({title:'Code review · '+p.name,detail:'Source reviewed. Possible issues still need proof from a working application.',at:p.checked});
+ return rows.sort((a,b)=>b.at-a.at);
+}
+function renderHome(){
+ for(const id of ['openHomeResults','openHomeBlockers','openHomeActivity'])$(id).disabled=false;
+ const a=state.autopilot,mode=a?.state||'unavailable',enabled=state.workflow?.enabled||!state.paused;
+ const labels={paused:['Research is paused','Saved progress is kept. Resume continues only tests that already have valid permission.','Paused'],unavailable:['Current worker status is unavailable','Saved results are below. A recent worker check-in is needed before we can confirm activity.','Needs attention'],running:['An approved test is running','ScopeGuard will save the result and move to the next permitted task.','Working'],ready:['The next test is ready','The worker will pick up the next saved, permitted test.','Ready'],waiting:['Your next check is scheduled','ScopeGuard waits between tests to respect the saved limits. Results appear when a check finishes.','Scheduled']};
+ const [title,description,badge]=labels[mode]||labels.unavailable;
+ $('homeTitle').textContent=title;$('homeDescription').textContent=description;$('status').textContent='● '+badge;
+ $('homeWorkerBadge').textContent=badge;$('homeWorkerBadge').dataset.tone=mode==='unavailable'?'offline':mode==='paused'?'hold':'good';
+ $('masterPause').textContent=enabled?'Pause':'Resume';
+ const eligible=(a?.jobs||[]).filter(j=>!j.blocker).sort((x,y)=>x.ready_at-y.ready_at);
+ $('homeNowSummary').textContent=!a?'Live task details have not loaded.':mode==='paused'?'Saved tests are paused.':eligible.length?eligible.length+' saved tests meet the current setup checks.':'No saved test currently meets its permission and setup requirements.';
+ $('homeTasks').replaceChildren();
+ for(const job of eligible.slice(0,4)){
+  const running=mode==='running'&&a.running?.job===job.key;
+  const when=mode==='paused'?'Paused':mode==='unavailable'?'Timing unverified':running?'Running now':job.ready_at*1000<=Date.now()?'Waiting for the worker':'Next: '+date(job.ready_at);
+  const scope=job.kind==='owned_validation'?'Checks ScopeGuard’s own login protection. ':'';
+  $('homeTasks').append(homeRow(homeTaskName(job),scope+when,running?'Working':mode==='paused'?'Paused':mode==='unavailable'?'Unverified':'Scheduled',running?'good':''));
+ }
+ if(eligible.length>4)$('homeTasks').append(el('small',(eligible.length-4)+' more saved tests in advanced details.'));
+ const research=state.automatic_research;
+ $('homeCodeStatus').textContent=research?(state.paused?'Code reviews are paused. ':research.healthy?'Automatic code review checks for source changes. ':'Code-review worker status needs attention. ')+(research.completed||0)+' code reviews saved.':'Code-review status is unavailable.';
+ $('homeBugCount').textContent=a?.confirmed_bounty_bugs??'—';
+ const cases=a?.case_count??a?.cases?.length??0;
+ $('homeResultSummary').textContent=!a?'Current results are unavailable.':cases?cases+' possible issues have saved evidence. They still need impact and program review.':'No confirmed vulnerability yet. Completed work is saved below.';
+ $('homeCompleted').textContent=a?.progress?.completed??'—';
+ $('homeCodeReviews').textContent=research?.completed??'—';
+ $('homeRuleReviews').textContent=state.workflow?.policy_evidence?.records?.length??'—';
+ $('homeBlockedCount').textContent=a?a.blocked+' '+(a.blocked===1?'test':'tests'):'Unknown';$('homeBlockedCount').dataset.tone=a?.blocked?'hold':'';
+ $('homeAttentionSummary').textContent=!a?'Current blockers are unavailable.':a.blocked?'These tests cannot continue yet. Other permitted work can continue.':'No saved tests are blocked. New programs still need permission and account setup.';
+ $('homeAttentionItems').replaceChildren(...homeBlockers().slice(0,2).map(g=>homeRow(g.count+' '+(g.count===1?'test':'tests')+' on hold',g.reason)));
+ const history=homeHistory();$('homeHistory').replaceChildren(...history.slice(0,3).map(r=>homeRow(r.title,r.detail+' '+date(r.at))));
+ if(!history.length)$('homeHistory').append(el('p','No completed work is recorded in this recent history yet.','muted'));
+}
+function renderHomeOffline(){
+ $('status').textContent='● Connection needs attention';$('homeTitle').textContent='The dashboard is not connected';
+ $('homeDescription').textContent='Live progress could not be refreshed. The saved figures below may be out of date.';
+ $('homeWorkerBadge').textContent='Not connected';$('homeWorkerBadge').dataset.tone='offline';
+ $('homeNowSummary').textContent='Current activity is unknown. The dashboard will retry automatically.';$('homeTasks').replaceChildren();
+ $('homeCodeStatus').textContent='Current code-review activity is unknown.';$('masterPause').disabled=true;
+ $('summaryUpdated').textContent=state?'Connection lost. The figures below are from the last successful update.':'Unable to load live progress. Refresh and sign in to the dashboard.';
+}
+function openHomeResults(){
+ const root=modal('Your results'),a=state.autopilot;
+ root.append(el('p','Confirmed bounty bugs: '+(a?.confirmed_bounty_bugs??'unknown')+'. A completed test or code review is not proof of a bug.'));
+ const cases=a?.case_count??a?.cases?.length??0;
+ root.append(el('h3','Possible issues'),el('p',cases?cases+' repeated observations are saved privately. They need impact, permission and duplicate review before reporting.':'No repeated runtime issue is saved by the automatic workflow.'));
+ root.append(button('Read saved test evidence',openAutopilot),button('Read code review results',openProjectAudits),button('Read program rules',openPolicyReviews));
+ root.append(el('h3','Latest completed or attempted work'));
+ for(const r of homeHistory().slice(0,6))root.append(homeRow(r.title,r.detail+' '+date(r.at)));
+}
+function openHomeBlockers(){
+ const root=modal('Why some tests are on hold'),jobs=(state.autopilot?.jobs||[]).filter(j=>j.blocker);
+ root.append(el('p','ScopeGuard keeps these tests stopped until their access, setup or permission is resolved. Opening this page does not restart them.'));
+ if(!state.autopilot)root.append(el('p','Current task status is unavailable.'));
+ else if(!jobs.length)root.append(el('p','No saved tests are blocked.'));
+ for(const job of jobs)root.append(homeRow(homeTaskName(job),job.blocker_detail||job.blocker));
+ const uber=state.uber_connection;
+ if(uber&&!uber.connected)root.append(el('h3','Uber is not a running test'),el('p',uber.message),el('p','A Rider login alone does not connect a security test. Uber profile access is an optional, separate setup.'));
+}
+function openHomeActivity(){
+ const root=modal('Work completed and recent attempts'),p=state.autopilot?.progress;
+ if(p){facts(root,[['Checks finished',p.completed],['ScopeGuard self-checks included',p.self_checks],['Attempts without a completed result',p.unfinished],['Last completed check',date(p.last_completed)]]);root.append(el('p',p.history_note,'muted'));}
+ const history=homeHistory();if(!history.length)root.append(el('p','No recent work is recorded.'));
+ for(const r of history)root.append(homeRow(r.title,r.detail+' '+date(r.at)));
+}
+$('openHomeResults').onclick=openHomeResults;$('openHomeBlockers').onclick=openHomeBlockers;$('openHomeActivity').onclick=openHomeActivity;
 function setup(){
  const root=modal('Your setup');
  root.append(el('p','These are available tools. The home screen shows whether website checks are running, waiting or blocked.','muted'));
@@ -385,7 +475,7 @@ function setup(){
 }
 $('connectAI').onclick=()=>state.autopilot?openAutopilot():openProgramQueue();$('openSetup').onclick=setup;
 $('detail').addEventListener('close',()=>{$('detail').querySelectorAll('input[type="password"]').forEach(i=>i.value='');});
-$('masterPause').onclick=async()=>{const b=$('masterPause');b.disabled=true;const pause=state.workflow.enabled||!state.paused;try{await change('/api/all-pause',{paused:pause});}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};
+$('masterPause').onclick=async()=>{if(!state||!liveConnected)return;const b=$('masterPause');b.disabled=true;const pause=state.workflow.enabled||!state.paused;try{await change('/api/all-pause',{paused:pause});}catch(e){$('message').textContent=e.message;}finally{b.disabled=!liveConnected;}};
 
 function reportSetup(){
  const root=modal('Connect your reporting account');

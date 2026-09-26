@@ -106,9 +106,13 @@ class AutopilotTests(unittest.TestCase):
         self.assertEqual(q['confirmed_bounty_bugs'],0)
         self.assertFalse(q['automatic_submission'])
         self.assertEqual(state['workflow']['submissions'],[])
+        self.assertEqual(q['progress']['completed'],3)
+        self.assertEqual(q['progress']['self_checks'],1)
+        self.assertEqual(q['progress']['unfinished'],1)
         self.assertNotIn(MARKER,json.dumps(q)); self.assertNotIn(AUTH,json.dumps(q))
         app.init()
         self.assertEqual(len(app.snapshot()['autopilot']['cases']),1)
+        self.assertEqual(app.snapshot()['autopilot']['progress'],q['progress'])
         self.assertEqual(self.api('/api/state',authenticated=False)[0],401)
 
     def test_pause_makes_no_request(self):
@@ -160,6 +164,63 @@ class AutopilotTests(unittest.TestCase):
         q=app.snapshot()['autopilot']
         self.assertEqual(q['recent_runs'][1]['outcome'],'interrupted')
         self.assertEqual(q['cases'],[])
+        self.assertEqual(q['progress']['unfinished'],1)
+        self.runners={}
+        self.tick(); app.init()
+        self.assertEqual(app.snapshot()['autopilot']['progress']['unfinished'],1)
+
+    def test_completed_totals_survive_history_pruning_and_restart(self):
+        key=self.add('/headers',access=False); self.resume()
+        now=int(time.time())
+        with app.db() as c:
+            c.execute('DELETE FROM autonomous_totals_origin')
+            c.execute('DELETE FROM autonomous_totals')
+            for i in range(202):
+                c.execute('''INSERT INTO autonomous_runs(job,kind,stamp,started,finished,lease_until,outcome,evidence)
+                  VALUES(?,?,?,?,?,0,?,'[]')''',('headers:'+str(key),'headers','old-fixture',now-500+i,now-500+i,
+                                                            'no_observation' if i<200 else 'failed'))
+        app.init() # Migrate a retained journal from the earlier application version.
+        self.assertEqual(app.snapshot()['autopilot']['progress']['completed'],200)
+        self.runners={'headers':lambda _: {'outcome':'no_observation'}}
+        self.tick()
+        with app.db() as c:
+            self.assertEqual(c.execute('SELECT COUNT(*) FROM autonomous_runs').fetchone()[0],200)
+        app.init(); app.init()
+        progress=app.snapshot()['autopilot']['progress']
+        self.assertEqual(progress['completed'],201)
+        self.assertEqual(progress['unfinished'],2)
+        self.assertEqual(progress['self_checks'],0)
+        self.assertGreaterEqual(progress['last_completed'],now)
+
+    def test_disabled_task_details_explain_stop_without_revealing_server_text(self):
+        key=self.add('/stopped',access=False)
+        with app.db() as c:
+            c.execute('UPDATE targets SET enabled=0,state=? WHERE id=?',('Stopped: HTTP 403 '+AUTH,key))
+        q=app.snapshot()['autopilot']
+        job=next(j for j in q['jobs'] if j['key']=='headers:'+str(key))
+        self.assertIn('website refused access',job['blocker_detail'])
+        self.assertNotIn(AUTH,json.dumps(q))
+        with app.db() as c:
+            receipt=autopilot.diagnostic(c,'a'*40)
+        self.assertEqual(receipt['blocker_detail_counts'][job['blocker_detail']],1)
+        self.assertNotIn(AUTH,json.dumps(receipt))
+        with app.db() as c:c.execute('UPDATE targets SET expires=0 WHERE id=?',(key,))
+        job=next(j for j in app.snapshot()['autopilot']['jobs'] if j['key']=='headers:'+str(key))
+        self.assertIn('Permission has expired',job['blocker_detail'])
+        second=self.add('/expired-parent')
+        with app.db() as c:
+            c.execute('UPDATE targets SET expires=0 WHERE id=?',(second,))
+            c.execute('UPDATE access_checks SET enabled=0 WHERE target=?',(second,))
+        job=next(j for j in app.snapshot()['autopilot']['jobs'] if j['key']=='access:'+str(second))
+        self.assertIn('Permission has expired',job['blocker_detail'])
+
+    def test_connection_failure_details_use_only_fixed_labels(self):
+        row={'expires':int(time.time())+3600,'status':AUTH,'result':json.dumps({'authentication_failed':True,'error':AUTH})}
+        self.assertIn('account connection was rejected',autopilot.stop_detail(row,int(time.time())))
+        row['result']=json.dumps({'reproduced':True,'error':AUTH})
+        self.assertIn('possible issue was saved',autopilot.stop_detail(row,int(time.time())))
+        row['result']='not valid JSON '+AUTH
+        self.assertNotIn(AUTH,autopilot.stop_detail(row,int(time.time())))
 
     def test_revocation_during_control_stops_the_next_request(self):
         key=self.add('/leaky'); self.resume()

@@ -15,6 +15,7 @@ RUN_LOCK = threading.Lock()
 LEASE_SECONDS = 300
 PROGRAM_GAP = 60
 KINDS = ('headers', 'access', 'gitlab', 'gitlab_pair', 'owned_validation')
+COMPLETED = ('observations','no_observation','boundary_held','reproduced_boundary')
 
 
 def init(c):
@@ -32,7 +33,39 @@ def init(c):
       CREATE TABLE IF NOT EXISTS autonomous_cases (
         id TEXT PRIMARY KEY,job TEXT,stamp TEXT,first_seen INTEGER,last_seen INTEGER,
         kind TEXT,evidence TEXT,draft TEXT);
+      CREATE TABLE IF NOT EXISTS autonomous_totals (
+        kind TEXT,outcome TEXT,total INTEGER,last_finished INTEGER,PRIMARY KEY(kind,outcome));
+      CREATE TABLE IF NOT EXISTS autonomous_totals_origin (id INTEGER PRIMARY KEY,since INTEGER);
     ''')
+    # Import retained history once. Older deleted attempts cannot be reconstructed.
+    created = c.execute('INSERT OR IGNORE INTO autonomous_totals_origin VALUES(1,?)',
+                        (int(time.time()),)).rowcount
+    if created:
+        c.execute('''INSERT INTO autonomous_totals SELECT kind,outcome,COUNT(*),MAX(finished)
+          FROM autonomous_runs WHERE outcome!='running' GROUP BY kind,outcome''')
+
+
+def count_result(c,kind,outcome,finished):
+    c.execute('''INSERT INTO autonomous_totals VALUES(?,?,1,?)
+      ON CONFLICT(kind,outcome) DO UPDATE SET total=total+1,last_finished=MAX(last_finished,excluded.last_finished)''',
+      (kind,outcome,finished))
+
+
+def stop_detail(row,now):
+    """Fixed, non-sensitive reasons. Never repeat server or credential text."""
+    if row['expires'] <= now: return 'Permission has expired; the program rules need a fresh review.'
+    try: result = json.loads(row.get('result','{}'))
+    except (ValueError,TypeError): result = {}
+    if not isinstance(result,dict): result = {}
+    if result.get('reproduced') is True: return 'A possible issue was saved. This test stopped to avoid reading more data.'
+    if result.get('authentication_failed') is True: return 'An account connection was rejected. It needs a valid replacement before testing.'
+    if result.get('failure_kind') == 'tls': return 'The secure connection failed. Testing stays off until the connection is reviewed.'
+    status = str(row.get('status',row.get('state','')))
+    if re.search(r'HTTP (401|403)\b',status): return 'The website refused access. Testing stays off until access and permission are reviewed.'
+    if re.search(r'HTTP (429|5\d\d)\b',status): return 'The website asked testing to stop or returned a server error. Review is required before restarting.'
+    if 'Setup needed' in status or 'Setup needs attention' in status: return 'The saved test setup did not pass its control check. Its connection or test data needs review.'
+    if row.get('failures',0) >= 3: return 'Repeated connection failures stopped this test. Its address and connection need review.'
+    return 'This test is switched off. It will stay off until its access and permission are reviewed.'
 
 
 def digest(value):
@@ -49,32 +82,39 @@ def jobs(c, now=None):
     now = int(time.time()) if now is None else now
     result = []
     targets = {row['id']: dict(row) for row in c.execute('SELECT * FROM targets')}
-    def add(kind, key, due, identity, program, label, blocker=''):
+    def add(kind, key, due, identity, program, label, blocker='', detail=''):
+        if blocker not in ('Saved target is disabled','Access comparison is disabled','Saved comparison is disabled'):
+            detail = {'Testing permission expired':'Permission has expired; the program rules need a fresh review.',
+                      'Access-comparison permission expired':'Permission for this private-data test has expired.',
+                      'Owner-account approval or connection changed':'The first account’s connection or permission changed. The two-account test needs review.'}.get(blocker,'')
         result.append({'key':kind+':'+str(key), 'kind':kind, 'target':key, 'due':due,
                        'stamp':digest(identity), 'program':digest(program),
-                       'label':label, 'blocker':blocker})
+                       'label':label, 'blocker':blocker, 'blocker_detail':detail if blocker else ''})
     def identity(t):
         return {k:t[k] for k in ('id','url','policy','rules','expires','interval','cors','enabled')}
     for key,t in targets.items():
         add('headers',key,t['due'],identity(t),t['policy'].rstrip('/'),
-            'Saved URL '+str(key)+' · headers',target_blocker(c,t,now))
+            'Saved URL '+str(key)+' · headers',target_blocker(c,t,now),stop_detail(t,now) if not t['enabled'] else '')
     for row in c.execute('SELECT * FROM access_checks'):
         a = dict(row); t = targets.get(a['target'])
         block = ('Approved target missing' if not t else target_blocker(c,t,now))
         block = block or ('Access comparison is disabled' if not a['enabled'] else
                           'Access-comparison permission expired' if a['expires'] <= now else '')
         add('access',a['target'],a['due'],[a['revision'],a['rules'],a['expires'],identity(t) if t else None],
-            t['policy'].rstrip('/') if t else 'missing', 'Saved URL '+str(a['target'])+' · access comparison',block)
+            t['policy'].rstrip('/') if t else 'missing', 'Saved URL '+str(a['target'])+' · access comparison',block,
+            stop_detail(t,now) if t and not t['enabled'] else stop_detail(a,now) if not a['enabled'] else '')
     parent = c.execute('SELECT * FROM gitlab_check WHERE id=1').fetchone()
     for kind, table in (('gitlab','gitlab_check'),('gitlab_pair','gitlab_peer')):
         row = c.execute('SELECT * FROM '+table+' WHERE id=1').fetchone()
         if not row: continue
+        row = dict(row)
         block = ('Saved comparison is disabled' if not row['enabled'] else
                  'Testing permission expired' if row['expires'] <= now else '')
         if kind == 'gitlab_pair' and (not parent or not parent['enabled'] or parent['expires'] <= now or parent['revision'] != row['parent_revision']):
             block = 'Owner-account approval or connection changed'
         add(kind,1,row['due'],[row['revision'],row['expires'],row['project']],
-            'https://hackerone.com/gitlab', 'Owned GitLab '+('two-account comparison' if kind=='gitlab_pair' else 'anonymous comparison'),block)
+            'https://hackerone.com/gitlab', 'Owned GitLab '+('two-account comparison' if kind=='gitlab_pair' else 'anonymous comparison'),block,
+            stop_detail(row,now) if not row['enabled'] else '')
     validation = c.execute('SELECT * FROM validation_schedule WHERE id=1').fetchone()
     add('owned_validation',1,validation['due'],['owned-loopback-validation-v1'],
         'owned-scopeguard', 'ScopeGuard login and request protection')
@@ -227,6 +267,7 @@ def _tick(db,lock,log,runners):
         # continue other permitted work without immediately repeating the request.
         for r in c.execute("SELECT * FROM autonomous_runs WHERE outcome='running' AND lease_until<=?",(now,)).fetchall():
             c.execute("UPDATE autonomous_runs SET outcome='interrupted',finished=? WHERE id=?",(now,r['id']))
+            count_result(c,r['kind'],'interrupted',now)
             c.execute('UPDATE autonomous_rotation SET retry_at=MAX(retry_at,?) WHERE job=?',(now+900,r['job']))
         if c.execute("SELECT 1 FROM autonomous_runs WHERE outcome='running'").fetchone(): return
         job = next_job(c,now,runners)
@@ -257,6 +298,7 @@ def _tick(db,lock,log,runners):
         updated = c.execute("UPDATE autonomous_runs SET finished=?,outcome=?,evidence=? WHERE id=? AND outcome='running'",
                             (finished,outcome,json.dumps(clean),run))
         if not updated.rowcount: return
+        count_result(c,job['kind'],outcome,finished)
         if outcome in ('failed','skipped','inconclusive'):
             old = c.execute('SELECT failures FROM autonomous_rotation WHERE job=?',(job['key'],)).fetchone()[0]
             c.execute('UPDATE autonomous_rotation SET failures=failures+1,retry_at=? WHERE job=?',
@@ -275,21 +317,28 @@ def snapshot(c):
     items = jobs(c,now)
     paused = bool(c.execute('SELECT paused FROM settings').fetchone()[0])
     heartbeat = c.execute('SELECT heartbeat FROM autonomous_status WHERE id=1').fetchone()[0]
-    running = c.execute("SELECT kind,started,lease_until FROM autonomous_runs WHERE outcome='running' ORDER BY id DESC LIMIT 1").fetchone()
+    running = c.execute("SELECT job,kind,started,lease_until FROM autonomous_runs WHERE outcome='running' ORDER BY id DESC LIMIT 1").fetchone()
     healthy = bool(heartbeat and 0 <= now-heartbeat < 90 or running and running['lease_until'] > now)
     eligible = [j for j in items if not j['blocker']]
     due = [j for j in eligible if j['ready_at'] <= now]
     state = 'paused' if paused else 'unavailable' if not healthy else 'running' if running else 'ready' if due else 'waiting'
     cases = [{'id':r['id'],'job':r['job'],'kind':r['kind'],'first_seen':r['first_seen'],'last_seen':r['last_seen'],
               'evidence':json.loads(r['evidence']),'draft':r['draft'],'submission_ready':False} for r in c.execute('SELECT * FROM autonomous_cases ORDER BY last_seen DESC LIMIT 30')]
+    totals = [dict(r) for r in c.execute('SELECT * FROM autonomous_totals')]
     return {'state':state,'healthy':healthy,'heartbeat':heartbeat,
             'running':dict(running) if running else None,'ready':len(due),'eligible':len(eligible),
             'blocked':sum(bool(j['blocker']) for j in items),
             'next_due':min((j['ready_at'] for j in eligible),default=None),
-            'jobs':[{k:j[k] for k in ('key','kind','label','blocker','ready_at')} for j in items],
+            'jobs':[{k:j[k] for k in ('key','kind','label','blocker','blocker_detail','ready_at')} for j in items],
             'recent_runs':[dict(r) for r in c.execute('SELECT id,job,kind,started,finished,outcome FROM autonomous_runs ORDER BY id DESC LIMIT 30')],
             'cases':cases,'case_count':c.execute('SELECT COUNT(*) FROM autonomous_cases').fetchone()[0],
             'confirmed_bounty_bugs':0,'automatic_submission':False,
+            'progress':{'completed':sum(r['total'] for r in totals if r['outcome'] in COMPLETED),
+                        'self_checks':sum(r['total'] for r in totals if r['kind']=='owned_validation' and r['outcome'] in COMPLETED),
+                        'unfinished':sum(r['total'] for r in totals if r['outcome'] not in COMPLETED),
+                        'last_completed':max((r['last_finished'] for r in totals if r['outcome'] in COMPLETED),default=0),
+                        'counting_since':c.execute('SELECT since FROM autonomous_totals_origin WHERE id=1').fetchone()[0],
+                        'history_note':'Counts cover this automatic workflow and its retained history. Earlier standalone tests and removed history are not added.'},
             'full_autonomous_bounty_research':False,
             'coverage':'Automatically selects and runs saved header, private-JSON, owned GitLab and owned-app checks. Source review runs separately. New program permission, account enrollment and general exploit discovery are not automated.'}
 
@@ -298,17 +347,19 @@ def diagnostic(c,revision):
     """Minimal host-log health receipt. No target names, URLs, cases or credentials."""
     s = snapshot(c)
     reasons = {}
+    details = {}
     kinds = {}
     for job in s['jobs']:
         reason = job['blocker']
         if reason:
             # Reasons are fixed local gate labels, never external response text.
             reasons[reason] = reasons.get(reason,0)+1
+            if job['blocker_detail']: details[job['blocker_detail']] = details.get(job['blocker_detail'],0)+1
         else:
             kinds[job['kind']] = kinds.get(job['kind'],0)+1
     return {'kind':'scopeguard_autopilot_health','revision':revision if re.fullmatch('[0-9a-f]{40}',revision or '') else 'unknown',
             'state':s['state'],'healthy':s['healthy'],'ready_jobs':s['ready'],
             'eligible_jobs':s['eligible'],'eligible_kinds':kinds,'blocked_jobs':s['blocked'],
-            'blocker_counts':reasons,'next_due':s['next_due'],
+            'blocker_counts':reasons,'blocker_detail_counts':details,'next_due':s['next_due'],
             'running_kind':s['running']['kind'] if s['running'] else None,
             'last_outcome':s['recent_runs'][0]['outcome'] if s['recent_runs'] else None}

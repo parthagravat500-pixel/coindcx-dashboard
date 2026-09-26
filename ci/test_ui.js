@@ -18,7 +18,7 @@ const html=fs.readFileSync('index.html','utf8'),nodes=new Map([...html.matchAll(
 const document={getElementById:id=>{if(!nodes.has(id))throw Error('Missing DOM id '+id);return nodes.get(id);},createElement:tag=>new Node(tag),createTextNode:text=>String(text),querySelectorAll:()=>[]};
 const state=JSON.parse(fs.readFileSync(0,'utf8'));
 const requests=[];
-const context=vm.createContext({document,URL,URLSearchParams,location:{hash:''},Date,console,setInterval:()=>{},confirm:()=>false,fetch:async(path,options={})=>{requests.push({path,method:options.method||'GET'});return {ok:true,json:async()=>state};}});
+const context=vm.createContext({document,URL,URLSearchParams,AbortController,setTimeout,clearTimeout,location:{hash:''},Date,console,setInterval:()=>{},confirm:()=>false,fetch:async(path,options={})=>{requests.push({path,method:options.method||'GET'});return {ok:true,json:async()=>state};}});
 vm.runInContext(fs.readFileSync('ui.js','utf8'),context);
 setImmediate(async()=>{
  assert.equal(nodes.get('message').textContent,'');
@@ -52,6 +52,32 @@ setImmediate(async()=>{
  vm.runInContext('openProgram(state.workflow.programs[0]);openAccess()',context);
  const descendants=n=>[n,...(n.children||[]).filter(x=>x&&typeof x==='object').flatMap(descendants)];
  const oldAutopilot=state.autopilot;
+ assert(!/<details[^>]*id="advancedPanel"[^>]*\bopen\b/.test(html),'Advanced setup stays closed by default.');
+ state.autopilot={state:'waiting',healthy:true,eligible:2,blocked:1,case_count:0,confirmed_bounty_bugs:0,
+  progress:{completed:7,self_checks:2,unfinished:3,last_completed:2,history_note:'Retained history only.'},
+  jobs:[{key:'gitlab:1',kind:'gitlab',ready_at:Date.now()/1000+3600,blocker:''},{key:'owned_validation:1',kind:'owned_validation',ready_at:Date.now()/1000+7200,blocker:''},{key:'headers:1',kind:'headers',blocker:'Disabled',blocker_detail:'<script>Fixed fixture stop reason</script>'}],
+  recent_runs:[{kind:'gitlab',outcome:'inconclusive',started:2,finished:3},{kind:'owned_validation',outcome:'boundary_held',started:1,finished:2}],cases:[]};
+ vm.runInContext('renderHome()',context);
+ assert.match(nodes.get('homeTitle').textContent,/next check is scheduled/);
+ assert.equal(nodes.get('homeCompleted').textContent,7);
+ assert.equal(nodes.get('homeBugCount').textContent,0);
+ assert.equal(nodes.get('homeBlockedCount').textContent,'1 test');
+ assert.equal(nodes.get('homeTasks').children.length,2);
+ assert(descendants(nodes.get('homeTasks')).some(n=>String(n.textContent).includes('ScopeGuard’s own login protection')));
+ assert(descendants(nodes.get('homeHistory')).some(n=>String(n.textContent).includes('Could not reach a conclusion')));
+ nodes.get('openHomeBlockers').onclick();
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Fixed fixture stop reason</script>'));
+ nodes.get('openHomeActivity').onclick();
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='Attempts without a completed result'));
+ nodes.get('openHomeResults').onclick();
+ assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'));
+ assert(requests.every(r=>r.method==='GET'),'Simple home details do not start tests or submit reports.');
+ state.autopilot.state='running';state.autopilot.running={job:'gitlab:1'};
+ vm.runInContext('renderHome()',context);
+ assert.equal(descendants(nodes.get('homeTasks')).filter(n=>n.textContent==='Working').length,1);
+ state.autopilot.state='paused';vm.runInContext('renderHome()',context);
+ assert.match(nodes.get('homeTitle').textContent,/Research is paused/);
+ assert(!descendants(nodes.get('homeTasks')).some(n=>n.textContent==='Working'));
  state.autopilot={state:'running',healthy:true,eligible:2,blocked:1,case_count:1,confirmed_bounty_bugs:0,heartbeat:1,next_due:2,
   coverage:'Bounded owned tests only',jobs:[{label:'Saved test',blocker:'<script>permission expired</script>',ready_at:1}],
   recent_runs:[{kind:'access',outcome:'reproduced_boundary',started:1,finished:2}],
@@ -228,5 +254,27 @@ setImmediate(async()=>{
  await assert.rejects(vm.runInContext('refresh()',context),/Connection or login failed/);
  assert.match(nodes.get('summaryUpdated').textContent,/last successful update/);
  assert.match(nodes.get('status').textContent,/Connection needs attention/);
+ assert.match(nodes.get('homeTitle').textContent,/not connected/);
+ assert.equal(nodes.get('homeTasks').children.length,0);
+ assert.equal(nodes.get('masterPause').disabled,true);
+ const beforePause=requests.length;await nodes.get('masterPause').onclick();assert.equal(requests.length,beforePause);
+ // A delayed old response cannot overwrite a newer one or a connection failure.
+ const delayed=[];context.fetch=()=>new Promise(resolve=>delayed.push(resolve));
+ const oldRefresh=vm.runInContext('refresh()',context),newRefresh=vm.runInContext('refresh()',context);
+ delayed[1]({ok:false});await assert.rejects(newRefresh,/Connection or login failed/);
+ delayed[0]({ok:true,json:async()=>state});await oldRefresh;
+ assert.match(nodes.get('homeTitle').textContent,/not connected/);
+ context.fetch=async()=>({ok:true,json:async()=>state});await vm.runInContext('refresh()',context);
+ assert.equal(nodes.get('masterPause').disabled,false);
+ assert(!/not connected/.test(nodes.get('homeTitle').textContent));
+ // An unresponsive state request times out without claiming that old tasks still run.
+ const normalTimeout=context.setTimeout,normalClear=context.clearTimeout;let fireTimeout;
+ context.setTimeout=callback=>{fireTimeout=callback;return 1;};context.clearTimeout=()=>{};
+ context.fetch=(path,options)=>new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'}))));
+ const hangingRefresh=vm.runInContext('refresh()',context);fireTimeout();
+ await assert.rejects(hangingRefresh,/took too long/);
+ assert.equal(nodes.get('masterPause').disabled,true);
+ assert.match(nodes.get('homeTitle').textContent,/not connected/);
+ context.setTimeout=normalTimeout;context.clearTimeout=normalClear;
  console.log('Dashboard DOM smoke test passed: truthful progress, queue blockers, stale data, valid IDs and text-only policy/review rendering.');
 });

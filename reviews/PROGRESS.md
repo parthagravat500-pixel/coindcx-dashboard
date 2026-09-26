@@ -1,5 +1,43 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, simple home page and durable progress
+
+Baseline: scopeguard-app 67dc2dc0fc7794acf8c87a2343199faee2ad9d3e. Verified
+all local tracked blobs against that branch before edits. The main home screen
+now answers what is happening, what was found, what is on hold, and what recently
+finished. Specialist forms stay closed under advanced details. Policy reviews,
+source reviews, successful checks and possible runtime issues remain distinct;
+no general autonomous bounty-research completion is claimed.
+
+Added durable outcome totals separate from the bounded journal, one-time import
+of retained earlier workflow rows, and separate self-check/unfinished counts.
+Pruning or restarting cannot reduce or double-count these totals. Earlier
+standalone-worker history is not added. Disabled jobs get fixed explanations
+for expired permission, access refusal, failed controls and connection problems.
+The private health receipt exposes only counts of these fixed reasons. No real
+user state, target names, credentials or findings are recorded in this commit.
+
+The home page translates actual outcomes, shows each task's next permitted time,
+and distinguishes waiting from running. Request timeout and response-order guards
+prevent old responses from replacing newer state. Lost connectivity removes live
+activity claims and disables the pause control until a fresh response arrives.
+Evidence remains text-only and authenticated; reading it performs no mutations.
+
+Validation: 254 Python tests passed. Three new tests cover history migration,
+pruning/restart durability and fixed/redacted blocker explanations. Existing
+end-to-end loopback tests now assert truthful completion/self-check/unfinished
+counts and no repeated interrupted-lease count. Expanded DOM smoke checks pass
+for the simple home, running versus waiting, safe evidence, read-only details,
+timeouts, out-of-order responses and connection recovery. No external security
+tests were performed for this change. A cloud-browser attempt to open the local
+synthetic phone preview was blocked because file URLs are not permitted. That
+operation stopped without a workaround; no visual-browser verification claimed.
+
+Publication and deployment are verified separately. The existing service,
+authentication, target permissions and resource plan are preserved. Full arbitrary
+program enrollment, account/identity challenges, new testing permissions and
+general vulnerability discovery remain outside the implemented automatic flow.
+
 ## 2026-09-26, live automatic-workflow receipt
 
 Commit 11d923add56f303b52b7c57aac12d9444b94153a passed isolated GitHub run
