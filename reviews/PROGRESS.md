@@ -1,5 +1,34 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, verified 1,000-checkpoint release at 14:26 UTC
+
+Runtime 7a96f08d3c423f8546a31137e94a78c9315be55d became live at 14:24:31 UTC
+on the existing service (dep-dartak0u01pc73dqj37g). The hosted build passed all
+344 tests in 33.290 seconds. Its 14:24:26 UTC aggregate receipt confirmed 1,000
+catalog entries, 50 areas, 11 partial automatic evidence bindings, 989 contextual
+reviews and 12 optional AI-guidance entries. The initial owned-code receipt had
+33 current files, three stale digests and one awaiting review; stale evidence was
+excluded rather than presented as current. No new program testing was activated.
+The simultaneous lead receipt reported zero active leads and zero confirmed bugs.
+
+The first GitHub isolated-test build found that its Docker-specific allowlist
+excluded the new JSON and Markdown catalog files. Commit
+acb31aad45b1fe2561b25f75e458cc2526e0a174 fixes only that test-context allowlist;
+all application runtime blobs are identical to the deployed revision. Workflow
+36248439586 then completed successfully, including the container build,
+dashboard DOM checks and isolated regression tests. No extra runtime deployment
+was required for that CI-only change. All 102 tracked blobs of the application
+release were verified after publication; main stayed at
+483c6c78bf8577b6ee358a33f8320618c63c4e23.
+
+The public private-model workflow for the application commit was observed in
+progress; no completed new AI result is claimed. Prompt construction was tested
+without model calls. This release makes the catalog, scoped preparation and
+existing evidence visible; it does not implement 1,000 automatic vulnerability
+detectors. Private authenticated browser inspection remains unavailable, so the
+live claims above are based on supported aggregate deployment receipts. No
+hosting settings, paid resources, external scans or spending changes were made.
+
 ## 2026-09-26, 1,000-checkpoint research catalog and bounded integration
 
 Baseline 44e0cf89e3a343a322a6803c792a3a157046d44d and all 97 tracked blobs
