@@ -90,6 +90,27 @@ function renderPolicyEvidence(){
  const checked=(evidence?.records||[]).map(r=>Date.parse(r.checked_at)).filter(Number.isFinite);
  $('policyReviewDate').textContent=checked.length?'Latest saved review: '+new Date(Math.max(...checked)).toLocaleString()+'. Open a program for its sources and checked date.':'';
  if(evidence)policyEvidenceRows(root,evidence.records);
+ renderResearchFocus();
+}
+function researchFocus(){return (state.workflow?.policy_evidence?.records||[]).filter(r=>r.research_plan?.selected).sort((a,b)=>(b.research_plan.updated_at||'').localeCompare(a.research_plan.updated_at||''))[0];}
+function researchPlanStatus(plan){return ({prepared:'Preparation ready',needs_user:'Waiting for your account step',blocked:'Preparation blocked',complete:'Recorded work completed'})[plan.status]||'Status unverified';}
+function renderResearchFocus(){
+ const review=researchFocus();$('researchFocusCard').hidden=!review;if(!review)return;
+ const plan=review.research_plan;
+ $('researchFocusTitle').textContent='Current focus: '+review.program;
+ $('researchFocusSummary').textContent=researchPlanStatus(plan)+'. '+plan.summary;
+ $('researchFocusUpdated').textContent='Saved update: '+plan.updated_at+'. This preparation does not start website tests.';
+ $('researchFocusActions').replaceChildren(...plan.user_actions.map(text=>el('li',text)));
+ $('openResearchFocus').onclick=()=>openResearchPlan(review);
+}
+function openResearchPlan(review){
+ const plan=review.research_plan,root=modal(review.program+' · preparation and next steps');
+ root.append(el('strong',researchPlanStatus(plan)),el('p',plan.summary),el('p',plan.goal));
+ for(const [key,title] of [['completed','Completed preparation'],['user_actions','What needs you'],['blockers','What is still blocked'],['planned_checks','Planned checks · not executed']]){
+  if(!plan[key]?.length)continue;root.append(el('h3',title));const list=el('ul');plan[key].forEach(text=>list.append(el('li',text)));root.append(list);
+ }
+ root.append(el('h3','Validation and actual results'),el('p',plan.validation),el('p',plan.result),el('p','Saved update: '+plan.updated_at,'muted'));
+ root.append(button('Read official scope evidence',()=>openPolicyReview(review)));
 }
 function openPolicyReviews(){
  const root=modal('Program policy reviews'),evidence=state.workflow?.policy_evidence;
@@ -102,6 +123,7 @@ function openPolicyReview(review){
  const root=modal(review.program+' · policy evidence');
  facts(root,[['Checked at',review.checked_at],['Availability',review.availability||'Not recorded'],['Scope',review.scope_complete?'Complete table recorded at the checked date':'Incomplete or restricted; do not infer permission'],['Automation',review.automation||'Unverified'],['Requests per second',review.explicit_requests_per_second==null?'Not stated / unknown':review.explicit_requests_per_second],['Account requirements',review.accounts||'Unverified'],['Testing activation','None from this evidence']]);
  if(review.note)root.append(el('p',review.note));
+ if(review.research_plan)root.append(button('Preparation and what needs you',()=>openResearchPlan(review)));
  if(review.request_limit_note)root.append(el('p',review.request_limit_note,'muted'));
  if(review.scope_visibility_note)root.append(el('p',review.scope_visibility_note,'muted'));
  for(const [key,label] of [['in_scope_assets','Recorded in-scope assets'],['scope_conditions','Scope conditions'],['excluded_assets','Excluded assets'],['exclusions','Excluded tests and reports'],['unresolved','Unresolved questions']]){

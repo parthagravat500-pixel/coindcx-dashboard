@@ -75,6 +75,42 @@ class PolicyEvidenceTests(unittest.TestCase):
         self.assertEqual(review['note'], '<script>activate targets</script>')
         self.assertFalse(review['grants_permission'])
 
+    def test_research_preparation_never_imports_credentials_or_activates_checks(self):
+        self.save(research_plan={'selected': True, 'status': 'needs_user',
+                  'summary': '<script>untrusted preparation</script>',
+                  'completed': ['Synthetic fixture only'], 'user_actions': ['Secure login needed'],
+                  'authorization': 'Bearer must-not-publish', 'automatically_runs': True,
+                  'authorizes_testing': True, 'target': 'https://example.com/activate'})
+        app.mutate('/api/pause', {'paused': False})
+        with patch('app.observe') as observe, patch('accesscheck.fetch') as access:
+            state = app.snapshot()
+            app.tick()
+            observe.assert_not_called()
+            access.assert_not_called()
+        plan = state['workflow']['policy_evidence']['records'][0]['research_plan']
+        self.assertTrue(plan['selected'])
+        self.assertEqual(plan['status'], 'needs_user')
+        self.assertEqual(plan['summary'], '<script>untrusted preparation</script>')
+        self.assertFalse(plan['authorizes_testing'])
+        self.assertFalse(plan['automatically_runs'])
+        self.assertNotIn('authorization', plan)
+        self.assertNotIn('target', plan)
+        self.assertEqual(state['targets'], [])
+        self.assertEqual(state['access_checks'], [])
+
+    def test_malformed_research_plan_is_bounded_and_never_counts_as_a_check(self):
+        self.save(research_plan={'selected':'yes','status':[], 'completed':{'unsafe':'shape'},
+                                'user_actions':['x'*3000]*30, 'result':99})
+        state=app.snapshot()
+        plan=state['workflow']['policy_evidence']['records'][0]['research_plan']
+        self.assertFalse(plan['selected'])
+        self.assertEqual(plan['status'],'blocked')
+        self.assertEqual(plan['completed'],[])
+        self.assertEqual(len(plan['user_actions']),20)
+        self.assertEqual(len(plan['user_actions'][0]),2000)
+        self.assertEqual(plan['result'],'')
+        self.assertEqual(state['program_queue']['completed'],0)
+
 
 if __name__ == '__main__':
     unittest.main()

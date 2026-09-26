@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "program": "Uber",
+      "policy_url": "https://hackerone.com/uber",
+      "sources": [
+        "https://hackerone.com/uber",
+        "https://hackerone.com/uber/policy_scopes"
+      ],
+      "policy_updated": "2026-04-30",
+      "scope_updated": "2026-09-22",
+      "review_status": "reviewed_manual_validation_required",
+      "availability": "Public HackerOne bounty program active; no pause banner observed.",
+      "in_scope_assets": [
+        "uber.com",
+        "Recon Data (official ListDomains and ListIPs endpoints)",
+        "*ubereats.com",
+        "*.uberinternal.com"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "The ubereats wildcard excludes every separately listed out-of-scope host.",
+        "Recon data is informational and does not make every returned asset bounty-eligible.",
+        "Reports must contain analysis, validation, reasoning and demonstrable security impact rather than scanner output.",
+        "Researchers may test only accounts they own and must minimize any access to other users' data.",
+        "The uber.com row is recorded as Domain, not rewritten as a wildcard. Exact subdomain coverage must be established before a vulnerability test.",
+        "The scope table excludes Fraud Reports, including free rides and payment evasion. Its narrower exclusion controls this work despite broader fraud examples in the policy prose.",
+        "The Merchants exception distinguishes same-organization role changes (excluded) from cross-tenant issues; this plan does not test merchants."
+      ],
+      "automation": "Unvalidated scan/enumeration output is excluded. This is not an explicit blanket ban on every automated tool. Permission and suitability for ScopeGuard recurring production comparisons have not been established; no Uber target or automatic profile is enabled by this review.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found in the official policy or scope table read. Null means unknown, not unlimited.",
+      "accounts": "Only owned personal/test accounts may be used. Reports are expected by default to identify the researcher with a @wearehackerone.com alias. Uber supplies no preconfigured test account when no test-account instructions are published. The inspected login page offers phone/email and Google; no account was signed in or created.",
+      "excluded_assets": [
+        "uber.onelogin.com",
+        "uber.com.cn and China/Didi assets",
+        "scaledsolutions*.uber.com",
+        "people.uber.com",
+        "newsroom.uber.com",
+        "merchants.ubereats.com (same-organization role escalation; cross-tenant issues remain eligible)",
+        "love.uber.com",
+        "https://brand.uber.com",
+        "https://assets.uber.com",
+        "Fraud Reports",
+        "et.uber.com",
+        "eng.uber.com",
+        "drive.uber.com",
+        "central-beta.uber.com",
+        "bizblog.uber.com",
+        "adsacademy.uber.com",
+        "*scaledsolutions.uber.com",
+        "*.ubertransit.io",
+        "*.uberscoot.us",
+        "*.ubercarshare.com"
+      ],
+      "exclusions": [
+        "Brute force, denial of service, social engineering and destructive testing",
+        "Automated output without manual validation and impact",
+        "Missing headers, TLS configuration, open ports, banners and versions without a security exploit",
+        "Rate-limit observations without demonstrated security impact",
+        "Accessing or changing other users' data beyond the minimum proof",
+        "Free-ride, payment-evasion and other fraud reports are explicitly excluded in the scope table.",
+        "Reports based only on a public login panel or missing non-authentication cookie flags have no established security impact."
+      ],
+      "unresolved": [
+        "Owned Uber account access and the researcher HackerOne identity are not available in the current browser.",
+        "No exact private test resource, endpoint, synthetic marker or intended-access baseline has been observed; a URL will not be guessed or activated.",
+        "A two-account comparison additionally needs a second separately owned account without shared access to the chosen synthetic record.",
+        "The official ListDomains URL with offset=0 and limit=20 was inaccessible through the web research tool. No returned asset list was obtained or used.",
+        "No numerical request limit was found; the proposed small request budget is an internal ceiling, not permission from Uber."
+      ],
+      "note": "Selected as the next research focus at the user request. Public preparation is complete; an owned-account sign-in is the next checkpoint. Zero live vulnerability checks or new targets resulted from this record.",
+      "checked_at": "2026-09-26T06:23:15Z",
+      "evidence_method": "Official HackerOne policy and all 24 rendered scope rows re-read; ordinary Uber homepage and sign-in form inspected without credentials.",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0,
+      "research_plan": {
+        "selected": true,
+        "status": "needs_user",
+        "updated_at": "2026-09-26T06:23:15Z",
+        "summary": "Public preparation is complete. An Uber account sign-in is needed before examining a private test resource.",
+        "goal": "Evaluate whether a non-financial private test record is protected from anonymous access and, if suitable, a second separately owned account. This is a hypothesis, not a discovered vulnerability.",
+        "completed": [
+          "Re-read the official policy and all 24 scope rows: four in scope and 20 excluded/conditional rows.",
+          "Identified exclusions relevant to this work: raw scanner reports, missing-header-only observations, account enumeration, brute force, disruption and fraud.",
+          "Inspected the ordinary public homepage and the official sign-in form without entering credentials or requesting a verification code.",
+          "Validated the existing access-comparison method against local synthetic and loopback fixtures; no Uber endpoint was used in these tests."
+        ],
+        "user_actions": [
+          "When available, complete secure sign-in for an Uber account you own. Only you can complete its phone/email verification; do not send passwords or verification codes in chat.",
+          "Confirm your existing HackerOne username so the expected researcher alias can be documented. No new HackerOne account is needed.",
+          "Only if we proceed to the two-account comparison, make a second separately owned test account available through secure sign-in. One account is enough to begin mapping the first test."
+        ],
+        "blockers": [
+          "Owned Uber account access and the researcher HackerOne identity are not available in the current browser.",
+          "No exact private test resource, endpoint, synthetic marker or intended-access baseline has been observed; a URL will not be guessed or activated.",
+          "A two-account comparison additionally needs a second separately owned account without shared access to the chosen synthetic record.",
+          "The official ListDomains URL with offset=0 and limit=20 was inaccessible through the web research tool. No returned asset list was obtained or used.",
+          "No numerical request limit was found; the proposed small request budget is an internal ceiling, not permission from Uber."
+        ],
+        "planned_checks": [
+          "After sign-in, map a non-financial private feature through its normal interface and verify the exact resource URL against current scope. Stop if it needs a ride, purchase, payment change, other-person data or an excluded asset.",
+          "Use only a synthetic non-sensitive test value, confirm intended privacy and obtain a successful owner control. Do not use trip history, real addresses or payment information as test material.",
+          "If the exact read-only method is permitted, compare the same owned resource without login. A login page, redirect or failed owner control is inconclusive, not a bug.",
+          "If a second owned account is available, check only the known first-account resource against that account and repeat both owner controls. Never guess identifiers or enumerate accounts.",
+          "Keep any eventual single validation bounded to at most six read-only requests. That ceiling is a local planning choice, not a published Uber limit or permission for recurring checks. Stop on rate limits, server errors, unexpected data or unclear scope.",
+          "Retain only minimal redacted evidence. Confirm account separation, expected permissions, reproducibility and actual impact before drafting any report; no submission is enabled by these notes."
+        ],
+        "validation": "25 local tests passed: test_accessmatrix, test_accesscheck and test_policyevidence. Fixtures cover blocked access, deliberately exposed synthetic data, failed controls, non-JSON/redirect responses, revocation, request limits and redaction. They do not measure Uber security.",
+        "result": "Live Uber vulnerability tests: 0. Confirmed Uber bugs: 0. Public policy and entry-page research only. No account creation, messages, rides, purchases, report submission or additional spending.",
+        "authorizes_testing": false,
+        "automatically_runs": false
+      }
+    }
+  ]
+}

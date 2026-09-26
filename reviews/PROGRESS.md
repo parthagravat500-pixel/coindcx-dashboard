@@ -1,5 +1,58 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, Uber selected for research
+
+Baseline: scopeguard-app 780715bfca2cdcb0319f632b88909c3d2886df75. The earlier
+simple dashboard deployment was confirmed live by Render and its GitHub checks
+passed. The user now selected Uber and authorized preparation up to steps that
+need their account or confirmation.
+
+Re-read the current Uber HackerOne policy (dated April 30) and all 24 scope rows
+(scope updated September 22): four in scope and 20 excluded/conditional rows.
+This is a follow-up to the existing Uber record, not a tenth reviewed program.
+The newer record in `2026-09-26-batch-04-uber.json` preserves sources, timestamp,
+exact assets, exclusions and uncertainty. It corrects two potential ambiguities:
+unvalidated automation output is ineligible, which is not an explicit blanket
+ban on every tool; and the uber.com Domain row is not expanded into a wildcard.
+The scope table's fraud exclusion takes precedence in this work over broader
+policy examples. No free-ride or payment-evasion testing is planned.
+
+Ordinary public research read https://www.uber.com/ and inspected the official
+sign-in page at https://auth.uber.com/v2?next_url=https://www.uber.com. The live
+form offered phone/email and Google; no identifier, password or OTP was entered.
+A bounded read of the policy-linked ListDomains endpoint with offset=0 and
+limit=20 returned tool-inaccessible; no asset data was obtained or used and no
+alternate access route was attempted. No other Uber endpoints were tested.
+
+Prepared a staged private-record access-control hypothesis. The first phase
+needs one owned account to locate a non-financial synthetic resource and verify
+exact scope; a later two-account comparison additionally needs a second owned
+account with no shared access. No endpoint or credential is guessed. A maximum
+of six read-only requests is a proposed local ceiling, not an Uber-published
+rate limit or approval for recurring production tests. Identity, privacy,
+controls, reproducibility and actual impact must be established before a report.
+
+Added a read-only Current focus card and preparation detail view. The card shows
+completed preparation and what needs the user. Plan ingestion allowlists display
+fields and forces authorizes_testing=false and automatically_runs=false. It
+cannot import targets, runner settings or credentials, and it does not add to
+completed-check or bug counters. The nine unique policy reviews still load.
+
+Validation: 38 focused access-matrix, access-check, policy-evidence and HTTP
+tests passed; JavaScript syntax and dashboard DOM checks passed. The existing
+loopback fixture distinguished protected and deliberately exposed synthetic
+records; these are not results about Uber. New regressions cover malformed plan
+data, credential/activation fields being discarded, no target creation and
+read-only plan rendering. No live Uber vulnerability checks, account creation,
+messages, submissions, purchases, additional spending or confirmed bugs.
+
+User checkpoints: secure sign-in to an owned Uber account (including its own
+verification step); existing HackerOne username; a second owned account only if
+the two-account test is selected. Exact private-resource scope and unattended
+tool permission remain unverified. The current signed-in dashboard is not
+claimed as visually inspected; the earlier browser access block remains.
+This commit prepares the visible task card; its deployment is pending here.
+
 ## 2026-09-26, simple progress dashboard
 
 Baseline: scopeguard-app commit ff1b0062703c28b46fcb8882bb9afe06b58f938f.

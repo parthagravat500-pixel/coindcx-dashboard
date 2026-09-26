@@ -10,6 +10,22 @@ TEXT_FIELDS = ('availability', 'review_status', 'policy_updated', 'scope_updated
 LIST_FIELDS = ('in_scope_assets', 'scope_conditions', 'excluded_assets', 'exclusions', 'unresolved')
 
 
+def research_plan(raw):
+    """Expose preparation notes only; never import runner or credential settings."""
+    if not isinstance(raw, dict):
+        return None
+    clean = {'selected': raw.get('selected') is True,
+             'status': raw.get('status') if raw.get('status') in
+                       ('prepared', 'needs_user', 'blocked', 'complete') else 'blocked',
+             'authorizes_testing': False, 'automatically_runs': False}
+    for key in ('updated_at', 'summary', 'goal', 'validation', 'result'):
+        clean[key] = raw[key][:2000] if isinstance(raw.get(key), str) else ''
+    for key in ('completed', 'user_actions', 'blockers', 'planned_checks'):
+        values = raw.get(key, [])
+        clean[key] = [v[:2000] for v in values[:20] if isinstance(v, str)] if isinstance(values, list) else []
+    return clean
+
+
 def public_url(value):
     if not isinstance(value, str):
         return None
@@ -41,6 +57,7 @@ def record(raw):
     result['explicit_requests_per_second'] = (limit if type(limit) in (int, float)
         and 0 <= limit <= 1e9 else None)
     result['scope_complete'] = raw.get('scope_complete') is True
+    result['research_plan'] = research_plan(raw.get('research_plan'))
     # Evidence is advisory even if a file contains an authorizing flag.
     result['grants_permission'] = False
     result['targets_activated'] = 0
