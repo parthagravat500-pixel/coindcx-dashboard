@@ -58,19 +58,34 @@ def init(c):
         next_request INTEGER DEFAULT 0,last_request INTEGER DEFAULT 0,last_success INTEGER DEFAULT 0,
         status TEXT DEFAULT 'connection_needed',index_checked INTEGER DEFAULT 0,
         offset INTEGER DEFAULT 0,index_complete INTEGER DEFAULT 0,program_index TEXT DEFAULT '{}');
-      CREATE TABLE IF NOT EXISTS program_research_health (id INTEGER PRIMARY KEY,heartbeat INTEGER,next_request INTEGER);
-      INSERT OR IGNORE INTO program_research_health VALUES(1,0,0);
+      CREATE TABLE IF NOT EXISTS program_research_health (id INTEGER PRIMARY KEY,heartbeat INTEGER,next_request INTEGER,parser_version INTEGER DEFAULT 2);
+      INSERT OR IGNORE INTO program_research_health(id,heartbeat,next_request) VALUES(1,0,0);
     ''')
     # Existing databases keep their progress; only fixed error codes are added.
     for table in ('program_research','program_research_providers'):
         columns={r[1] for r in c.execute('PRAGMA table_info('+table+')')}
         for name in ('last_error','error_phase'):
             if name not in columns:c.execute('ALTER TABLE '+table+' ADD COLUMN '+name+" TEXT DEFAULT ''")
+    if 'parser_version' not in {r[1] for r in c.execute('PRAGMA table_info(program_research_health)')}:
+        c.execute('ALTER TABLE program_research_health ADD COLUMN parser_version INTEGER DEFAULT 1')
+    if c.execute('SELECT parser_version FROM program_research_health WHERE id=1').fetchone()[0]<2:
+        # Retry parser failures once after this correction, retaining provider
+        # access blocks, rate-limit timers and the global request budget.
+        c.execute("UPDATE program_research SET status='queued',due=0,phase='policy',page=1,partial='{}' WHERE status='incomplete' AND checked=0 AND last_error IN ('','program_type')")
+        c.execute('UPDATE program_research_health SET parser_version=2 WHERE id=1')
     for p in programapi.HOSTS:c.execute('INSERT OR IGNORE INTO program_research_providers(provider) VALUES(?)',(p,))
 
 
 def safe_text(value,limit=20000):
     if not isinstance(value,str) or len(value)>limit:raise programapi.APIError('schema')
+    return value
+
+
+def resource_type(value):
+    # Type names are descriptive API metadata, not program authorization. The
+    # observed API uses labels different from its examples. Validate the actual
+    # identity and required attributes instead, preserving the source label.
+    if not isinstance(value,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,79}',value):raise programapi.APIError('schema')
     return value
 
 
@@ -94,9 +109,11 @@ def h1_policy(doc,policy):
     data=doc.get('data',{});attrs=data.get('attributes',{}) if isinstance(data,dict) else {}
     if not isinstance(data,dict) or not isinstance(attrs,dict):raise programapi.APIError('program_shape')
     handle=programapi.canonical(policy).removeprefix('hackerone:')
-    if data.get('type')!='program':raise programapi.APIError('program_type')
+    kind=resource_type(data.get('type'))
     if str(attrs.get('handle','')).lower()!=handle:raise programapi.APIError('program_identity')
+    if 'policy' not in attrs or not isinstance(attrs.get('submission_state'),str):raise programapi.APIError('program_shape')
     out=empty_evidence(policy);out['policy_text']=safe_text(attrs.get('policy') or '',120000)
+    out['platform_record_type']=kind
     out['program_status']=safe_text(attrs.get('submission_state') or 'unknown',80)
     out['visibility']=safe_text(attrs.get('state') or 'unknown',80)
     out['offers_bounties']=attrs.get('offers_bounties') is True
@@ -109,9 +126,10 @@ def h1_scope(doc,handle,page):
     if not isinstance(data,list) or len(data)>100:raise programapi.APIError('schema')
     out=[]
     for row in data:
-        if not isinstance(row,dict) or row.get('type')!='structured-scope' or not isinstance(row.get('attributes'),dict):raise programapi.APIError('schema')
+        if not isinstance(row,dict) or not isinstance(row.get('attributes'),dict):raise programapi.APIError('schema')
+        kind=resource_type(row.get('type'))
         a=row['attributes']
-        out.append({'asset':safe_text(a.get('asset_identifier'),2000),'type':safe_text(a.get('asset_type'),80),
+        out.append({'asset':safe_text(a.get('asset_identifier'),2000),'type':safe_text(a.get('asset_type'),80),'platform_record_type':kind,
                     'eligible_for_submission':a.get('eligible_for_submission') if type(a.get('eligible_for_submission')) is bool else None,
                     'eligible_for_bounty':a.get('eligible_for_bounty') if type(a.get('eligible_for_bounty')) is bool else None,
                     'instructions':safe_text(a.get('instruction') or ''), 'updated':safe_text(a.get('updated_at') or '',80)})
@@ -132,8 +150,9 @@ def h1_exclusions(doc):
     if not isinstance(rows,list) or len(rows)>500 or doc.get('links',{}).get('next'):raise programapi.APIError('schema')
     result=[]
     for r in rows:
-        if not isinstance(r,dict) or r.get('type')!='scope-exclusion' or not isinstance(r.get('attributes'),dict):raise programapi.APIError('schema')
-        a=r['attributes'];result.append({'category':safe_text(a.get('category'),500),'details':safe_text(a.get('details') or '')})
+        if not isinstance(r,dict) or not isinstance(r.get('attributes'),dict):raise programapi.APIError('schema')
+        kind=resource_type(r.get('type'))
+        a=r['attributes'];result.append({'category':safe_text(a.get('category'),500),'details':safe_text(a.get('details') or ''),'platform_record_type':kind})
     return result
 
 

@@ -1,5 +1,26 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, program API parser compatibility
+
+The diagnostic release a05e92c97ea6845509f0bfe873939d99b92177d4 passed
+291 hosted tests and became live at 11:16 UTC. Its fixed diagnostic confirmed
+that the nominal program record type did not match the documentation example.
+The actual source label was not logged, so no particular alias is claimed.
+
+The reader now validates bounded metadata labels, exact requested program handle,
+the required policy/state fields and exact scope/exclusion attribute shapes. It
+preserves the platform label as metadata rather than treating a documentation
+example's label as an authorization boundary. Missing fields, wrong program
+identity, invalid labels and incomplete evidence still fail closed. No testing
+permission or activation is produced. The source remains the fixed HTTPS API
+route with the account's existing authorized connection.
+
+A one-time parser migration reschedules unfinished parsing failures without
+resetting access refusals, provider blocks, retry timers or request limits.
+Twenty-five focused tests passed, including metadata variants, identity binding,
+and migration preserving those controls. Real document collection remains subject
+to the subsequent live worker receipt; this source change alone is not a review.
+
 ## 2026-09-26, live program research and failure explanations
 
 Commit d51e94ef4ae81b59f6281a791b3d35b6b89a9165 passed GitHub checks and all
