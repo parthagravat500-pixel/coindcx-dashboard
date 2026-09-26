@@ -69,6 +69,14 @@ setImmediate(async()=>{
  nodes.get('openResearchFocus').onclick();
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='No live finding'));
  assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'),'Research preparation must stay read-only.');
+ state.workflow.policy_evidence.records[0].research_plan.connection={status:'provider_approval_required',summary:'<script>Connection requires approval</script>',manual_alternative:'Manual browser review is separate.',checked_at:'2026-09-26T07:00:00Z',requirements:['Provider approval is not verified.'],sources:['https://example.com/docs'],connected:false};
+ vm.runInContext('renderResearchFocus()',context);
+ assert.equal(nodes.get('researchFocusConnection').hidden,false);
+ assert.match(nodes.get('researchFocusConnection').textContent,/needs provider approval/);
+ nodes.get('openResearchFocus').onclick();
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Connection requires approval</script>'));
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='Manual browser review is separate.'));
+ assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'),'Connection notes must not collect credentials or activate tests.');
  nodes.get('openPolicyReviews').onclick();
  assert.equal(nodes.get('detailContent').children[0].textContent,'Program policy reviews');
  state.workflow.policy_evidence={unavailable_entries:1,records:[]};

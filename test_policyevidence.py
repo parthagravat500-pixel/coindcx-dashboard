@@ -111,6 +111,34 @@ class PolicyEvidenceTests(unittest.TestCase):
         self.assertEqual(plan['result'],'')
         self.assertEqual(state['program_queue']['completed'],0)
 
+    def test_connection_notes_cannot_import_secrets_or_establish_access(self):
+        self.save(research_plan={'selected': True, 'status': 'prepared', 'connection': {
+            'status': 'connected', 'connected': True, 'authorizes_testing': True,
+            'client_secret': 'fixture-secret', 'access_token': 'fixture-token',
+            'summary': '<script>connect now</script>', 'requirements': ['a' * 3000] * 15,
+            'sources': ['https://example.com/docs', 'javascript:alert(1)',
+                        'https://secret@example.com/docs', 'https://example.com/callback?code=secret']}})
+        app.mutate('/api/pause', {'paused': False})
+        with patch('urllib.request.urlopen') as network, patch('app.observe') as observe:
+            state = app.snapshot()
+            app.tick()
+            network.assert_not_called()
+            observe.assert_not_called()
+        connection = state['workflow']['policy_evidence']['records'][0]['research_plan']['connection']
+        self.assertEqual(connection['status'], 'unverified')
+        self.assertFalse(connection['connected'])
+        self.assertFalse(connection['authorizes_testing'])
+        self.assertNotIn('client_secret', connection)
+        self.assertNotIn('access_token', connection)
+        self.assertEqual(connection['sources'], ['https://example.com/docs'])
+        self.assertEqual(connection['summary'], '<script>connect now</script>')
+        self.assertEqual(len(connection['requirements']), 10)
+        self.assertEqual(len(connection['requirements'][0]), 2000)
+        self.assertEqual(state['targets'], [])
+        self.assertEqual(state['access_checks'], [])
+        self.assertEqual(state['program_queue']['completed'], 0)
+        self.assertIsNone(policyevidence.connection_plan(['bad shape']))
+
 
 if __name__ == '__main__':
     unittest.main()

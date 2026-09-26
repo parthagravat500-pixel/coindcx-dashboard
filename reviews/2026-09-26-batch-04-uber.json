@@ -31,7 +31,7 @@
       "automation": "Unvalidated scan/enumeration output is excluded. This is not an explicit blanket ban on every automated tool. Permission and suitability for ScopeGuard recurring production comparisons have not been established; no Uber target or automatic profile is enabled by this review.",
       "explicit_requests_per_second": null,
       "request_limit_note": "No numerical testing request limit found in the official policy or scope table read. Null means unknown, not unlimited.",
-      "accounts": "Only owned personal/test accounts may be used. Reports are expected by default to identify the researcher with a @wearehackerone.com alias. Uber supplies no preconfigured test account when no test-account instructions are published. The inspected login page offers phone/email and Google; no account was signed in or created.",
+      "accounts": "Only owned personal/test accounts may be used. Reports are expected by default to reference a @wearehackerone.com alias. A separate account is not required when an existing owned account is suitable. Uber supplies no preconfigured test account when no test-account instructions are published. Phone sign-in, shared-browser sign-in and API app approval are distinct steps.",
       "excluded_assets": [
         "uber.onelogin.com",
         "uber.com.cn and China/Didi assets",
@@ -64,13 +64,13 @@
         "Reports based only on a public login panel or missing non-authentication cookie flags have no established security impact."
       ],
       "unresolved": [
-        "Owned Uber account access and the researcher HackerOne identity are not available in the current browser.",
+        "A signed-in session in the research browser has not been verified. A login on another device does not establish that session or a ScopeGuard API connection.",
         "No exact private test resource, endpoint, synthetic marker or intended-access baseline has been observed; a URL will not be guessed or activated.",
         "A two-account comparison additionally needs a second separately owned account without shared access to the chosen synthetic record.",
         "The official ListDomains URL with offset=0 and limit=20 was inaccessible through the web research tool. No returned asset list was obtained or used.",
         "No numerical request limit was found; the proposed small request budget is an internal ceiling, not permission from Uber."
       ],
-      "note": "Selected as the next research focus at the user request. Public preparation is complete; an owned-account sign-in is the next checkpoint. Zero live vulnerability checks or new targets resulted from this record.",
+      "note": "Public policy and controlled research preparation are saved. A phone login is not a shared research-browser session or an API connection. No live vulnerability check or target activation has resulted from these notes.",
       "checked_at": "2026-09-26T06:23:15Z",
       "evidence_method": "Official HackerOne policy and all 24 rendered scope rows re-read; ordinary Uber homepage and sign-in form inspected without credentials.",
       "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
@@ -79,22 +79,22 @@
       "research_plan": {
         "selected": true,
         "status": "needs_user",
-        "updated_at": "2026-09-26T06:23:15Z",
-        "summary": "Public preparation is complete. An Uber account sign-in is needed before examining a private test resource.",
+        "updated_at": "2026-09-26T07:10:21Z",
+        "summary": "The program rules and controlled test plan are prepared. A phone login does not connect ScopeGuard. Manual browser research needs a secure session in the research browser; an API connection separately needs Uber approval and an implemented connector.",
         "goal": "Evaluate whether a non-financial private test record is protected from anonymous access and, if suitable, a second separately owned account. This is a hypothesis, not a discovered vulnerability.",
         "completed": [
           "Re-read the official policy and all 24 scope rows: four in scope and 20 excluded/conditional rows.",
           "Identified exclusions relevant to this work: raw scanner reports, missing-header-only observations, account enumeration, brute force, disruption and fraud.",
           "Inspected the ordinary public homepage and the official sign-in form without entering credentials or requesting a verification code.",
-          "Validated the existing access-comparison method against local synthetic and loopback fixtures; no Uber endpoint was used in these tests."
+          "Validated the existing access-comparison method against local synthetic and loopback fixtures; no Uber endpoint was used in these tests.",
+          "Checked official Uber OAuth and profile API documentation; both published profile API versions explicitly require Uber approval."
         ],
         "user_actions": [
-          "When available, complete secure sign-in for an Uber account you own. Only you can complete its phone/email verification; do not send passwords or verification codes in chat.",
-          "Confirm your existing HackerOne username so the expected researcher alias can be documented. No new HackerOne account is needed.",
-          "Only if we proceed to the two-account comparison, make a second separately owned test account available through secure sign-in. One account is enough to begin mapping the first test."
+          "For manual browser research, complete the secure sign-in prompt in the shared research browser when offered. A phone browser session is separate; do not copy passwords, verification codes or cookies into chat. No extra Uber account is needed for this first step."
         ],
         "blockers": [
-          "Owned Uber account access and the researcher HackerOne identity are not available in the current browser.",
+          "A signed-in session in the research browser has not been verified. A login on another device does not establish that session or a ScopeGuard API connection.",
+          "The documented Uber profile API requires provider approval. No approved application or working ScopeGuard OAuth connector has been established. This API prerequisite is separate from permission for manual browser research.",
           "No exact private test resource, endpoint, synthetic marker or intended-access baseline has been observed; a URL will not be guessed or activated.",
           "A two-account comparison additionally needs a second separately owned account without shared access to the chosen synthetic record.",
           "The official ListDomains URL with offset=0 and limit=20 was inaccessible through the web research tool. No returned asset list was obtained or used.",
@@ -109,9 +109,28 @@
           "Retain only minimal redacted evidence. Confirm account separation, expected permissions, reproducibility and actual impact before drafting any report; no submission is enabled by these notes."
         ],
         "validation": "25 local tests passed: test_accessmatrix, test_accesscheck and test_policyevidence. Fixtures cover blocked access, deliberately exposed synthetic data, failed controls, non-JSON/redirect responses, revocation, request limits and redaction. They do not measure Uber security.",
-        "result": "Live Uber vulnerability tests: 0. Confirmed Uber bugs: 0. Public policy and entry-page research only. No account creation, messages, rides, purchases, report submission or additional spending.",
+        "result": "Live Uber vulnerability tests: 0. Confirmed Uber bugs: 0. API and OAuth documentation reviewed without API requests or credentials. No report submission or additional spending.",
         "authorizes_testing": false,
-        "automatically_runs": false
+        "automatically_runs": false,
+        "connection": {
+          "status": "provider_approval_required",
+          "summary": "Uber requires approval for its profile API. ScopeGuard has no Uber OAuth connector configured; signing in to Uber on your phone does not connect it.",
+          "checked_at": "2026-09-26T07:10:21Z",
+          "requirements": [
+            "Provider access: Uber approval for the specific API and an application registered through its supported developer process.",
+            "Implementation: an OAuth connector with private server-side credential storage, state validation, fixed callback and minimal scopes; none is implemented or enabled by these notes.",
+            "Account consent: the owner authorizes only the approved app and required scope through Uber. A rider login or HackerOne account alone is not API approval.",
+            "Testing permission: independently verify the exact asset and proposed method against current bounty scope before any security test. API access is not blanket testing permission."
+          ],
+          "manual_alternative": "Ordinary manual browser research uses a securely authenticated browser session and the program rules. The API approval requirement does not by itself prohibit that route. A shared-browser sign-in remains separate from an unattended ScopeGuard connection.",
+          "sources": [
+            "https://developer.uber.com/docs/consumer-identity/references/api/v3/me-get",
+            "https://developer.uber.com/docs/riders/references/api/v1.2/me-get",
+            "https://developer.uber.com/docs/riders/guides/authentication/user-access-token"
+          ],
+          "connected": false,
+          "authorizes_testing": false
+        }
       }
     }
   ]

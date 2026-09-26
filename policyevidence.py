@@ -23,7 +23,26 @@ def research_plan(raw):
     for key in ('completed', 'user_actions', 'blockers', 'planned_checks'):
         values = raw.get(key, [])
         clean[key] = [v[:2000] for v in values[:20] if isinstance(v, str)] if isinstance(values, list) else []
+    clean['connection'] = connection_plan(raw.get('connection'))
     return clean
+
+
+def connection_plan(raw):
+    """Display connection prerequisites; policy files cannot create a connection."""
+    if not isinstance(raw, dict):
+        return None
+    result = {'status': raw.get('status') if raw.get('status') in
+              ('provider_approval_required', 'not_configured', 'unverified') else 'unverified',
+              'connected': False, 'authorizes_testing': False}
+    for key in ('summary', 'manual_alternative', 'checked_at'):
+        result[key] = raw[key][:2000] if isinstance(raw.get(key), str) else ''
+    values = raw.get('requirements', [])
+    result['requirements'] = [v[:2000] for v in values[:10] if isinstance(v, str)] if isinstance(values, list) else []
+    sources = raw.get('sources', [])
+    # Documentation links carry no credentials or OAuth callback parameters.
+    result['sources'] = [url for url in sources[:10] if public_url(url)
+                         and not urlsplit(url).query] if isinstance(sources, list) else []
+    return result
 
 
 def public_url(value):

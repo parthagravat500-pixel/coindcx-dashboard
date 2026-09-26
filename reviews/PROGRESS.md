@@ -1,5 +1,40 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, Uber connection requirements
+
+Baseline: scopeguard-app f75af88f997a2fa64fc9b86892527507b7480840. Latest
+remote source and prior preparation were read and local edited-file blob hashes
+matched before starting. Existing user changes were preserved.
+
+Official developer documentation was read for OAuth user tokens and both the
+v1.2 and v3 profile APIs. Both endpoint pages state that API access requires Uber
+approval. A phone login and HackerOne membership do not establish that approval.
+No provider-approved application or working Uber OAuth connector was established
+in ScopeGuard. The API prerequisite is separate from manual browser research
+under the bounty rules; it is not represented as a blanket ban on manual testing.
+
+Added a structured, read-only connection requirements panel to the existing
+research plan. It shows provider access, implementation, owner consent and exact
+testing-scope prerequisites, with official documentation URLs and a checked date.
+The manual browser route is distinguished from a server API connection. Removed
+repeated account-creation and username-confirmation instructions from this public
+plan. No personal identity, phone number, email, credential or account screenshot
+is included in source. The nine unique policy reviews remain nine; this is not
+another program review or completed security check.
+
+Connection notes accept only bounded display fields. Credential fields and
+OAuth callback query parameters are discarded; connected and authorizes_testing
+stay false even if an evidence file claims otherwise. No OAuth connector,
+credential store or live testing permission is created by these notes.
+
+Validation: 39 focused access-matrix, access-check, policy-evidence and HTTP tests
+passed, plus JavaScript syntax and dashboard DOM smoke checks. Synthetic fixtures
+verify that connection notes cannot authenticate, activate a target, collect
+credentials, inflate completed checks or render executable markup. No Uber API
+request, live vulnerability test, account creation, contact, submission, paid
+service or new compute resource was used for this work. The shared research
+browser sign-in and deployment verification remain pending at this commit.
+
 ## 2026-09-26, Uber selected for research
 
 Baseline: scopeguard-app 780715bfca2cdcb0319f632b88909c3d2886df75. The earlier

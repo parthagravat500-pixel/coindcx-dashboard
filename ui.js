@@ -94,6 +94,7 @@ function renderPolicyEvidence(){
 }
 function researchFocus(){return (state.workflow?.policy_evidence?.records||[]).filter(r=>r.research_plan?.selected).sort((a,b)=>(b.research_plan.updated_at||'').localeCompare(a.research_plan.updated_at||''))[0];}
 function researchPlanStatus(plan){return ({prepared:'Preparation ready',needs_user:'Waiting for your account step',blocked:'Preparation blocked',complete:'Recorded work completed'})[plan.status]||'Status unverified';}
+function connectionPlanStatus(connection){return ({provider_approval_required:'App connection needs provider approval',not_configured:'App connection is not configured',unverified:'App connection is unverified'})[connection.status]||'App connection is unverified';}
 function renderResearchFocus(){
  const review=researchFocus();$('researchFocusCard').hidden=!review;if(!review)return;
  const plan=review.research_plan;
@@ -101,11 +102,14 @@ function renderResearchFocus(){
  $('researchFocusSummary').textContent=researchPlanStatus(plan)+'. '+plan.summary;
  $('researchFocusUpdated').textContent='Saved update: '+plan.updated_at+'. This preparation does not start website tests.';
  $('researchFocusActions').replaceChildren(...plan.user_actions.map(text=>el('li',text)));
+ const connection=plan.connection;$('researchFocusConnection').hidden=!connection;
+ $('researchFocusConnection').textContent=connection?connectionPlanStatus(connection)+'. '+connection.summary:'';
  $('openResearchFocus').onclick=()=>openResearchPlan(review);
 }
 function openResearchPlan(review){
  const plan=review.research_plan,root=modal(review.program+' · preparation and next steps');
  root.append(el('strong',researchPlanStatus(plan)),el('p',plan.summary),el('p',plan.goal));
+ if(plan.connection){const connection=plan.connection;root.append(el('h3',connectionPlanStatus(connection)),el('p',connection.summary));const requirements=el('ul');connection.requirements.forEach(text=>requirements.append(el('li',text)));root.append(requirements,el('p',connection.manual_alternative),el('small','Connection documentation checked: '+connection.checked_at));connection.sources.forEach(url=>root.append(el('br'),safeLink('Official connection documentation',url)));}
  for(const [key,title] of [['completed','Completed preparation'],['user_actions','What needs you'],['blockers','What is still blocked'],['planned_checks','Planned checks · not executed']]){
   if(!plan[key]?.length)continue;root.append(el('h3',title));const list=el('ul');plan[key].forEach(text=>list.append(el('li',text)));root.append(list);
  }
