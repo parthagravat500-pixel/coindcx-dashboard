@@ -1,3 +1,40 @@
+## Automatic lead investigations
+
+Source reviews now feed a persistent, ranked lead inbox alongside repeated runtime
+observations. The existing worker updates the inbox every ten seconds from saved
+evidence. Changed source is analyzed automatically; unchanged evidence is not
+counted again. Current owner review decisions are honored, and changed code
+reopens stale decisions. Leads no longer observed are retained as historical
+evidence, never labelled a proven fix. Login, CSRF, saved target permissions and
+report-submission gates remain unchanged.
+
+`querycheck.py` adds actual SQLite component experiments for a narrow supported
+class of dynamic SELECT queries. An inert Python path model supplies the SQL; a
+two-row in-memory fixture supplies synthetic records. A candidate must return an
+extra row twice while owner controls before/after and a parameter-binding negative
+control pass. The connection denies writes, attachments, pragmas, arbitrary
+functions and extension loading, and bounds statement size, columns, expression
+depth, VM work and returned rows. Only control booleans, counts and hashes persist.
+No imported project code, credentials, real database or external website is used.
+
+This is component evidence under an inferred schema and SQLite dialect. It is
+**not execution of the application and not a confirmed application vulnerability**.
+Unsupported query shapes, framework behavior and database dialects remain
+unresolved. Numeric guards and safely bound queries do not receive a positive
+reproduction result. Coverage is at most twelve SQL leads and three entry paths
+per project review; other types retain their existing path-model evidence.
+
+The home page's View leads opens a read-only list with evidence strength, actual
+controls, recorded date, private draft and remaining validation needs. At most
+100 ranked entries are shown, with truncation disclosed. Information-only header
+observations are not promoted into this supported-lead count. Up to 200 old
+inactive leads are retained in addition to current bounded project evidence.
+A private operational receipt exposes only aggregate lead states and worker
+health, not project names, drafts or findings. No general autonomous enrollment,
+account verification, scope approval, exploit discovery or bounty acceptance is
+claimed. Existing approved source watches and owned app checks run independently
+of an open browser; unapproved sites do not get scanned.
+
 ## Simple dashboard
 
 The phone-friendly home page shows the next permitted test, saved results, tests
@@ -62,7 +99,7 @@ new testing permission, general exploit discovery or bounty acceptance.
 ## Automatic source investigation
 
 When the existing master research switch is enabled, the server checks its
-29 installed Python source files for changes every minute. No browser needs to
+31 installed Python source files for changes every minute. No browser needs to
 stay open. The pipeline records input paths, runs bounded synthetic path
 experiments, and creates an investigation draft for each static lead. Existing
 authorized source watches and project uploads use the same pipeline. Unchanged

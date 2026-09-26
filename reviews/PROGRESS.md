@@ -1,5 +1,46 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, automatic lead follow-up and evidence inbox
+
+Baseline: scopeguard-app da01ffbc852a3264907389729921b47598d46cb5. Verified all
+83 local tracked blobs against the remote tree before editing. Implemented
+querycheck.py and leadwork.py, connected them to the existing source-review and
+worker paths, and exposed a simple View leads list without adding setup forms.
+
+Local SQL component reproduction uses actual SQLite against inferred two-row
+synthetic fixtures. It requires repeat extra-row observations plus owner and
+parameter-binding controls, while prohibiting writes, attachments, pragmas and
+arbitrary functions. Statement and VM work are bounded. Project code never
+executes and source/query literals are not saved. The result is explicitly local
+component evidence, not an application exploit, security guarantee, confirmed
+bounty or submission approval. Other database dialects and unsupported paths
+remain unresolved. Source-analysis version changed to invalidate old engine
+caches; installed owned-source coverage is now 31 Python files.
+
+The lead inbox ranks repeated runtime observations and local component evidence
+above unverified source suspicions. It deduplicates evidence, preserves history
+through restart, respects current review decisions, reopens stale decisions on
+source changes and demotes configuration-changed runtime evidence. Not reproduced
+and not observed never mean proven safe or fixed. Only existing saved evidence
+is indexed: no target activation, permission renewal or report submission occurs.
+
+Validation: 266 Python tests passed, including twelve new component/lead tests.
+Actual quoted and numeric injection fixtures reproduce twice; numeric guards and
+parameter binding do not become supported leads. Tests cover SQL authorizer
+restrictions, budgets, redaction, unknown paths, deduplication, restart, review
+changes and authenticated HTTP upload → production worker iteration → dashboard
+evidence. Existing real-loopback boundary tests now verify runtime evidence enters
+the inbox and expired permission makes it historical. The dashboard DOM smoke
+test and JavaScript syntax checks passed. Owned installed-source review completed
+locally in under a second and produced zero supported leads; no real vulnerability
+or earnings are claimed. Synthetic demonstrations never become production leads.
+
+Browser preview remains blocked by the earlier browser URL-policy decision; no
+workaround or visual verification is claimed. Publication, the exact-commit CI
+run, existing-service deployment and private aggregate worker receipt are verified
+separately. No extra service, model/API charge, new compute resource or external
+security test is required by this change. All unrelated trading code is preserved.
+
 ## 2026-09-26, simple home page and durable progress
 
 Baseline: scopeguard-app 67dc2dc0fc7794acf8c87a2343199faee2ad9d3e. Verified

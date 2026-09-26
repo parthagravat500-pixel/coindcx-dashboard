@@ -9,8 +9,9 @@ import stat
 import time
 import zipfile
 import pathcheck
+import querycheck
 
-VERSION = 'project-flow-3/' + pathcheck.VERSION
+VERSION = 'project-flow-4/' + pathcheck.VERSION + '/' + querycheck.VERSION
 MAX_TOTAL = 2000000
 MAX_FILE = 128000
 MAX_FILES = 80
@@ -192,9 +193,13 @@ def record(c,name,files,skipped=0):
     if old and old[0] == digest: return False
     result = analyze(files);result['non_python_or_excluded_files'] = skipped
     experiments = pathcheck.validate(files, result['findings'])
+    components = querycheck.validate(files, result['findings'])
     for finding in result['findings']:
         finding['automatic_validation'] = experiments[finding['id']]
+        finding['component_validation'] = components[finding['id']]
         finding['investigation_draft'] = pathcheck.draft(finding, digest)
+        component = finding['component_validation']
+        finding['investigation_draft'] += '\n\nLocal component test: '+component['status']+'. '+component['reason']+'\n'+querycheck.LIMITATION
     result['automatic_validation'] = {
         'engine': pathcheck.VERSION, 'leads_processed': min(len(experiments), pathcheck.MAX_LEADS),
         'experiments': sum(v['experiments'] for v in experiments.values()),
@@ -202,6 +207,12 @@ def record(c,name,files,skipped=0):
         'unresolved': sum(v['status']!='modeled_flow' for v in experiments.values()),
         'drafts': len(experiments), 'runtime_verified': False,
         'limitation': pathcheck.LIMITATION}
+    result['component_validation'] = {'engine':querycheck.VERSION,
+        'reproduced':sum(v['component_verified'] for v in components.values()),
+        'not_reproduced':sum(v['status']=='not_reproduced' for v in components.values()),
+        'unresolved':sum(v['status'] in ('unsupported','limited') for v in components.values()),
+        'attempts':sum(v['attempts'] for v in components.values()),'limitation':querycheck.LIMITATION,
+        'application_verified':False}
     manifest = {path:hashlib.sha256(source.encode()).hexdigest() for path,source in files.items()}
     previous = json.loads(old[1]) if old else {}
     compatible = previous.get('engine') == VERSION and 'manifest' in previous
@@ -215,6 +226,7 @@ def record(c,name,files,skipped=0):
         finding['changed_trace_files'] = sorted({t['file'] for t in finding['trace']} & set(changed+added)) if compatible else []
         # A priority score is an investigation order, never severity or payout probability.
         finding['research_priority'] = (30 if finding['change_status']=='New lead' else 0) + (20 if finding['changed_trace_files'] else 0) + min(len({t['file'] for t in finding['trace']}),5)
+        if finding['component_validation']['component_verified']: finding['research_priority'] += 50
         finding['related_leads'] = sum(f['title']==finding['title'] and f['id']!=finding['id'] for f in result['findings'])
     current = {f['id'] for f in result['findings']}
     result['manifest'] = manifest

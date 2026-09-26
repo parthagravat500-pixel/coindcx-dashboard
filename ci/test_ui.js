@@ -52,6 +52,17 @@ setImmediate(async()=>{
  vm.runInContext('openProgram(state.workflow.programs[0]);openAccess()',context);
  const descendants=n=>[n,...(n.children||[]).filter(x=>x&&typeof x==='object').flatMap(descendants)];
  const oldAutopilot=state.autopilot;
+ const oldInbox=state.lead_inbox;
+ state.lead_inbox={healthy:true,paused:false,active_leads:1,qualified_states:['local_reproduction'],counts:{local_reproduction:1},leads:[{active:1,state:'local_reproduction',label:'Reproduced in a local component',source:'Owned fixture',observed:1,details:{title:'Possible SQL issue',file:'web.py',line:3,reason:'Synthetic query changed twice.',next_step:'Verify actual application.',draft:'<script>Untrusted evidence remains text</script>',evidence:[{checks:{owner_control:true,parameter_binding_blocks:true}}]}}]};
+ vm.runInContext('renderHome();openHomeLeads()',context);
+ assert.match(nodes.get('homeLeadSummary').textContent,/1 possible lead has/);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Untrusted evidence remains text</script>'));
+ assert(descendants(nodes.get('detailContent')).some(n=>String(n.textContent).includes('fake database records')));
+ assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'));
+ assert(requests.every(r=>r.method==='GET'),'Opening lead evidence never activates tests or submits a report.');
+ state.lead_inbox={...state.lead_inbox,healthy:false};vm.runInContext('renderHome()',context);
+ assert.match(nodes.get('homeLeadSummary').textContent,/fresh worker update/);
+ state.lead_inbox=oldInbox;
  assert(!/<details[^>]*id="advancedPanel"[^>]*\bopen\b/.test(html),'Advanced setup stays closed by default.');
  state.autopilot={state:'waiting',healthy:true,eligible:2,blocked:1,case_count:0,confirmed_bounty_bugs:0,
   progress:{completed:7,self_checks:2,unfinished:3,last_completed:2,history_note:'Retained history only.'},

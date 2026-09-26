@@ -109,11 +109,24 @@ class AutopilotTests(unittest.TestCase):
         self.assertEqual(q['progress']['completed'],3)
         self.assertEqual(q['progress']['self_checks'],1)
         self.assertEqual(q['progress']['unfinished'],1)
+        with app.db() as c:
+            app.leadwork.sync(c)
+            inbox=app.leadwork.snapshot(c)
+        self.assertEqual(inbox['active_leads'],1)
+        self.assertEqual(inbox['counts'],{'runtime_reproduced':1})
+        self.assertEqual(inbox['leads'][0]['details']['application_tested'],True)
+        self.assertFalse(inbox['leads'][0]['details']['confirmed_bounty'])
         self.assertNotIn(MARKER,json.dumps(q)); self.assertNotIn(AUTH,json.dumps(q))
         app.init()
         self.assertEqual(len(app.snapshot()['autopilot']['cases']),1)
         self.assertEqual(app.snapshot()['autopilot']['progress'],q['progress'])
         self.assertEqual(self.api('/api/state',authenticated=False)[0],401)
+        with app.db() as c:
+            c.execute('UPDATE targets SET expires=0 WHERE id=1')
+            app.leadwork.sync(c)
+            inbox=app.leadwork.snapshot(c)
+        self.assertEqual(inbox['active_leads'],0)
+        self.assertEqual(inbox['counts'],{'historical_runtime':1})
 
     def test_pause_makes_no_request(self):
         self.add('/leaky')

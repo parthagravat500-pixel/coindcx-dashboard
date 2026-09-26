@@ -419,10 +419,13 @@ function renderHome(){
  }
  if(eligible.length>4)$('homeTasks').append(el('small',(eligible.length-4)+' more saved tests in advanced details.'));
  const research=state.automatic_research;
- $('homeCodeStatus').textContent=research?(state.paused?'Code reviews are paused. ':research.healthy?'Automatic code review checks for source changes. ':'Code-review worker status needs attention. ')+(research.completed||0)+' code reviews saved.':'Code-review status is unavailable.';
+ $('homeCodeStatus').textContent=research?(state.paused?'Own-code reviews are paused. ':research.state==='error'?'Own-code review will retry after an error. ':research.healthy?'ScopeGuard checks its own code when it changes. ':'Own-code review worker status needs attention. ')+(research.completed||0)+' code reviews saved.':'Code-review status is unavailable.';
  $('homeBugCount').textContent=a?.confirmed_bounty_bugs??'—';
  const cases=a?.case_count??a?.cases?.length??0;
  $('homeResultSummary').textContent=!a?'Current results are unavailable.':cases?cases+' possible issues have saved evidence. They still need impact and program review.':'No confirmed vulnerability yet. Completed work is saved below.';
+ const inbox=state.lead_inbox;
+ $('homeLeadSummary').textContent=!inbox?'Lead review is unavailable.':!inbox.healthy?'Saved lead review needs a fresh worker update.':inbox.active_leads?inbox.active_leads+' possible '+(inbox.active_leads===1?'lead has':'leads have')+' supporting evidence. Open the list to see what was actually tested.':'No supported lead is currently ready for investigation. Reviews continue when approved source changes.';
+ $('openHomeLeads').textContent=inbox?'View leads ('+inbox.active_leads+')':'View leads';$('openHomeLeads').disabled=!inbox;
  $('homeCompleted').textContent=a?.progress?.completed??'—';
  $('homeCodeReviews').textContent=research?.completed??'—';
  $('homeRuleReviews').textContent=state.workflow?.policy_evidence?.records?.length??'—';
@@ -445,7 +448,7 @@ function openHomeResults(){
  root.append(el('p','Confirmed bounty bugs: '+(a?.confirmed_bounty_bugs??'unknown')+'. A completed test or code review is not proof of a bug.'));
  const cases=a?.case_count??a?.cases?.length??0;
  root.append(el('h3','Possible issues'),el('p',cases?cases+' repeated observations are saved privately. They need impact, permission and duplicate review before reporting.':'No repeated runtime issue is saved by the automatic workflow.'));
- root.append(button('Read saved test evidence',openAutopilot),button('Read code review results',openProjectAudits),button('Read program rules',openPolicyReviews));
+ root.append(button('Read lead investigations',openHomeLeads),button('Read saved test evidence',openAutopilot),button('Read code review results',openProjectAudits),button('Read program rules',openPolicyReviews));
  root.append(el('h3','Latest completed or attempted work'));
  for(const r of homeHistory().slice(0,6))root.append(homeRow(r.title,r.detail+' '+date(r.at)));
 }
@@ -465,6 +468,28 @@ function openHomeActivity(){
  for(const r of history)root.append(homeRow(r.title,r.detail+' '+date(r.at)));
 }
 $('openHomeResults').onclick=openHomeResults;$('openHomeBlockers').onclick=openHomeBlockers;$('openHomeActivity').onclick=openHomeActivity;
+function openHomeLeads(){
+ const root=modal('Possible leads and tested evidence'),inbox=state.lead_inbox;
+ if(!inbox){root.append(el('p','Lead evidence is unavailable from this server.'));return;}
+ root.append(el('p','ScopeGuard follows up automatically within its supported tests. A lead is a reason to investigate, not a confirmed bounty bug.'));
+ if(!inbox.healthy)root.append(el('p','The evidence worker has not checked in recently. These are saved results.'));
+ if(inbox.paused)root.append(el('p','New source and website tests are paused. Saved evidence remains available.'));
+ if(inbox.limited)root.append(el('p','Showing the highest-ranked '+inbox.leads.length+' of '+inbox.total_records+' retained entries. Individual source and test reviews contain the remaining evidence.'));
+ const qualified=inbox.qualified_states||[],active=inbox.leads.filter(l=>l.active&&qualified.includes(l.state));
+ facts(root,[['Possible leads',inbox.active_leads],['Local component reproductions',inbox.counts.local_reproduction||0],['Repeated website or own-app observations',inbox.counts.runtime_reproduced||0],['Confirmed bounty bugs',0]]);
+ function entry(lead){const box=el('details'),d=lead.details;box.append(el('summary',lead.label+' · '+d.title),el('p',lead.source+(d.file?' · '+d.file+':'+d.line:'')),el('p',d.reason),el('small','Evidence recorded '+date(lead.observed)),el('p','Next: '+d.next_step));
+  if(lead.state==='local_reproduction')box.append(el('p','The test used a modeled path and fake database records. It did not execute the application or test a real customer database.'));
+  for(const proof of d.evidence||[]){if(proof.checks)facts(box,Object.entries(proof.checks).map(([k,v])=>[k.replaceAll('_',' '),v?'Passed':'Not established']));}
+  if(d.draft){const draft=el('details');draft.append(el('summary','Private investigation draft'),el('pre',d.draft));box.append(draft);}
+  box.append(el('p','Program eligibility, actual impact and duplicate status still need verification. No report has been sent.','muted'));return box;
+ }
+ if(!active.length)root.append(el('p','No lead with sufficient supporting evidence is currently listed. That does not prove all reviewed code is safe.'));
+ active.forEach(l=>root.append(entry(l)));
+ const remaining=inbox.leads.filter(l=>!l.active||!qualified.includes(l.state));
+ if(remaining.length){const old=el('details');old.append(el('summary','Other suspicions and earlier evidence ('+remaining.length+')'));remaining.forEach(l=>old.append(entry(l)));root.append(old);}
+ root.append(el('p','The strongest evidence is listed first. Unchanged evidence is not counted again.','muted'));
+}
+$('openHomeLeads').onclick=openHomeLeads;
 function setup(){
  const root=modal('Your setup');
  root.append(el('p','These are available tools. The home screen shows whether website checks are running, waiting or blocked.','muted'));
@@ -678,6 +703,7 @@ function openProjectAudits(){
  if(f.automatic_validation){const v=f.automatic_validation;detail.append(el('h3','Automatic path experiment'),el('p',v.status.replaceAll('_',' ')+': '+v.reason),el('p',v.experiments+' generated-input experiments attempted. This is an incomplete model, not a live exploit.'));
  for(const evidence of v.evidence||[]){detail.append(el('p','Probe family: '+evidence.probe_family));const route=el('ol');for(const step of evidence.route||[])route.append(el('li',step.file+':'+step.line+' — '+step.role));detail.append(route);}}
  if(f.investigation_draft){const draft=el('details');draft.append(el('summary','Automatically prepared investigation draft'),el('pre',f.investigation_draft));detail.append(draft);}
+ if(f.component_validation){const v=f.component_validation;detail.append(el('h3','Local component reproduction'),el('p',v.status.replaceAll('_',' ')+': '+v.reason),el('p',v.limitation,'muted'));}
  if(f.research){detail.append(el('strong',f.research.question));const checklist=el('ol');f.research.evidence_required.forEach(t=>checklist.append(el('li',t)));detail.append(checklist);
  if(f.related_leads)detail.append(el('p',f.related_leads+' related leads use the same operation. '+f.research.variant_hint));}
  detail.append(el('p','Evidence status: static hypothesis. No runtime impact demonstrated.','muted'));

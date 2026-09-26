@@ -30,6 +30,7 @@ import programqueue
 import uberconnect
 import autoresearch
 import autopilot
+import leadwork
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -82,6 +83,7 @@ def init():
         programqueue.init(c)
         autoresearch.init(c)
         autopilot.init(c)
+        leadwork.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -264,12 +266,17 @@ def dependency_worker():
 
 
 def queue_worker():
+    next_lead_receipt = 0
     while True:
         try:
             with LOCK:
                 workqueue.tick(db, log)
                 with db() as c:
                     autoresearch.tick(c, ROOT, log)
+                    leadwork.sync(c)
+                    if time.time() >= next_lead_receipt:
+                        print(json.dumps(leadwork.receipt(c,os.environ.get('RENDER_GIT_COMMIT',''))),flush=True)
+                        next_lead_receipt = time.time()+300
         except Exception:
             with db() as c:
                 c.execute("UPDATE background_status SET status='Review failed; retrying on next cycle' WHERE id=1")
@@ -324,6 +331,7 @@ def snapshot():
                 'project_audits': projectaudit.snapshot(c),
                 'automatic_research': autoresearch.snapshot(c),
                 'autopilot': autopilot.snapshot(c),
+                'lead_inbox': leadwork.snapshot(c),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
