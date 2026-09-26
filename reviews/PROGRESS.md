@@ -1,5 +1,31 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, verified live result at 11:44 UTC
+
+Runtime commit 32272c563c5d13dca0b091e9846ad83d07304e9a is live on the
+existing ScopeGuard service (deployment dep-darqvgu0tbcc73cn2jh0, finished
+11:44:22 UTC). GitHub workflow 36239685090 succeeded. The hosted build passed
+all 301 tests in 37.302 seconds. No plan, compute resource or deployment settings
+were changed; only scopeguard-app was updated.
+
+The actual running instance's 11:44:18 UTC aggregate receipt confirmed a healthy,
+unpaused worker with 304 listings, 52 saved policy texts, and 1 complete official
+document collection. There were 52 collecting, 154 queued, 70 requiring the
+missing Intigriti connection, 18 incomplete, 6 unavailable/dismissed, and 3 with
+unsupported program addresses. The 118 attempted count is per-program request
+history, not completed research. HackerOne's existing connection was active.
+These are time-stamped observations, not a claim that later counts remain equal.
+
+The app's worker continues connected research independently. Full automated
+testing across all programs is still not implemented or authorized by these
+records. The Intigriti connection, program-specific method/account requirements,
+unavailable rules and unsupported addresses remain blockers. No new target was
+activated, no external vulnerability scan or report submission was performed,
+and no confirmed bounty vulnerability or earnings were established. Browser access
+to the private dashboard was not obtained; verification used permitted aggregate
+host diagnostics and isolated tests. The separate completion watch remains open
+because full autonomous research/testing across all listed programs is unfinished.
+
 ## 2026-09-26, visible partial evidence and earlier completed results
 
 The official catalog route on a198a98fa9bf48c0135f4f2038f8c60130b4ebb4
