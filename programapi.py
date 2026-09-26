@@ -69,7 +69,9 @@ def request(provider, credentials, route):
           if provider=='hackerone' else 'Bearer '+credentials['token'])
     raw=None;conn=http.client.HTTPSConnection(host,timeout=20)
     try:
-        raw=socket.create_connection((public_addresses(host)[0],443),timeout=20)
+        try:addresses=public_addresses(host)
+        except ValueError:raise APIError('dns') from None
+        raw=socket.create_connection((addresses[0],443),timeout=20)
         conn.sock=ssl.create_default_context().wrap_socket(raw,server_hostname=host)
         conn.request('GET',route,headers={'Authorization':auth,'Accept':'application/json',
                      'User-Agent':'ScopeGuard-PolicyResearch/1','Accept-Encoding':'identity','Connection':'close'})
@@ -80,7 +82,7 @@ def request(provider, credentials, route):
         body=response.read(MAX_BYTES+1)
         if len(body)>MAX_BYTES:raise APIError('size')
         try:result=json.loads(body)
-        except (ValueError,UnicodeError):raise APIError('schema') from None
+        except (ValueError,UnicodeError):raise APIError('response_format') from None
         if not isinstance(result,dict):raise APIError('schema')
         return result
     finally:

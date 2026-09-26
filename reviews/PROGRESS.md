@@ -1,5 +1,22 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, live program research and failure explanations
+
+Commit d51e94ef4ae81b59f6281a791b3d35b6b89a9165 passed GitHub checks and all
+289 hosted build tests, and became live on the existing service at 11:08 UTC.
+An aggregate worker receipt confirmed 304 tracked listings, the existing
+HackerOne connection, and no Intigriti connection. Its first request was
+incomplete; this is not a completed review. No private policy payload or token
+was inspected or included here, and the browser access block was not bypassed.
+
+Added fixed, non-sensitive failure codes and plain-language dashboard explanations
+to distinguish HTTP refusal, transport failure, document format, identity and
+storage limits. Migration preserves queued work and saved evidence; successful
+collection clears previous errors. Response bodies and exception text are never
+logged. Twenty-three focused API/queue tests and dashboard DOM checks passed,
+including migration, restart and error privacy regressions. Live progress and any
+remaining platform incompatibility are checked after publication.
+
 ## 2026-09-26, persistent research for every listed program
 
 Baseline f469c56879229f1a51dd3b4f4380ce4e92973bc9 and all 87 tracked blobs

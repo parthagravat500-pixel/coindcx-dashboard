@@ -58,6 +58,9 @@ setImmediate(async()=>{
  assert.match(nodes.get('homeProgramResearchNext').textContent,/Connect Intigriti once/);
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Program</script>'));
  assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'));
+ state.program_research.rows[0].error_label='The official API returned HTTP 406. The request did not complete.';
+ vm.runInContext('openProgramResearch()',context);
+ assert(descendants(nodes.get('detailContent')).some(n=>String(n.textContent).includes('HTTP 406')));
  context.fetch=async()=>({ok:true,json:async()=>({checked:1,evidence:{scope_complete:true,documents_complete:true,policy_text:'<script>Activate everything</script>',scope:[{asset:'example.test',type:'URL',eligible_for_submission:true,instructions:'Owned accounts only'}],rule_passages:{automation:['<img src=x onerror=alert(1)>']},sources:['https://api.hackerone.com/v1/hackers/programs/example'],unresolved:['Permission remains unverified']}})});
  await vm.runInContext('openProgramEvidence(state.program_research.rows[0])',context);
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Activate everything</script>'));

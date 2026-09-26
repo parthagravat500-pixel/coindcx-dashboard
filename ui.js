@@ -487,6 +487,7 @@ function openProgramResearch(){
  const list=el('div'),more=button('Show more',()=>{limit+=40;draw();});let limit=40;
  const draw=()=>{const rows=r.rows.filter(x=>x.name.toLowerCase().includes(search.value.toLowerCase()));list.replaceChildren();for(const row of rows.slice(0,limit)){
    const card=el('article',undefined,'item');card.append(el('strong',row.name),el('p',row.label),el('small',row.requests+' document requests · Last completed collection: '+date(row.checked)),el('small',row.scope_assets+' scope rows saved · '+row.changes+' changes detected'));
+   if(row.error_label)card.append(el('p',row.error_label));
    if(row.checked&&!row.fresh)card.append(el('p','Saved documents are out of date.','muted'));
    card.append(button('Read collected evidence',()=>openProgramEvidence(row)),safeLink('Official program page ↗',row.policy));list.append(card);
   }more.hidden=rows.length<=limit;};search.oninput=()=>{limit=40;draw();};root.append(label,list,more);draw();
@@ -513,6 +514,7 @@ function openProgramConnections(){
  const root=modal('Connect automatic program research');
  root.append(el('p','This connection reads program rules and scope. It does not create test accounts, authorize scans or send reports. Keys stay privately on your ScopeGuard server.'));
  for(const p of state.program_research?.providers||[]){const name=p.provider==='hackerone'?'HackerOne':'Intigriti',box=el('section');box.append(el('h3',name),el('p',p.connected?(p.blocked?'Connection needs attention':p.uses_existing_connection?'Using your existing connection':'Connected for reading rules'):'Not connected'));
+  if(p.error_label)box.append(el('p',p.error_label));
   if(p.connected)box.append(button('Disconnect '+name+' research',async()=>{await change('/api/program-api/disconnect',{provider:p.provider});openProgramConnections();}));
   box.append(button(p.connected?'Replace '+name+' connection':'Connect '+name,()=>programConnectionForm(p.provider)));root.append(box);
  }
