@@ -307,6 +307,8 @@ def _tick(db,lock,log,runners):
             c.execute('UPDATE autonomous_rotation SET failures=0,retry_at=0 WHERE job=?',(job['key'],))
         c.execute('UPDATE autonomous_programs SET next_allowed=MAX(next_allowed,?) WHERE program=?',(finished+PROGRAM_GAP,job['program']))
         if outcome == 'reproduced_boundary': save_case(c,job,clean,finished)
+        import checkpointengine
+        checkpointengine.record_runtime(c,job,outcome,clean,finished)
         c.execute("DELETE FROM autonomous_runs WHERE id NOT IN (SELECT id FROM autonomous_runs ORDER BY id DESC LIMIT 200) AND outcome!='running'")
         c.execute('UPDATE autonomous_status SET heartbeat=? WHERE id=1',(finished,))
         log(c,'Automatic runtime task '+job['kind']+': '+outcome+'. Evidence saved; next eligible task will be selected. No report sent.')

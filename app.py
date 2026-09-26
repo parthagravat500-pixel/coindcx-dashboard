@@ -34,6 +34,7 @@ import leadwork
 import programapi
 import programresearch
 import researchcheckpoints
+import checkpointengine
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -89,6 +90,7 @@ def init():
         autopilot.init(c)
         leadwork.init(c)
         programresearch.init(c)
+        checkpointengine.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -141,6 +143,7 @@ def tick(target_id=None):
                 log(c, 'Automatic stop for target ' + str(t['id']) + ': HTTP ' + str(status))
                 return {'outcome':'stopped'}
             leads = findings(observation, cors)
+            checkpointengine.record_head(c, t, observation, cors)
             for f in leads:
                 key = hashlib.sha256((str(t['id']) + ':' + f['rule']).encode()).hexdigest()[:24]
                 evidence = json.dumps({'observation': observation, 'cors_observation': cors, 'note': f['evidence']})
@@ -234,6 +237,19 @@ def program_research_worker():
             # No external error text or credentials enter events or host logs.
             with db() as c:log(c,'Program research could not advance; saved evidence retained.')
         WAKE.wait(programresearch.INTERVAL)
+
+
+def checkpoint_worker():
+    next_receipt = 0
+    while True:
+        try:
+            checkpointengine.tick(db, ROOT)
+            if time.time() >= next_receipt:
+                with db() as c: print(json.dumps(checkpointengine.receipt(c)), flush=True)
+                next_receipt = time.time() + 300
+        except Exception:
+            print('{"kind":"scopeguard_checkpoint_automation_health","healthy":false,"error":1}', flush=True)
+        WAKE.wait(checkpointengine.INTERVAL)
 
 
 def supervisor_worker():
@@ -360,6 +376,7 @@ def snapshot():
                 'lead_inbox': leadwork.snapshot(c),
                 'program_research': programresearch.snapshot(c,DATA),
                 'research_checkpoints': researchcheckpoints.summary(c,ROOT),
+                'checkpoint_automation': checkpointengine.summary(c),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
@@ -549,6 +566,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200,json.dumps(result))
             except ValueError as error:
                 return self.reply(400,json.dumps({'error':str(error)}))
+        if self.path == '/api/checkpoint-results' or self.path.startswith('/api/checkpoint-results?'):
+            try:
+                with db() as c: result = checkpointengine.browse(c, self.path.partition('?')[2], ROOT)
+                return self.reply(200, json.dumps(result))
+            except ValueError as exc:
+                return self.reply(400, json.dumps({'error': str(exc)}))
         if self.path == '/research-checkpoints.md':
             return self.reply(200,(ROOT/'checkpoints/CHECKPOINTS.md').read_text(),'text/plain',
                               headers={'Content-Disposition':'attachment; filename="ScopeGuard-1000-checkpoints.md"'})
@@ -648,6 +671,7 @@ if __name__ == '__main__':
     threading.Thread(target=supervisor_worker, daemon=True).start()
     threading.Thread(target=discovery_worker, daemon=True).start()
     threading.Thread(target=program_research_worker, daemon=True).start()
+    threading.Thread(target=checkpoint_worker, daemon=True).start()
     threading.Thread(target=reporting_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
     threading.Thread(target=autonomous_worker, args=(server.server_address[1],), daemon=True).start()

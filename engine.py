@@ -44,7 +44,9 @@ def observe(url, origin=None):
         pairs = response.getheaders()
         # Store only security-relevant headers, never cookie values or redirects.
         names = {'strict-transport-security', 'content-security-policy', 'x-frame-options',
-                 'x-content-type-options', 'access-control-allow-origin', 'access-control-allow-credentials'}
+                 'x-content-type-options', 'access-control-allow-origin', 'access-control-allow-credentials',
+                 'referrer-policy', 'permissions-policy', 'cross-origin-opener-policy',
+                 'cross-origin-embedder-policy', 'cross-origin-resource-policy', 'cache-control'}
         selected = {k.lower(): v[:2000] for k, v in pairs if k.lower() in names}
         cookies = []
         for key, value in pairs:
