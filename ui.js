@@ -1,4 +1,53 @@
 'use strict';
+function renderCheckpointSummary(){
+ const c=state.research_checkpoints;
+ $('homeCheckpointsBadge').textContent=c?c.total.toLocaleString()+' checkpoints':'Unavailable';
+ $('homeCheckpointsSummary').textContent=c?c.total.toLocaleString()+' research checkpoints in '+c.categories+' areas. '+c.automatic_evidence_support+' have automatic evidence support; '+c.contextual_review+' need contextual review or specialist testing.':'Waiting for the research catalog.';
+ $('homeCheckpointsEvidence').textContent=c?c.current_owned_files+' current ScopeGuard Python files have saved pattern reviews. These cover '+c.source_evidence_checks+' checklist items partially. '+(c.stale_owned_files+c.missing_owned_files)+' files await a current review.':'Evidence is unavailable.';
+ $('openCheckpoints').disabled=!c;$('openCheckpointEvidence').disabled=!c;
+}
+function checkpointState(value){return ({not_tested:'Not tested',needs_evidence:'Evidence needed',evidence_recorded:'Evidence saved · review needed',needs_review:'Needs review',blocked:'On hold',signal_recorded:'Code signal · impact unproven',no_signal_in_saved_files:'No pattern found · control unvalidated'})[value]||'Unverified';}
+async function openCheckpoints(options={}){
+ const title=options.program?(options.name||'Program')+' · suggested checklist':options.context==='owned'?'Checklist · ScopeGuard code evidence':'Research checklist';
+ const root=modal(title),heading=root.children[0],intro=el('p','Loading checkpoints…'),plan=el('div'),list=el('div'),count=el('p');
+ const searchLabel=el('label','Find a checkpoint'),search=el('input');search.type='search';search.maxLength=120;search.placeholder='Try account access, payments, or AI';searchLabel.append(search);
+ const areaLabel=el('label','Research area'),area=el('select');areaLabel.append(area);
+ const modeLabel=el('label','Evidence support'),mode=el('select');for(const [value,label] of [['all','All checkpoints'],['automatic','Automatic evidence support'],['contextual','Contextual or specialist review'],['ai','Used in experimental AI guidance']]){const o=el('option',label);o.value=value;mode.append(o);}mode.value=options.context==='owned'?'automatic':'all';modeLabel.append(mode);
+ const controls=el('div',undefined,'filters');controls.append(searchLabel,areaLabel,modeLabel);
+ const download=el('a','Download the complete 1,000-item list');download.href='/research-checkpoints.md';download.download='ScopeGuard-1000-checkpoints.md';
+ let offset=0,next=null,version=0,timer,controller;
+ const previous=button('Previous',()=>{offset=Math.max(0,offset-40);return draw();}),more=button('Next',()=>{if(next!==null){offset=next;return draw();}});
+ const pager=el('div',undefined,'controls');pager.append(previous,more);
+ root.append(intro,download,plan,controls,count,list,pager);
+ const alive=()=>root.children[0]===heading&&$('detail').open;
+ async function draw(){
+  const requested=++version;controller?.abort();controller=new AbortController();const localController=controller;
+  const timeout=setTimeout(()=>localController.abort(),12000);previous.hidden=more.hidden=true;list.replaceChildren(el('p','Loading…'));
+  const query=new URLSearchParams({q:search.value,mode:mode.value,offset:String(offset),limit:'40'});
+  if(area.value)query.set('area',area.value);if(options.program)query.set('program',options.program);if(options.context)query.set('context',options.context);
+  try{
+   const response=await fetch('/api/checkpoints?'+query.toString(),{signal:localController.signal,cache:'no-store'});
+   if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(error.error||'The checklist could not be loaded. Refresh and sign in.');}
+   const data=await response.json();
+   if(!alive()||requested!==version)return;
+   intro.textContent=data.total+' catalog entries. '+data.limitation;
+   if(!area.children.length){const all=el('option','All suggested areas');all.value='';area.append(all);for(const item of data.areas){const o=el('option',item.title+' ('+item.count+')');o.value=item.id;area.append(o);}}
+   plan.replaceChildren();if(data.plan){plan.append(el('p',data.plan.suggested+' checkpoints suggested from saved scope. None are counted as tested by this plan.'),el('p',data.plan.basis,'muted'));for(const reason of data.plan.blockers)plan.append(el('p',reason));}
+   else if(options.context==='owned')plan.append(el('p','These are saved results from ScopeGuard’s own Python files. They are never attributed to another company. Four policy items need a program context; seven source items can show owned-code evidence.'));
+   count.textContent=data.matched?'Showing '+(data.offset+1)+'–'+Math.min(data.offset+data.items.length,data.matched)+' of '+data.matched+' matching checkpoints.':'No checkpoints match these filters.';
+   list.replaceChildren();for(const item of data.items){const card=el('article',undefined,'item');card.append(el('span',checkpointState(item.observation.state),'tag'),el('strong',item.id+' · '+item.title),el('small',item.category),el('p',item.observation.note));
+    const details=el('details');details.append(el('summary','How to review this checkpoint'),el('p','Method: '+item.method.replaceAll('_',' ')),el('p','Evidence support: '+item.support),el('p','Before review: '+item.prerequisites),el('p','Evidence needed: '+item.evidence_needed));
+    if(item.observation.checked)details.append(el('small','Evidence timestamp: '+date(item.observation.checked)));
+    if(item.ai_guidance)details.append(el('p','Also included in the existing experimental AI review of fixed ScopeGuard code excerpts. This is guidance, not evidence that the checkpoint ran or passed.'));
+    for(const reference of item.references)details.append(safeLink(reference.title+' ↗',reference.url),el('br'));
+    card.append(details);list.append(card);}
+   next=data.next_offset;previous.hidden=offset===0;more.hidden=next===null;
+  }catch(error){if(alive()&&requested===version){list.replaceChildren(el('p',error.name==='AbortError'?'Checklist request timed out. Try another filter or reopen this view.':error.message));count.textContent='The checklist could not be refreshed.';}}
+  finally{clearTimeout(timeout);}
+ }
+ area.onchange=mode.onchange=()=>{offset=0;return draw();};search.oninput=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(alive()){offset=0;draw();}},250);};
+ await draw();
+}
 let state, gitlabSetupDraft=null, gitlabSetupOpened=false, liveConnected=false, refreshVersion=0;
 const $ = id => document.getElementById(id);
 function el(tag, text, cls) { const n = document.createElement(tag); if(text !== undefined) n.textContent = text; if(cls) n.className = cls; return n; }
@@ -57,6 +106,8 @@ async function refresh(){
  finally{clearTimeout(timeout);}
 }
 $('pause').onclick=()=>{if(state)change('/api/pause',{paused:!state.paused}).catch(e=>$('message').textContent=e.message);};
+$('openCheckpoints').onclick=()=>openCheckpoints();
+$('openCheckpointEvidence').onclick=()=>openCheckpoints({context:'owned'});
 $('targetForm').onsubmit=async e=>{e.preventDefault();const form=e.target;const f=new FormData(form);const b=form.querySelector('button');b.disabled=true;try{await change('/api/targets',{name:f.get('name'),url:f.get('url'),policy:f.get('policy'),rules:f.get('rules'),interval:Number(f.get('hours'))*3600,expires:Math.floor(Date.now()/1000)+Number(f.get('days'))*86400-5,authorized:f.has('authorized'),automation_allowed:f.has('automation_allowed'),cors:f.has('cors')});form.reset();}catch(err){$('message').textContent=err.message;}finally{b.disabled=false;}};
 refresh().catch(e=>$('message').textContent=e.message);
 
@@ -228,6 +279,7 @@ function openPolicyReview(review){
 }
 $('openPolicyReviews').onclick=openPolicyReviews;
 function openProgram(p){const root=modal(p.name);root.append(el('span',money(p),'reward'),el('p','Listed by '+sourceName(p.source)+' · reward and availability need confirmation in the official policy.','muted'));
+ root.append(button('Research checklist for this program',()=>openCheckpoints({program:p.id,name:p.name})));
  facts(root,[['Directory status',!p.available?'Unavailable or removed':p.stale?'Cached / needs refresh':p.details.availability||'Listed as open'],['Last directory observation',date(p.last_seen)],['Requirements',p.details.requirements.join('; ')||'Read the current program terms'],['Listed scope entries',p.details.scope_count??'Not collected'],['Current testing',p.readiness?.label||'No testing configured'],['Scope','Limited to separately saved permissions; this listing grants none.']]);
  if(p.details.reward_status)root.append(el('p',p.details.reward_status));
  if(p.details.listed_maximum!=null)root.append(el('p','Directory reports a maximum of '+p.details.listed_maximum+'; currency is not supplied. It is not used for cross-currency ranking.','muted'));
@@ -431,6 +483,7 @@ function homeHistory(){
  return rows.sort((a,b)=>b.at-a.at);
 }
 function renderHome(){
+ renderCheckpointSummary();
  renderProgramResearch();
  for(const id of ['openHomeResults','openHomeBlockers','openHomeActivity'])$(id).disabled=false;
  const a=state.autopilot,mode=a?.state||'unavailable',enabled=state.workflow?.enabled||!state.paused;
@@ -467,6 +520,7 @@ function renderHome(){
  if(!history.length)$('homeHistory').append(el('p','No completed work is recorded in this recent history yet.','muted'));
 }
 function renderHomeOffline(){
+ $('homeCheckpointsBadge').textContent='Not connected';$('homeCheckpointsEvidence').textContent='Checklist evidence may be out of date.';$('openCheckpoints').disabled=true;$('openCheckpointEvidence').disabled=true;
  $('homeDiscoveryBadge').textContent='Not connected';$('homeDiscoveryNext').textContent='Discovery figures may be out of date.';$('openDiscovery').disabled=true;
  $('homeProgramResearchBadge').textContent='Not connected';$('homeProgramResearchNext').textContent='Program research status may be out of date.';$('openProgramResearch').disabled=true;$('openProgramConnections').disabled=true;
  $('status').textContent='● Connection needs attention';$('homeTitle').textContent='The dashboard is not connected';
@@ -534,6 +588,7 @@ async function openProgramEvidence(row){
  if(!response.ok)throw Error(data.error||'Evidence could not be loaded');
  if(root.children[0]!==heading||!$('detail').open)return;
  root.replaceChildren(el('h2',row.name+' · collected evidence'));const e=data.evidence||{};
+ root.append(button('Research checklist for this program',()=>openCheckpoints({program:row.id,name:row.name})));
  root.append(el('p',data.partial?'Collection is incomplete. The saved policy text and available scope are shown below.':'Collected: '+date(data.checked)+'.'),el('p','Testing permission is unverified. No target was activated.'),el('p','Program status reported by platform: '+(e.program_status||'Not collected')));
  if(data.partial)root.append(el('p',data.policy_checked_at?'Policy text read: '+date(data.policy_checked_at):'The policy read time was not retained in this older partial record.'));
  if(!data.checked&&!data.partial){root.append(el('p',row.label+'. No completed official document collection is saved.'));return;}

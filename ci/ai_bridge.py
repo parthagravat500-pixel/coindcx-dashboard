@@ -57,6 +57,9 @@ def deliver(stage,result=None):
 
 
 def excerpts(root):
+    # Trusted, bounded checklist guidance is separate from the untrusted source.
+    catalog=json.loads((root/'checkpoints/catalog.json').read_text())
+    checkpoints={r['id']:r['title'] for g in catalog['categories'] for r in g['checks']}
     def section(filename,name):
         source=(root/filename).read_text()
         tree=ast.parse(source)
@@ -76,7 +79,10 @@ def excerpts(root):
         line,text=section(filename,function)
         text+='\n\nSUPPORTING SOURCE FROM THIS SAME COMMIT\n'+'\n\n'.join(section(f,n)[1] for f,n in contexts[filename])
         if len(text)>8500:raise ValueError('Excerpt exceeds review budget')
-        output.append({'file':filename,'line':line,'source':text})
+        ids=catalog['ai_context'][filename]
+        if len(ids)!=6 or len(set(ids))!=6:raise ValueError('Invalid checkpoint context')
+        guidance=[{'id':key,'title':checkpoints[key]} for key in ids]
+        output.append({'file':filename,'line':line,'source':text,'checkpoints':guidance})
     return output
 
 

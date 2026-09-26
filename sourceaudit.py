@@ -16,7 +16,7 @@ RULES = {
 }
 FILES = ('app.py','engine.py','supervisor.py','workflow.py','workqueue.py','casework.py','connections.py','reporting.py','sourceaudit.py','codeflow.py','dependencies.py','rewards.py','validation.py','accesscheck.py','accessmatrix.py','capitaldemo.py','gitlabcheck.py','gitlabpair.py','projectaudit.py','sourcewatch.py','programqueue.py','readiness.py','research.py','ci_identity.py','policyevidence.py','uberconnect.py','autoresearch.py','pathcheck.py','autopilot.py','querycheck.py','leadwork.py')
 MAX_BYTES=128000
-FILES += ('programapi.py','programresearch.py','researchbrief.py','methodgraph.py','discoveryfeeds.py')
+FILES += ('programapi.py','programresearch.py','researchbrief.py','methodgraph.py','discoveryfeeds.py','researchcheckpoints.py')
 
 
 def init(c):

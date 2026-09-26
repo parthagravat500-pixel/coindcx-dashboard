@@ -1,3 +1,44 @@
+## Research checklist: 1,000 checkpoints
+
+The home-screen **Research checklist** opens a searchable, paginated catalog of
+1,000 individually authored investigation prompts in 50 areas. The complete list
+is in [checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md); reviewed source data
+is [checkpoints/catalog.json](checkpoints/catalog.json). Regenerate the readable
+copy with `python ci/export_checkpoints.py`. Background references are linked at
+category level; this is not an official standard, certification, exhaustive test
+suite, or a claim that every researcher uses the same list.
+
+Each program has a **Research checklist for this program** button. Plans are
+generated offline from current, complete saved scope and explicit eligible asset
+types. Missing, stale, partial, or blocked evidence limits the plan to preparation
+areas. Excluded or conflicting assets do not suggest a testing context. Feature
+applicability still needs review; a web scope entry does not establish that every
+web feature exists. Plans create no targets, permissions, requests, completed
+tests, or confirmed bugs. They are generated on demand, not queued test jobs.
+
+Eleven checkpoints have partial automatic evidence support:
+
+| Checkpoints | Existing evidence used | What remains unproven |
+| --- | --- | --- |
+| SG-0001, SG-0002, SG-0006, SG-0008 | Saved policy completeness, status, exact inclusion/exclusion conflicts, automation restrictions | Full policy interpretation and permission for any method |
+| SG-0781–SG-0787 | Seven existing Python pattern checks on current owned ScopeGuard file digests | Reachability, runtime impact, complete control validation, external-program applicability |
+
+The other 989 entries require contextual review or specialist testing. Twelve
+entries are also provided as guidance to the existing experimental private AI
+review (six per fixed owned-code excerpt); this does not make them implemented
+detectors. The model's existing output budget, isolation and private delivery
+remain in place. No additional model calls, new schedule, or training is added.
+AI output cannot complete checkpoints or approve testing.
+
+The authenticated `/api/checkpoints` endpoint supports `q`, `area`, `mode`,
+`program`, `context`, `offset`, and `limit` filters. Pages default to 40 entries
+and are capped at 100. `/research-checkpoints.md` downloads the readable list
+behind the same dashboard authentication. There is no checkpoint mutation or
+bulk approval endpoint. Owned-code evidence cannot be attributed to a discovered
+company, stale source digests are excluded, and truncated evidence cannot count
+as a clean result. Aggregate catalog receipts contain counts and fixed metadata
+only. The feature shares the existing web service and stores no new credentials.
+
 ## Wider automatic program discovery
 
 The existing directory worker now monitors five public feeds: HackerOne,

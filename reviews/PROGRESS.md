@@ -1,5 +1,52 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, 1,000-checkpoint research catalog and bounded integration
+
+Baseline 44e0cf89e3a343a322a6803c792a3a157046d44d and all 97 tracked blobs
+matched before edits. The requested list was written first: 1,000 individually
+authored entries in 50 areas, without repeated title strings or generated
+feature/payload permutations. The readable list and JSON source are in
+checkpoints/. Category guidance records prerequisites, evidence to retain,
+methods, suggested contexts and primary background references checked on
+26 September. These are original research prompts, not copied standard clauses,
+an OWASP certification, an exhaustive list or a universal researcher checklist.
+
+Added an authenticated searchable/paginated catalog, complete-list download and
+program-specific research plans. Plans use only explicit eligible saved scope
+types from fresh complete collections; missing/partial/stale/blocked records
+receive the 80 general preparation items. Exclusions and exact conflicting rows
+cannot suggest a test context. A program URL does not establish that every web
+feature exists. Plans are generated offline on demand and are not queue jobs.
+No new target, method authorization, completed test or confirmed bug is created.
+
+Four policy checkpoints show saved completeness, platform status, exact scope
+conflicts and automation restrictions. Seven source checkpoints link the existing
+Python pattern analyzer's current owned-file evidence. Digest mismatches and
+truncated output stay incomplete; owned-source evidence is never attached to a
+bounty program. All 11 are partial evidence support, not whole-control validation.
+The other 989 remain contextual or specialist reviews. Twelve additional-context
+IDs are supplied as guidance to the existing private AI review, six per fixed
+owned-code excerpt, with the existing model/output/isolation limits. No new model
+schedule, paid call, source execution, training or testing permission is added.
+
+Twelve new regression tests cover catalog consistency, pagination/filter bounds,
+policy and scope gates, source digest freshness, context separation, truncation,
+read-only/no-network behavior, restart semantics, aggregate redaction and real
+loopback HTTP authentication/downloads. A further AI regression validates bounded
+prompt assembly and rejects malformed guidance. Dashboard DOM checks cover
+filters, pagination, safe text rendering, program blockers, delayed responses and
+authentication errors. All 344 tests passed in 27.499 seconds after integration,
+with dashboard DOM checks, JavaScript syntax and Python compilation also passing.
+A local saved-evidence view linked all 37 current owned Python files and emitted
+no validated-control claims; its full empty-directory snapshot took 4.85 ms.
+Hosted full-suite and live verification are recorded separately after deployment.
+
+Changes are limited to scopeguard-app. No private dashboard inspection, external
+security test, account creation, report submission, new compute resource, hosting
+setting change or extra spending was performed. Remaining limits: most checks
+require application-specific evidence and a supported authorized method; there
+is no claim of 1,000 automatic detectors or complete autonomous bounty hunting.
+
 ## 2026-09-26, verified wider-discovery release at 13:52 UTC
 
 Runtime 6b48fdd72f6fbe82db35cfa9a123b9884c9288ec became live on the existing

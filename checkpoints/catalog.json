@@ -1,0 +1,4920 @@
+{
+  "version": "2026.09.26.1",
+  "authored_on": "2026-09-26",
+  "title": "ScopeGuard research checkpoints",
+  "provenance": "Original ScopeGuard research prompts, organized with background reading from established public security guides. Not copied standard requirements, an OWASP certification, an exhaustive list, or a claim that every researcher or AI uses these exact checks.",
+  "limits": "Catalog entries are not executed tests, testing permission, confirmed bugs, or promised earnings. Applicability depends on actual features and current program rules. Some areas require specialist tools and controlled environments.",
+  "references": {
+    "wstg": {
+      "title": "OWASP Web Security Testing Guide v4.2",
+      "url": "https://wstg.owasp.org/v4.2/",
+      "checked_on": "2026-09-26"
+    },
+    "api": {
+      "title": "OWASP API Security Top 10 (2023)",
+      "url": "https://api-security.owasp.org/editions/2023/en/0x11-t10/",
+      "checked_on": "2026-09-26"
+    },
+    "masvs": {
+      "title": "OWASP Mobile Application Security Verification Standard",
+      "url": "https://mas.owasp.org/MASVS/",
+      "checked_on": "2026-09-26"
+    },
+    "genai": {
+      "title": "OWASP GenAI security project risk guidance",
+      "url": "https://genai.owasp.org/llm-top-10/",
+      "checked_on": "2026-09-26"
+    },
+    "cheatsheets": {
+      "title": "OWASP Cheat Sheet Series",
+      "url": "https://cheatsheetseries.owasp.org/",
+      "checked_on": "2026-09-26"
+    }
+  },
+  "categories": [
+    {
+      "id": "area-01",
+      "title": "Permission and research boundaries",
+      "profiles": [
+        "all"
+      ],
+      "method": "document_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Official policy source, read time, exact wording needed for the decision, and unresolved conditions. A listing never supplies permission.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0001",
+          "title": "Record the official policy URL and the time it was read."
+        },
+        {
+          "id": "SG-0002",
+          "title": "Confirm that the program is currently accepting security research."
+        },
+        {
+          "id": "SG-0003",
+          "title": "Match the proposed hostname to an explicit scope entry."
+        },
+        {
+          "id": "SG-0004",
+          "title": "Check whether wildcard scope includes the proposed subdomain."
+        },
+        {
+          "id": "SG-0005",
+          "title": "Record path restrictions within an otherwise eligible host."
+        },
+        {
+          "id": "SG-0006",
+          "title": "Resolve conflicts between scope inclusions and exclusions."
+        },
+        {
+          "id": "SG-0007",
+          "title": "Identify assets operated by a third party rather than the program."
+        },
+        {
+          "id": "SG-0008",
+          "title": "Record which automated methods the program explicitly allows."
+        },
+        {
+          "id": "SG-0009",
+          "title": "Record any numeric request limit without inventing a default permission."
+        },
+        {
+          "id": "SG-0010",
+          "title": "Check whether production testing is prohibited or restricted."
+        },
+        {
+          "id": "SG-0011",
+          "title": "Identify the required test environment before preparing requests."
+        },
+        {
+          "id": "SG-0012",
+          "title": "Determine whether researcher-owned accounts are mandatory."
+        },
+        {
+          "id": "SG-0013",
+          "title": "Determine whether identity verification or residency affects eligibility."
+        },
+        {
+          "id": "SG-0014",
+          "title": "Record required researcher headers or traffic identifiers."
+        },
+        {
+          "id": "SG-0015",
+          "title": "List prohibited techniques and map them to disabled methods."
+        },
+        {
+          "id": "SG-0016",
+          "title": "Check whether linked policy documents add further restrictions."
+        },
+        {
+          "id": "SG-0017",
+          "title": "Record stop conditions for errors, sensitive data, and service impact."
+        },
+        {
+          "id": "SG-0018",
+          "title": "Separate submission eligibility from eligibility for a monetary reward."
+        },
+        {
+          "id": "SG-0019",
+          "title": "Record the policy expiry or the next required review date."
+        },
+        {
+          "id": "SG-0020",
+          "title": "Keep uncertain permission unresolved instead of approving a target."
+        }
+      ]
+    },
+    {
+      "id": "area-02",
+      "title": "Asset inventory and environment",
+      "profiles": [
+        "all"
+      ],
+      "method": "document_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Versioned inventory entry, ownership/source provenance, environment, and exact scope match. Do not enumerate extra assets.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0021",
+          "title": "Distinguish the production service from its staging counterpart."
+        },
+        {
+          "id": "SG-0022",
+          "title": "Record the exact application version covered by the research."
+        },
+        {
+          "id": "SG-0023",
+          "title": "Identify API versions explicitly covered by the program."
+        },
+        {
+          "id": "SG-0024",
+          "title": "Record which mobile package identifiers are in scope."
+        },
+        {
+          "id": "SG-0025",
+          "title": "Record which desktop release channels are eligible."
+        },
+        {
+          "id": "SG-0026",
+          "title": "Map documented service owners to the listed assets."
+        },
+        {
+          "id": "SG-0027",
+          "title": "Identify deprecated endpoints from authorized documentation."
+        },
+        {
+          "id": "SG-0028",
+          "title": "Check whether legacy interfaces share the current permission boundary."
+        },
+        {
+          "id": "SG-0029",
+          "title": "Identify supported protocols without probing additional ports."
+        },
+        {
+          "id": "SG-0030",
+          "title": "Record source repository branches covered by permission."
+        },
+        {
+          "id": "SG-0031",
+          "title": "Identify public documentation that describes eligible features."
+        },
+        {
+          "id": "SG-0032",
+          "title": "Separate public pages from authenticated functionality."
+        },
+        {
+          "id": "SG-0033",
+          "title": "Record geographic deployment restrictions affecting the test environment."
+        },
+        {
+          "id": "SG-0034",
+          "title": "Identify customer-managed installations that require separate consent."
+        },
+        {
+          "id": "SG-0035",
+          "title": "Record sandbox endpoints independently from live payment endpoints."
+        },
+        {
+          "id": "SG-0036",
+          "title": "Identify feature flags that change the available security surface."
+        },
+        {
+          "id": "SG-0037",
+          "title": "Record redirects as new destinations requiring separate scope review."
+        },
+        {
+          "id": "SG-0038",
+          "title": "Track renamed assets without silently extending old approval."
+        },
+        {
+          "id": "SG-0039",
+          "title": "Identify cached inventory entries that need fresh confirmation."
+        },
+        {
+          "id": "SG-0040",
+          "title": "Preserve the provenance of every asset added to the research plan."
+        }
+      ]
+    },
+    {
+      "id": "area-03",
+      "title": "Threat model and trust boundaries",
+      "profiles": [
+        "all"
+      ],
+      "method": "document_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Data-flow or workflow description, identities, trust boundary, and a concrete abuse hypothesis with stated assumptions.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0041",
+          "title": "Identify the data that must remain private for each user role."
+        },
+        {
+          "id": "SG-0042",
+          "title": "Map where untrusted input first enters the application."
+        },
+        {
+          "id": "SG-0043",
+          "title": "Identify which services can perform privileged actions."
+        },
+        {
+          "id": "SG-0044",
+          "title": "Document transitions between anonymous and authenticated states."
+        },
+        {
+          "id": "SG-0045",
+          "title": "Identify boundaries between customer organizations."
+        },
+        {
+          "id": "SG-0046",
+          "title": "Record assumptions about trusted network locations."
+        },
+        {
+          "id": "SG-0047",
+          "title": "Identify browser-controlled fields that the server must revalidate."
+        },
+        {
+          "id": "SG-0048",
+          "title": "Map trust placed in upstream identity providers."
+        },
+        {
+          "id": "SG-0049",
+          "title": "Identify background jobs that act with elevated privileges."
+        },
+        {
+          "id": "SG-0050",
+          "title": "Document who may change a resource's ownership."
+        },
+        {
+          "id": "SG-0051",
+          "title": "Identify workflows that move money or spend credits."
+        },
+        {
+          "id": "SG-0052",
+          "title": "Record which operations are irreversible in production."
+        },
+        {
+          "id": "SG-0053",
+          "title": "Identify external integrations that can introduce attacker-controlled content."
+        },
+        {
+          "id": "SG-0054",
+          "title": "Map where sensitive data crosses regional boundaries."
+        },
+        {
+          "id": "SG-0055",
+          "title": "Identify default privileges granted to newly created identities."
+        },
+        {
+          "id": "SG-0056",
+          "title": "Record the intended audience of shared links."
+        },
+        {
+          "id": "SG-0057",
+          "title": "Identify security decisions delegated to client-side code."
+        },
+        {
+          "id": "SG-0058",
+          "title": "Document how administrators impersonate or assist users."
+        },
+        {
+          "id": "SG-0059",
+          "title": "Identify assumptions that fail when a dependency is unavailable."
+        },
+        {
+          "id": "SG-0060",
+          "title": "Prioritize hypotheses by plausible impact and reachable prerequisites."
+        }
+      ]
+    },
+    {
+      "id": "area-04",
+      "title": "Registration and identity changes",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0061",
+          "title": "Verify email ownership before granting email-dependent privileges."
+        },
+        {
+          "id": "SG-0062",
+          "title": "Keep unverified registrations separate from existing verified identities."
+        },
+        {
+          "id": "SG-0063",
+          "title": "Bind invitation acceptance to the intended recipient."
+        },
+        {
+          "id": "SG-0064",
+          "title": "Prevent registration fields from assigning privileged roles."
+        },
+        {
+          "id": "SG-0065",
+          "title": "Apply the same identity uniqueness rules across signup routes."
+        },
+        {
+          "id": "SG-0066",
+          "title": "Handle email case differences consistently during identity matching."
+        },
+        {
+          "id": "SG-0067",
+          "title": "Handle phone-number normalization consistently during account matching."
+        },
+        {
+          "id": "SG-0068",
+          "title": "Require renewed verification after a primary email change."
+        },
+        {
+          "id": "SG-0069",
+          "title": "Require renewed verification after a primary phone change."
+        },
+        {
+          "id": "SG-0070",
+          "title": "Notify the previous contact address of a sensitive identity change."
+        },
+        {
+          "id": "SG-0071",
+          "title": "Protect account merging with proof for both identities."
+        },
+        {
+          "id": "SG-0072",
+          "title": "Preserve organization restrictions during social-account signup."
+        },
+        {
+          "id": "SG-0073",
+          "title": "Expire unused registration verification links."
+        },
+        {
+          "id": "SG-0074",
+          "title": "Invalidate a verification link after its first successful use."
+        },
+        {
+          "id": "SG-0075",
+          "title": "Prevent invite reuse after its recipient or organization changes."
+        },
+        {
+          "id": "SG-0076",
+          "title": "Keep disabled identities from being silently reactivated through signup."
+        },
+        {
+          "id": "SG-0077",
+          "title": "Apply age or eligibility gates on the server where required."
+        },
+        {
+          "id": "SG-0078",
+          "title": "Avoid exposing sensitive profile fields in signup error responses."
+        },
+        {
+          "id": "SG-0079",
+          "title": "Ensure account deletion does not let old tokens reach a replacement account."
+        },
+        {
+          "id": "SG-0080",
+          "title": "Keep invitation cancellation effective on already opened acceptance pages."
+        }
+      ]
+    },
+    {
+      "id": "area-05",
+      "title": "Password authentication",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0081",
+          "title": "Require authentication on alternate login endpoints."
+        },
+        {
+          "id": "SG-0082",
+          "title": "Avoid revealing whether a private account exists in login errors."
+        },
+        {
+          "id": "SG-0083",
+          "title": "Ensure a disabled account cannot obtain a new session."
+        },
+        {
+          "id": "SG-0084",
+          "title": "Check that password comparison does not silently truncate input."
+        },
+        {
+          "id": "SG-0085",
+          "title": "Reject empty passwords through every supported login route."
+        },
+        {
+          "id": "SG-0086",
+          "title": "Enforce the intended password policy on server-side password changes."
+        },
+        {
+          "id": "SG-0087",
+          "title": "Store passwords with an appropriate salted password-hashing scheme."
+        },
+        {
+          "id": "SG-0088",
+          "title": "Keep password material out of diagnostic logs."
+        },
+        {
+          "id": "SG-0089",
+          "title": "Require a secure transport channel for submitted credentials."
+        },
+        {
+          "id": "SG-0090",
+          "title": "Apply the configured attempt budget consistently across login aliases."
+        },
+        {
+          "id": "SG-0091",
+          "title": "Prevent lockout messages from disclosing private identity details."
+        },
+        {
+          "id": "SG-0092",
+          "title": "Require fresh authentication before changing a password."
+        },
+        {
+          "id": "SG-0093",
+          "title": "Invalidate appropriate existing sessions after a password change."
+        },
+        {
+          "id": "SG-0094",
+          "title": "Reject temporary passwords after their intended lifetime."
+        },
+        {
+          "id": "SG-0095",
+          "title": "Keep service-account login separate from human-user login rules."
+        },
+        {
+          "id": "SG-0096",
+          "title": "Verify that remember-me tokens are independently revocable."
+        },
+        {
+          "id": "SG-0097",
+          "title": "Prevent fallback authentication from weakening the main login policy."
+        },
+        {
+          "id": "SG-0098",
+          "title": "Ensure an interrupted login does not create a fully authenticated session."
+        },
+        {
+          "id": "SG-0099",
+          "title": "Bind authentication callbacks to the initiating login attempt."
+        },
+        {
+          "id": "SG-0100",
+          "title": "Document the limited scope of any password-policy observation."
+        }
+      ]
+    },
+    {
+      "id": "area-06",
+      "title": "Multifactor authentication and passkeys",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0101",
+          "title": "Require the second factor before granting normal session privileges."
+        },
+        {
+          "id": "SG-0102",
+          "title": "Bind each factor challenge to the correct account."
+        },
+        {
+          "id": "SG-0103",
+          "title": "Expire abandoned factor challenges."
+        },
+        {
+          "id": "SG-0104",
+          "title": "Reject a successfully consumed one-time factor code."
+        },
+        {
+          "id": "SG-0105",
+          "title": "Enforce a bounded attempt policy for factor verification."
+        },
+        {
+          "id": "SG-0106",
+          "title": "Require appropriate reauthentication before enrolling a new factor."
+        },
+        {
+          "id": "SG-0107",
+          "title": "Require appropriate reauthentication before removing a factor."
+        },
+        {
+          "id": "SG-0108",
+          "title": "Prevent backup codes from being reused."
+        },
+        {
+          "id": "SG-0109",
+          "title": "Protect backup-code regeneration from an untrusted session."
+        },
+        {
+          "id": "SG-0110",
+          "title": "Invalidate old backup codes after replacement."
+        },
+        {
+          "id": "SG-0111",
+          "title": "Keep recovery flows from bypassing enrolled-factor policy."
+        },
+        {
+          "id": "SG-0112",
+          "title": "Verify the passkey relying-party identifier matches the service."
+        },
+        {
+          "id": "SG-0113",
+          "title": "Validate the origin in a passkey authentication ceremony."
+        },
+        {
+          "id": "SG-0114",
+          "title": "Bind passkey registration challenges to the initiating session."
+        },
+        {
+          "id": "SG-0115",
+          "title": "Check user-verification requirements for sensitive passkey operations."
+        },
+        {
+          "id": "SG-0116",
+          "title": "Handle unavailable authenticators without granting elevated access."
+        },
+        {
+          "id": "SG-0117",
+          "title": "Notify the account owner when factor settings change."
+        },
+        {
+          "id": "SG-0118",
+          "title": "Distinguish remembered devices from permanently exempt identities."
+        },
+        {
+          "id": "SG-0119",
+          "title": "Revoke remembered-factor trust when a device is removed."
+        },
+        {
+          "id": "SG-0120",
+          "title": "Protect factor-enrollment secrets from logs and client analytics."
+        }
+      ]
+    },
+    {
+      "id": "area-07",
+      "title": "Account recovery",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0121",
+          "title": "Send recovery messages only to verified recovery destinations."
+        },
+        {
+          "id": "SG-0122",
+          "title": "Use unpredictable reset tokens with sufficient entropy."
+        },
+        {
+          "id": "SG-0123",
+          "title": "Expire reset tokens after a documented short lifetime."
+        },
+        {
+          "id": "SG-0124",
+          "title": "Invalidate a reset token after successful use."
+        },
+        {
+          "id": "SG-0125",
+          "title": "Bind each reset token to a single account and purpose."
+        },
+        {
+          "id": "SG-0126",
+          "title": "Invalidate older recovery links when policy requires replacement."
+        },
+        {
+          "id": "SG-0127",
+          "title": "Do not construct reset links from an untrusted host header."
+        },
+        {
+          "id": "SG-0128",
+          "title": "Avoid putting reset tokens in third-party tracking requests."
+        },
+        {
+          "id": "SG-0129",
+          "title": "Require the new password to satisfy the normal password policy."
+        },
+        {
+          "id": "SG-0130",
+          "title": "Keep recovery responses from disclosing private account existence."
+        },
+        {
+          "id": "SG-0131",
+          "title": "Protect recovery-destination changes with fresh authentication."
+        },
+        {
+          "id": "SG-0132",
+          "title": "Ensure canceled account recovery cannot later complete."
+        },
+        {
+          "id": "SG-0133",
+          "title": "Revoke appropriate sessions after recovery succeeds."
+        },
+        {
+          "id": "SG-0134",
+          "title": "Treat recovery for organization-managed accounts according to enterprise policy."
+        },
+        {
+          "id": "SG-0135",
+          "title": "Avoid using publicly discoverable facts as recovery secrets."
+        },
+        {
+          "id": "SG-0136",
+          "title": "Protect assisted recovery actions with recorded authorization."
+        },
+        {
+          "id": "SG-0137",
+          "title": "Keep reset forms from accepting unrelated account identifiers."
+        },
+        {
+          "id": "SG-0138",
+          "title": "Check that account suspension survives password recovery."
+        },
+        {
+          "id": "SG-0139",
+          "title": "Prevent recovery links from being valid for another application tenant."
+        },
+        {
+          "id": "SG-0140",
+          "title": "Verify that recovery completion does not expose the replacement password."
+        }
+      ]
+    },
+    {
+      "id": "area-08",
+      "title": "Sessions and cookies",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0141",
+          "title": "Rotate the session identifier after successful login."
+        },
+        {
+          "id": "SG-0142",
+          "title": "Rotate session state after a privilege elevation."
+        },
+        {
+          "id": "SG-0143",
+          "title": "Invalidate the server-side session on logout."
+        },
+        {
+          "id": "SG-0144",
+          "title": "Enforce inactivity expiry on the server."
+        },
+        {
+          "id": "SG-0145",
+          "title": "Enforce an absolute maximum session lifetime."
+        },
+        {
+          "id": "SG-0146",
+          "title": "Prevent a pre-login identifier from fixing the authenticated session."
+        },
+        {
+          "id": "SG-0147",
+          "title": "Scope session cookies to the intended host and path."
+        },
+        {
+          "id": "SG-0148",
+          "title": "Require Secure on cookies carrying authentication state."
+        },
+        {
+          "id": "SG-0149",
+          "title": "Require HttpOnly on session cookies that scripts do not need."
+        },
+        {
+          "id": "SG-0150",
+          "title": "Choose SameSite behavior appropriate to the application's workflows."
+        },
+        {
+          "id": "SG-0151",
+          "title": "Keep session secrets out of URLs and browser history."
+        },
+        {
+          "id": "SG-0152",
+          "title": "Reject expired sessions on background API requests."
+        },
+        {
+          "id": "SG-0153",
+          "title": "Revoke selected device sessions independently."
+        },
+        {
+          "id": "SG-0154",
+          "title": "Ensure logout from one account cannot affect an unrelated account."
+        },
+        {
+          "id": "SG-0155",
+          "title": "Invalidate sessions after administrator-initiated account suspension."
+        },
+        {
+          "id": "SG-0156",
+          "title": "Avoid persisting privileged sessions in shared browser storage."
+        },
+        {
+          "id": "SG-0157",
+          "title": "Keep session state consistent across horizontally scaled servers."
+        },
+        {
+          "id": "SG-0158",
+          "title": "Prevent duplicate cookie names from changing the selected identity."
+        },
+        {
+          "id": "SG-0159",
+          "title": "Require fresh authentication after a high-risk account event."
+        },
+        {
+          "id": "SG-0160",
+          "title": "Distinguish an observed cookie attribute from proven account compromise."
+        }
+      ]
+    },
+    {
+      "id": "area-09",
+      "title": "Object and function authorization",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "api",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0161",
+          "title": "Check ownership before returning a private object's details."
+        },
+        {
+          "id": "SG-0162",
+          "title": "Check ownership before updating a private object."
+        },
+        {
+          "id": "SG-0163",
+          "title": "Check ownership before deleting a private object."
+        },
+        {
+          "id": "SG-0164",
+          "title": "Apply authorization to bulk object operations."
+        },
+        {
+          "id": "SG-0165",
+          "title": "Apply authorization to nested resources and their parents."
+        },
+        {
+          "id": "SG-0166",
+          "title": "Check privileges on administrative functions at the server."
+        },
+        {
+          "id": "SG-0167",
+          "title": "Enforce read-only roles on write endpoints."
+        },
+        {
+          "id": "SG-0168",
+          "title": "Recheck permissions when an object's owner changes."
+        },
+        {
+          "id": "SG-0169",
+          "title": "Recheck access when group membership is removed."
+        },
+        {
+          "id": "SG-0170",
+          "title": "Enforce authorization on alternate representations of the same resource."
+        },
+        {
+          "id": "SG-0171",
+          "title": "Protect private object exports with the original access boundary."
+        },
+        {
+          "id": "SG-0172",
+          "title": "Enforce access rules on search results containing private objects."
+        },
+        {
+          "id": "SG-0173",
+          "title": "Prevent hidden form fields from overriding the acting identity."
+        },
+        {
+          "id": "SG-0174",
+          "title": "Apply object checks before generating temporary download links."
+        },
+        {
+          "id": "SG-0175",
+          "title": "Avoid treating an unpredictable identifier as authorization."
+        },
+        {
+          "id": "SG-0176",
+          "title": "Restrict access to archived resources after permission revocation."
+        },
+        {
+          "id": "SG-0177",
+          "title": "Protect restore operations with the same ownership checks as deletion."
+        },
+        {
+          "id": "SG-0178",
+          "title": "Verify authorization on server-side previews of private content."
+        },
+        {
+          "id": "SG-0179",
+          "title": "Require explicit privilege for impersonation functions."
+        },
+        {
+          "id": "SG-0180",
+          "title": "Record both allowed and denied controls using researcher-owned accounts."
+        }
+      ]
+    },
+    {
+      "id": "area-10",
+      "title": "Organization and tenant isolation",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "api",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0181",
+          "title": "Derive the active tenant from trusted membership data."
+        },
+        {
+          "id": "SG-0182",
+          "title": "Keep tenant identifiers in URLs from overriding authenticated membership."
+        },
+        {
+          "id": "SG-0183",
+          "title": "Isolate database queries by the authorized tenant."
+        },
+        {
+          "id": "SG-0184",
+          "title": "Partition tenant-scoped caches correctly."
+        },
+        {
+          "id": "SG-0185",
+          "title": "Keep background job results within their originating tenant."
+        },
+        {
+          "id": "SG-0186",
+          "title": "Enforce tenant boundaries on organization search."
+        },
+        {
+          "id": "SG-0187",
+          "title": "Reject invitations created for a different organization context."
+        },
+        {
+          "id": "SG-0188",
+          "title": "Revoke access after a user leaves an organization."
+        },
+        {
+          "id": "SG-0189",
+          "title": "Apply tenant boundaries to audit-log downloads."
+        },
+        {
+          "id": "SG-0190",
+          "title": "Keep organization administrators from controlling platform administrators."
+        },
+        {
+          "id": "SG-0191",
+          "title": "Isolate custom domain configuration between organizations."
+        },
+        {
+          "id": "SG-0192",
+          "title": "Bind enterprise identity-provider settings to their organization."
+        },
+        {
+          "id": "SG-0193",
+          "title": "Protect tenant-specific webhook secrets from other tenants."
+        },
+        {
+          "id": "SG-0194",
+          "title": "Avoid exposing organization billing data through shared identifiers."
+        },
+        {
+          "id": "SG-0195",
+          "title": "Keep tenant exports from including cross-tenant attachments."
+        },
+        {
+          "id": "SG-0196",
+          "title": "Isolate saved reports and dashboard widgets by tenant."
+        },
+        {
+          "id": "SG-0197",
+          "title": "Prevent tenant switching from retaining earlier elevated privileges."
+        },
+        {
+          "id": "SG-0198",
+          "title": "Keep shared templates from leaking private tenant configuration."
+        },
+        {
+          "id": "SG-0199",
+          "title": "Validate tenant boundaries in service-to-service calls."
+        },
+        {
+          "id": "SG-0200",
+          "title": "Test isolation with two expressly authorized test organizations only."
+        }
+      ]
+    },
+    {
+      "id": "area-11",
+      "title": "OAuth and OpenID Connect",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0201",
+          "title": "Validate authorization redirects against registered callback addresses."
+        },
+        {
+          "id": "SG-0202",
+          "title": "Bind authorization state to the initiating browser session."
+        },
+        {
+          "id": "SG-0203",
+          "title": "Enforce PKCE when required for the client type."
+        },
+        {
+          "id": "SG-0204",
+          "title": "Reject authorization codes issued to another client."
+        },
+        {
+          "id": "SG-0205",
+          "title": "Reject authorization codes after successful redemption."
+        },
+        {
+          "id": "SG-0206",
+          "title": "Validate the identity-token issuer."
+        },
+        {
+          "id": "SG-0207",
+          "title": "Validate the identity-token audience."
+        },
+        {
+          "id": "SG-0208",
+          "title": "Validate the nonce when the flow requires one."
+        },
+        {
+          "id": "SG-0209",
+          "title": "Reject tokens outside their validity interval."
+        },
+        {
+          "id": "SG-0210",
+          "title": "Restrict requested scopes to those the user approved."
+        },
+        {
+          "id": "SG-0211",
+          "title": "Preserve scope reductions when refreshing a token."
+        },
+        {
+          "id": "SG-0212",
+          "title": "Revoke refresh tokens when the connection is disconnected."
+        },
+        {
+          "id": "SG-0213",
+          "title": "Protect refresh-token rotation against reuse of an invalidated token."
+        },
+        {
+          "id": "SG-0214",
+          "title": "Keep confidential-client credentials off public client bundles."
+        },
+        {
+          "id": "SG-0215",
+          "title": "Avoid sending bearer tokens to callback destinations outside the client."
+        },
+        {
+          "id": "SG-0216",
+          "title": "Bind account linking to an authenticated local identity."
+        },
+        {
+          "id": "SG-0217",
+          "title": "Prevent login callbacks from silently linking an attacker's account."
+        },
+        {
+          "id": "SG-0218",
+          "title": "Distinguish provider identity from a mutable email address."
+        },
+        {
+          "id": "SG-0219",
+          "title": "Require explicit consent when an integration gains new privileges."
+        },
+        {
+          "id": "SG-0220",
+          "title": "Record provider-specific requirements before treating a flow as vulnerable."
+        }
+      ]
+    },
+    {
+      "id": "area-12",
+      "title": "SAML and enterprise federation",
+      "profiles": [
+        "web",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0221",
+          "title": "Validate the signature on the SAML element actually consumed."
+        },
+        {
+          "id": "SG-0222",
+          "title": "Reject assertions from an untrusted identity provider."
+        },
+        {
+          "id": "SG-0223",
+          "title": "Validate the intended audience restriction."
+        },
+        {
+          "id": "SG-0224",
+          "title": "Validate the assertion recipient."
+        },
+        {
+          "id": "SG-0225",
+          "title": "Validate the response destination."
+        },
+        {
+          "id": "SG-0226",
+          "title": "Match solicited responses to the initiating request."
+        },
+        {
+          "id": "SG-0227",
+          "title": "Apply the documented policy to unsolicited SAML responses."
+        },
+        {
+          "id": "SG-0228",
+          "title": "Reject expired assertions."
+        },
+        {
+          "id": "SG-0229",
+          "title": "Reject assertions that are not yet valid."
+        },
+        {
+          "id": "SG-0230",
+          "title": "Prevent an already consumed assertion from being replayed."
+        },
+        {
+          "id": "SG-0231",
+          "title": "Keep duplicate XML identifiers from selecting an unsigned element."
+        },
+        {
+          "id": "SG-0232",
+          "title": "Disable external entity resolution in federation XML parsing."
+        },
+        {
+          "id": "SG-0233",
+          "title": "Treat role attributes according to the local authorization policy."
+        },
+        {
+          "id": "SG-0234",
+          "title": "Prevent an email attribute alone from linking an existing privileged user."
+        },
+        {
+          "id": "SG-0235",
+          "title": "Bind federation metadata changes to organization administration privileges."
+        },
+        {
+          "id": "SG-0236",
+          "title": "Handle signing-certificate rotation without accepting arbitrary certificates."
+        },
+        {
+          "id": "SG-0237",
+          "title": "Enforce the intended session lifetime after federated login."
+        },
+        {
+          "id": "SG-0238",
+          "title": "Restrict RelayState destinations to the intended application context."
+        },
+        {
+          "id": "SG-0239",
+          "title": "Preserve account suspension when the identity provider authenticates a user."
+        },
+        {
+          "id": "SG-0240",
+          "title": "Record authentication context when sensitive actions require stronger login."
+        }
+      ]
+    },
+    {
+      "id": "area-13",
+      "title": "Tokens, API keys, and signatures",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "api",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0241",
+          "title": "Validate token signatures before trusting token claims."
+        },
+        {
+          "id": "SG-0242",
+          "title": "Restrict accepted token algorithms to a configured allowlist."
+        },
+        {
+          "id": "SG-0243",
+          "title": "Reject unsigned tokens when signatures are required."
+        },
+        {
+          "id": "SG-0244",
+          "title": "Keep symmetric and asymmetric verification keys from being confused."
+        },
+        {
+          "id": "SG-0245",
+          "title": "Validate the issuer for service-issued bearer tokens."
+        },
+        {
+          "id": "SG-0246",
+          "title": "Validate the audience for service-issued bearer tokens."
+        },
+        {
+          "id": "SG-0247",
+          "title": "Enforce expiration even when a token remains cryptographically valid."
+        },
+        {
+          "id": "SG-0248",
+          "title": "Handle clock skew within a bounded documented interval."
+        },
+        {
+          "id": "SG-0249",
+          "title": "Reject tokens with malformed or contradictory claims."
+        },
+        {
+          "id": "SG-0250",
+          "title": "Limit token key selection to trusted key material."
+        },
+        {
+          "id": "SG-0251",
+          "title": "Keep token key identifiers from becoming file paths or network destinations."
+        },
+        {
+          "id": "SG-0252",
+          "title": "Support revocation for high-privilege API keys."
+        },
+        {
+          "id": "SG-0253",
+          "title": "Apply key scopes to every operation using that key."
+        },
+        {
+          "id": "SG-0254",
+          "title": "Show a newly created secret only where the product requires it."
+        },
+        {
+          "id": "SG-0255",
+          "title": "Keep masked-key displays from revealing a usable credential."
+        },
+        {
+          "id": "SG-0256",
+          "title": "Separate production keys from sandbox keys."
+        },
+        {
+          "id": "SG-0257",
+          "title": "Prevent key rotation from re-enabling a revoked key."
+        },
+        {
+          "id": "SG-0258",
+          "title": "Bind request signatures to the relevant method and destination."
+        },
+        {
+          "id": "SG-0259",
+          "title": "Include freshness or replay protection in signed requests."
+        },
+        {
+          "id": "SG-0260",
+          "title": "Distinguish an exposed public verification key from a secret credential."
+        }
+      ]
+    },
+    {
+      "id": "area-14",
+      "title": "Cross-site request protection",
+      "profiles": [
+        "web",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0261",
+          "title": "Require anti-forgery protection for browser-authenticated state changes."
+        },
+        {
+          "id": "SG-0262",
+          "title": "Bind anti-forgery tokens to the intended authenticated context."
+        },
+        {
+          "id": "SG-0263",
+          "title": "Reject absent anti-forgery tokens on protected operations."
+        },
+        {
+          "id": "SG-0264",
+          "title": "Reject malformed anti-forgery tokens on protected operations."
+        },
+        {
+          "id": "SG-0265",
+          "title": "Reject another session's anti-forgery token."
+        },
+        {
+          "id": "SG-0266",
+          "title": "Avoid accepting a query parameter as an unintended token fallback."
+        },
+        {
+          "id": "SG-0267",
+          "title": "Keep safe HTTP methods free of state-changing side effects."
+        },
+        {
+          "id": "SG-0268",
+          "title": "Apply protection to alternate content types accepted by a write endpoint."
+        },
+        {
+          "id": "SG-0269",
+          "title": "Protect login transitions against cross-site account confusion."
+        },
+        {
+          "id": "SG-0270",
+          "title": "Protect logout when forced logout has meaningful workflow impact."
+        },
+        {
+          "id": "SG-0271",
+          "title": "Validate browser origin information where the defense relies on it."
+        },
+        {
+          "id": "SG-0272",
+          "title": "Handle missing Origin or Referer according to explicit policy."
+        },
+        {
+          "id": "SG-0273",
+          "title": "Do not rely solely on a user-controlled requested-with header."
+        },
+        {
+          "id": "SG-0274",
+          "title": "Protect account email changes from cross-site submission."
+        },
+        {
+          "id": "SG-0275",
+          "title": "Protect payment-destination changes from cross-site submission."
+        },
+        {
+          "id": "SG-0276",
+          "title": "Protect file-upload forms that use ambient cookies."
+        },
+        {
+          "id": "SG-0277",
+          "title": "Cover GraphQL mutations when cookie authentication is used."
+        },
+        {
+          "id": "SG-0278",
+          "title": "Cover WebSocket setup when the socket can change state."
+        },
+        {
+          "id": "SG-0279",
+          "title": "Verify protection remains effective after a session renewal."
+        },
+        {
+          "id": "SG-0280",
+          "title": "Use local or owned-account controls rather than involving other users."
+        }
+      ]
+    },
+    {
+      "id": "area-15",
+      "title": "Cross-origin resource access",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0281",
+          "title": "Compare allowed origins using an exact trusted-origin policy."
+        },
+        {
+          "id": "SG-0282",
+          "title": "Reject untrusted origins when credentialed responses are available."
+        },
+        {
+          "id": "SG-0283",
+          "title": "Avoid reflecting an arbitrary Origin as an allowed origin."
+        },
+        {
+          "id": "SG-0284",
+          "title": "Handle the null origin according to a deliberate policy."
+        },
+        {
+          "id": "SG-0285",
+          "title": "Keep origin suffix checks from trusting unrelated domains."
+        },
+        {
+          "id": "SG-0286",
+          "title": "Consider scheme and port when matching allowed origins."
+        },
+        {
+          "id": "SG-0287",
+          "title": "Apply origin rules consistently to preflight and actual responses."
+        },
+        {
+          "id": "SG-0288",
+          "title": "Restrict allowed methods to the intended cross-origin operations."
+        },
+        {
+          "id": "SG-0289",
+          "title": "Restrict allowed request headers to the intended integration needs."
+        },
+        {
+          "id": "SG-0290",
+          "title": "Keep exposed response headers from revealing sensitive values."
+        },
+        {
+          "id": "SG-0291",
+          "title": "Vary cached responses appropriately when allowed origins differ."
+        },
+        {
+          "id": "SG-0292",
+          "title": "Apply credential rules consistently across successful and error responses."
+        },
+        {
+          "id": "SG-0293",
+          "title": "Avoid extending a trusted frontend's access to every subdomain."
+        },
+        {
+          "id": "SG-0294",
+          "title": "Remove obsolete partner origins from the allowlist."
+        },
+        {
+          "id": "SG-0295",
+          "title": "Protect development-origin exceptions from reaching production configuration."
+        },
+        {
+          "id": "SG-0296",
+          "title": "Verify whether the response actually contains private information."
+        },
+        {
+          "id": "SG-0297",
+          "title": "Verify browser behavior before treating a header combination as exploitable."
+        },
+        {
+          "id": "SG-0298",
+          "title": "Separate public unauthenticated APIs from private credentialed APIs."
+        },
+        {
+          "id": "SG-0299",
+          "title": "Check cross-origin rules on alternate API versions."
+        },
+        {
+          "id": "SG-0300",
+          "title": "Record the exact origin and response context for a CORS observation."
+        }
+      ]
+    },
+    {
+      "id": "area-16",
+      "title": "Browser rendering and script injection",
+      "profiles": [
+        "web",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0301",
+          "title": "Encode untrusted text inserted into HTML element content."
+        },
+        {
+          "id": "SG-0302",
+          "title": "Encode untrusted values inserted into HTML attributes."
+        },
+        {
+          "id": "SG-0303",
+          "title": "Constrain untrusted values used in script execution contexts."
+        },
+        {
+          "id": "SG-0304",
+          "title": "Validate schemes for user-controlled navigation URLs."
+        },
+        {
+          "id": "SG-0305",
+          "title": "Keep user content out of executable JavaScript strings."
+        },
+        {
+          "id": "SG-0306",
+          "title": "Sanitize rich text with an appropriate maintained parser."
+        },
+        {
+          "id": "SG-0307",
+          "title": "Preserve sanitization when rich text is edited and saved again."
+        },
+        {
+          "id": "SG-0308",
+          "title": "Prevent markdown rendering from introducing executable HTML unexpectedly."
+        },
+        {
+          "id": "SG-0309",
+          "title": "Treat SVG uploads according to their active-content capabilities."
+        },
+        {
+          "id": "SG-0310",
+          "title": "Avoid assigning untrusted data directly to innerHTML."
+        },
+        {
+          "id": "SG-0311",
+          "title": "Avoid evaluating URL-fragment data as code."
+        },
+        {
+          "id": "SG-0312",
+          "title": "Validate origins and message structure in postMessage handlers."
+        },
+        {
+          "id": "SG-0313",
+          "title": "Keep DOM identifiers from overriding security-sensitive objects."
+        },
+        {
+          "id": "SG-0314",
+          "title": "Apply output handling to administrator views of user content."
+        },
+        {
+          "id": "SG-0315",
+          "title": "Apply output handling to notification and email preview pages."
+        },
+        {
+          "id": "SG-0316",
+          "title": "Keep template autoescaping enabled for untrusted values."
+        },
+        {
+          "id": "SG-0317",
+          "title": "Handle client-side template expressions as data where appropriate."
+        },
+        {
+          "id": "SG-0318",
+          "title": "Assess script execution in the correct origin and user context."
+        },
+        {
+          "id": "SG-0319",
+          "title": "Use inert markers or isolated fixtures before any active demonstration."
+        },
+        {
+          "id": "SG-0320",
+          "title": "Separate missing browser hardening from demonstrated script execution."
+        }
+      ]
+    },
+    {
+      "id": "area-17",
+      "title": "SQL database boundaries",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Authorized source location or local database fixture, input path, bound-query control, and minimal redacted result.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0321",
+          "title": "Bind externally influenced query values through parameters."
+        },
+        {
+          "id": "SG-0322",
+          "title": "Allowlist dynamic database column names."
+        },
+        {
+          "id": "SG-0323",
+          "title": "Allowlist dynamic database table names."
+        },
+        {
+          "id": "SG-0324",
+          "title": "Constrain dynamic sort directions."
+        },
+        {
+          "id": "SG-0325",
+          "title": "Avoid concatenating pagination inputs into SQL fragments."
+        },
+        {
+          "id": "SG-0326",
+          "title": "Preserve parameter binding inside stored procedures."
+        },
+        {
+          "id": "SG-0327",
+          "title": "Review ORM raw-query escape hatches."
+        },
+        {
+          "id": "SG-0328",
+          "title": "Keep query-builder expressions from accepting raw user syntax."
+        },
+        {
+          "id": "SG-0329",
+          "title": "Validate numeric conversions before constructing numeric SQL clauses."
+        },
+        {
+          "id": "SG-0330",
+          "title": "Treat wildcard search semantics separately from SQL structure."
+        },
+        {
+          "id": "SG-0331",
+          "title": "Apply tenant restrictions to joined tables."
+        },
+        {
+          "id": "SG-0332",
+          "title": "Use database credentials with only required privileges."
+        },
+        {
+          "id": "SG-0333",
+          "title": "Avoid returning raw database errors to clients."
+        },
+        {
+          "id": "SG-0334",
+          "title": "Keep connection strings out of responses and logs."
+        },
+        {
+          "id": "SG-0335",
+          "title": "Bind array membership queries without building quoted value lists."
+        },
+        {
+          "id": "SG-0336",
+          "title": "Review second-use queries that consume previously stored user input."
+        },
+        {
+          "id": "SG-0337",
+          "title": "Protect report builders that expose selectable query components."
+        },
+        {
+          "id": "SG-0338",
+          "title": "Verify transaction rollback preserves authorization invariants."
+        },
+        {
+          "id": "SG-0339",
+          "title": "Compare a suspected query path with a parameterized negative control."
+        },
+        {
+          "id": "SG-0340",
+          "title": "Record reachable input-to-query evidence instead of assuming every dynamic query is exploitable."
+        }
+      ]
+    },
+    {
+      "id": "area-18",
+      "title": "NoSQL, search, and expression queries",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0341",
+          "title": "Require expected scalar types in document lookup fields."
+        },
+        {
+          "id": "SG-0342",
+          "title": "Reject unexpected query operators from user-provided objects."
+        },
+        {
+          "id": "SG-0343",
+          "title": "Build search filters from an allowlisted schema."
+        },
+        {
+          "id": "SG-0344",
+          "title": "Keep regular-expression search inputs within bounded syntax and size."
+        },
+        {
+          "id": "SG-0345",
+          "title": "Apply tenant filters to every document collection lookup."
+        },
+        {
+          "id": "SG-0346",
+          "title": "Prevent client-provided projections from returning private fields."
+        },
+        {
+          "id": "SG-0347",
+          "title": "Restrict document update operators accepted through public APIs."
+        },
+        {
+          "id": "SG-0348",
+          "title": "Keep aggregation pipelines under server control."
+        },
+        {
+          "id": "SG-0349",
+          "title": "Avoid evaluating user input as server-side database script."
+        },
+        {
+          "id": "SG-0350",
+          "title": "Protect graph queries from untrusted query-language fragments."
+        },
+        {
+          "id": "SG-0351",
+          "title": "Bind LDAP filter values with context-appropriate escaping."
+        },
+        {
+          "id": "SG-0352",
+          "title": "Escape search-engine query syntax where literal search is intended."
+        },
+        {
+          "id": "SG-0353",
+          "title": "Keep geospatial query bounds within documented limits."
+        },
+        {
+          "id": "SG-0354",
+          "title": "Separate object identifiers from operator-bearing request objects."
+        },
+        {
+          "id": "SG-0355",
+          "title": "Restrict search-index administration to authorized roles."
+        },
+        {
+          "id": "SG-0356",
+          "title": "Preserve ownership checks in bulk document updates."
+        },
+        {
+          "id": "SG-0357",
+          "title": "Avoid exposing backend query plans to unauthenticated users."
+        },
+        {
+          "id": "SG-0358",
+          "title": "Validate recursive filter depth in an isolated fixture."
+        },
+        {
+          "id": "SG-0359",
+          "title": "Compare filtered results against an authorized baseline dataset."
+        },
+        {
+          "id": "SG-0360",
+          "title": "Distinguish a query parse error from proven unauthorized data access."
+        }
+      ]
+    },
+    {
+      "id": "area-19",
+      "title": "Commands, templates, and object loading",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0361",
+          "title": "Pass process arguments without invoking an unnecessary shell."
+        },
+        {
+          "id": "SG-0362",
+          "title": "Constrain executable selection to intended commands."
+        },
+        {
+          "id": "SG-0363",
+          "title": "Separate option values from command-line flags."
+        },
+        {
+          "id": "SG-0364",
+          "title": "Keep environment variables from selecting unintended interpreters."
+        },
+        {
+          "id": "SG-0365",
+          "title": "Avoid evaluating user-controlled template source."
+        },
+        {
+          "id": "SG-0366",
+          "title": "Constrain template helper functions to intended capabilities."
+        },
+        {
+          "id": "SG-0367",
+          "title": "Keep template loaders inside authorized template directories."
+        },
+        {
+          "id": "SG-0368",
+          "title": "Disable unsafe object construction when loading YAML."
+        },
+        {
+          "id": "SG-0369",
+          "title": "Avoid deserializing untrusted Python pickle data."
+        },
+        {
+          "id": "SG-0370",
+          "title": "Reject untrusted native object serialization formats."
+        },
+        {
+          "id": "SG-0371",
+          "title": "Apply explicit type restrictions to polymorphic deserialization."
+        },
+        {
+          "id": "SG-0372",
+          "title": "Keep serialized object signatures separate from encryption assumptions."
+        },
+        {
+          "id": "SG-0373",
+          "title": "Validate serialized object size before allocating large structures."
+        },
+        {
+          "id": "SG-0374",
+          "title": "Prevent object hydration from invoking unintended lifecycle hooks."
+        },
+        {
+          "id": "SG-0375",
+          "title": "Avoid interpreting user input as a general expression language."
+        },
+        {
+          "id": "SG-0376",
+          "title": "Protect plugin loaders from user-controlled import paths."
+        },
+        {
+          "id": "SG-0377",
+          "title": "Constrain document-conversion subprocess parameters."
+        },
+        {
+          "id": "SG-0378",
+          "title": "Review image-processing delegates that can launch external programs."
+        },
+        {
+          "id": "SG-0379",
+          "title": "Use harmless local fixtures for interpreter-boundary experiments."
+        },
+        {
+          "id": "SG-0380",
+          "title": "Require a reachable untrusted input path before escalating a dangerous-call signal."
+        }
+      ]
+    },
+    {
+      "id": "area-20",
+      "title": "Server-side outbound requests",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0381",
+          "title": "Allowlist intended destinations for server-side URL fetching."
+        },
+        {
+          "id": "SG-0382",
+          "title": "Validate the destination scheme before creating a request."
+        },
+        {
+          "id": "SG-0383",
+          "title": "Reject embedded credentials in fetched URLs."
+        },
+        {
+          "id": "SG-0384",
+          "title": "Resolve and validate all destination addresses before connecting."
+        },
+        {
+          "id": "SG-0385",
+          "title": "Reject private and reserved destinations where public fetching is intended."
+        },
+        {
+          "id": "SG-0386",
+          "title": "Keep redirect destinations within the same approved outbound policy."
+        },
+        {
+          "id": "SG-0387",
+          "title": "Prevent a second DNS resolution from changing the validated destination."
+        },
+        {
+          "id": "SG-0388",
+          "title": "Constrain outbound ports to documented service needs."
+        },
+        {
+          "id": "SG-0389",
+          "title": "Keep cloud metadata destinations outside public fetch functionality."
+        },
+        {
+          "id": "SG-0390",
+          "title": "Prevent URL parsers from disagreeing on the actual host."
+        },
+        {
+          "id": "SG-0391",
+          "title": "Treat encoded address forms consistently during validation."
+        },
+        {
+          "id": "SG-0392",
+          "title": "Bound connection and response-read timeouts."
+        },
+        {
+          "id": "SG-0393",
+          "title": "Bound downloaded response size."
+        },
+        {
+          "id": "SG-0394",
+          "title": "Do not forward incoming authentication headers to arbitrary destinations."
+        },
+        {
+          "id": "SG-0395",
+          "title": "Separate webhook delivery credentials by destination."
+        },
+        {
+          "id": "SG-0396",
+          "title": "Keep proxy settings from bypassing destination restrictions."
+        },
+        {
+          "id": "SG-0397",
+          "title": "Review preview generators that fetch user-supplied URLs."
+        },
+        {
+          "id": "SG-0398",
+          "title": "Review import features that fetch remote documents."
+        },
+        {
+          "id": "SG-0399",
+          "title": "Use controlled local endpoints when validating outbound restrictions."
+        },
+        {
+          "id": "SG-0400",
+          "title": "Record outbound-request evidence without contacting unrelated infrastructure."
+        }
+      ]
+    },
+    {
+      "id": "area-21",
+      "title": "File uploads and media processing",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0401",
+          "title": "Allow only file types required by the feature."
+        },
+        {
+          "id": "SG-0402",
+          "title": "Validate content independently from the supplied filename extension."
+        },
+        {
+          "id": "SG-0403",
+          "title": "Normalize filenames before applying filename restrictions."
+        },
+        {
+          "id": "SG-0404",
+          "title": "Prevent uploaded filenames from selecting storage paths."
+        },
+        {
+          "id": "SG-0405",
+          "title": "Store uploads outside executable application directories."
+        },
+        {
+          "id": "SG-0406",
+          "title": "Assign server-generated storage identifiers."
+        },
+        {
+          "id": "SG-0407",
+          "title": "Check ownership before replacing an existing upload."
+        },
+        {
+          "id": "SG-0408",
+          "title": "Protect upload completion callbacks with the uploader's authorization."
+        },
+        {
+          "id": "SG-0409",
+          "title": "Bound upload size before processing content."
+        },
+        {
+          "id": "SG-0410",
+          "title": "Bound image dimensions before full decoding."
+        },
+        {
+          "id": "SG-0411",
+          "title": "Strip unnecessary embedded metadata where privacy requires it."
+        },
+        {
+          "id": "SG-0412",
+          "title": "Serve untrusted active content from an appropriately isolated origin."
+        },
+        {
+          "id": "SG-0413",
+          "title": "Set content disposition according to the intended download behavior."
+        },
+        {
+          "id": "SG-0414",
+          "title": "Prevent media conversion from fetching arbitrary external resources."
+        },
+        {
+          "id": "SG-0415",
+          "title": "Keep temporary upload files private until validation completes."
+        },
+        {
+          "id": "SG-0416",
+          "title": "Remove abandoned multipart uploads according to retention policy."
+        },
+        {
+          "id": "SG-0417",
+          "title": "Revalidate files after server-side transformations when needed."
+        },
+        {
+          "id": "SG-0418",
+          "title": "Keep antivirus status from being a client-controlled field."
+        },
+        {
+          "id": "SG-0419",
+          "title": "Apply quota checks to the final stored size."
+        },
+        {
+          "id": "SG-0420",
+          "title": "Use non-sensitive sample files for upload validation."
+        }
+      ]
+    },
+    {
+      "id": "area-22",
+      "title": "Downloads and filesystem paths",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0421",
+          "title": "Resolve requested files within a designated storage root."
+        },
+        {
+          "id": "SG-0422",
+          "title": "Normalize path separators before validating containment."
+        },
+        {
+          "id": "SG-0423",
+          "title": "Handle encoded path components consistently across routing layers."
+        },
+        {
+          "id": "SG-0424",
+          "title": "Prevent symbolic links from escaping permitted storage."
+        },
+        {
+          "id": "SG-0425",
+          "title": "Check object authorization before streaming a file."
+        },
+        {
+          "id": "SG-0426",
+          "title": "Apply permission checks to partial-content requests."
+        },
+        {
+          "id": "SG-0427",
+          "title": "Avoid using client-supplied absolute filesystem paths."
+        },
+        {
+          "id": "SG-0428",
+          "title": "Keep temporary download tokens bound to the intended object."
+        },
+        {
+          "id": "SG-0429",
+          "title": "Expire signed download links as documented."
+        },
+        {
+          "id": "SG-0430",
+          "title": "Limit signed links to intended HTTP methods where supported."
+        },
+        {
+          "id": "SG-0431",
+          "title": "Keep response filenames from injecting headers."
+        },
+        {
+          "id": "SG-0432",
+          "title": "Prevent public directory listings from exposing private documents."
+        },
+        {
+          "id": "SG-0433",
+          "title": "Protect backup and export download routes."
+        },
+        {
+          "id": "SG-0434",
+          "title": "Handle file-not-found errors without disclosing internal paths."
+        },
+        {
+          "id": "SG-0435",
+          "title": "Keep archive extraction paths inside the destination directory."
+        },
+        {
+          "id": "SG-0436",
+          "title": "Reject conflicting canonical names during archive extraction."
+        },
+        {
+          "id": "SG-0437",
+          "title": "Apply safe permissions to extracted files."
+        },
+        {
+          "id": "SG-0438",
+          "title": "Prevent overwriting security-sensitive files during import."
+        },
+        {
+          "id": "SG-0439",
+          "title": "Remove generated downloads after their retention period."
+        },
+        {
+          "id": "SG-0440",
+          "title": "Use synthetic files rather than reading unrelated system data."
+        }
+      ]
+    },
+    {
+      "id": "area-23",
+      "title": "Structured parsers and document formats",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0441",
+          "title": "Disable external entity expansion in untrusted XML."
+        },
+        {
+          "id": "SG-0442",
+          "title": "Disable unnecessary document type definitions."
+        },
+        {
+          "id": "SG-0443",
+          "title": "Bound nested XML element depth."
+        },
+        {
+          "id": "SG-0444",
+          "title": "Bound JSON nesting before expensive processing."
+        },
+        {
+          "id": "SG-0445",
+          "title": "Reject duplicate security-sensitive JSON keys consistently."
+        },
+        {
+          "id": "SG-0446",
+          "title": "Use strict schema validation for signed structured messages."
+        },
+        {
+          "id": "SG-0447",
+          "title": "Keep parser error details from exposing internal resources."
+        },
+        {
+          "id": "SG-0448",
+          "title": "Limit archive expansion relative to the compressed input."
+        },
+        {
+          "id": "SG-0449",
+          "title": "Bound the number of archive members."
+        },
+        {
+          "id": "SG-0450",
+          "title": "Reject unexpected archive member types."
+        },
+        {
+          "id": "SG-0451",
+          "title": "Keep CSV exports from being interpreted as spreadsheet commands."
+        },
+        {
+          "id": "SG-0452",
+          "title": "Handle delimiter and quote escaping in CSV output."
+        },
+        {
+          "id": "SG-0453",
+          "title": "Validate multipart boundaries and part counts consistently."
+        },
+        {
+          "id": "SG-0454",
+          "title": "Reject ambiguous content encodings at parser boundaries."
+        },
+        {
+          "id": "SG-0455",
+          "title": "Keep PDF rendering from loading arbitrary external resources."
+        },
+        {
+          "id": "SG-0456",
+          "title": "Constrain document macros in server-side preview pipelines."
+        },
+        {
+          "id": "SG-0457",
+          "title": "Validate image parser inputs before invoking native decoders."
+        },
+        {
+          "id": "SG-0458",
+          "title": "Reject unsupported character encodings consistently."
+        },
+        {
+          "id": "SG-0459",
+          "title": "Handle numeric precision differences in structured financial inputs."
+        },
+        {
+          "id": "SG-0460",
+          "title": "Use bounded local samples to investigate parser disagreement."
+        }
+      ]
+    },
+    {
+      "id": "area-24",
+      "title": "REST and general API behavior",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "api",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0461",
+          "title": "Require authentication on every documented private API route."
+        },
+        {
+          "id": "SG-0462",
+          "title": "Apply authorization after routing to the selected API version."
+        },
+        {
+          "id": "SG-0463",
+          "title": "Reject unsupported HTTP methods explicitly."
+        },
+        {
+          "id": "SG-0464",
+          "title": "Treat alternate method override mechanisms consistently."
+        },
+        {
+          "id": "SG-0465",
+          "title": "Enforce request schemas for writable properties."
+        },
+        {
+          "id": "SG-0466",
+          "title": "Exclude server-controlled fields from mass assignment."
+        },
+        {
+          "id": "SG-0467",
+          "title": "Return only fields authorized for the caller's role."
+        },
+        {
+          "id": "SG-0468",
+          "title": "Apply pagination limits on the server."
+        },
+        {
+          "id": "SG-0469",
+          "title": "Keep list filters from selecting unauthorized records."
+        },
+        {
+          "id": "SG-0470",
+          "title": "Validate content types before deserializing requests."
+        },
+        {
+          "id": "SG-0471",
+          "title": "Apply consistent authorization to batch API calls."
+        },
+        {
+          "id": "SG-0472",
+          "title": "Protect API documentation containing private schemas or credentials."
+        },
+        {
+          "id": "SG-0473",
+          "title": "Keep deprecated APIs subject to current account restrictions."
+        },
+        {
+          "id": "SG-0474",
+          "title": "Use idempotency semantics for sensitive retryable operations."
+        },
+        {
+          "id": "SG-0475",
+          "title": "Bind idempotency keys to the authenticated operation context."
+        },
+        {
+          "id": "SG-0476",
+          "title": "Avoid returning secrets in API error objects."
+        },
+        {
+          "id": "SG-0477",
+          "title": "Document resource-cost limits without stress-testing production."
+        },
+        {
+          "id": "SG-0478",
+          "title": "Apply authorization to asynchronous result retrieval."
+        },
+        {
+          "id": "SG-0479",
+          "title": "Prevent client-specified callback addresses from bypassing outbound policy."
+        },
+        {
+          "id": "SG-0480",
+          "title": "Confirm API behavior with an allowed baseline before interpreting differences."
+        }
+      ]
+    },
+    {
+      "id": "area-25",
+      "title": "GraphQL",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "api",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0481",
+          "title": "Authorize each field resolver that returns private data."
+        },
+        {
+          "id": "SG-0482",
+          "title": "Authorize mutations independently of query permissions."
+        },
+        {
+          "id": "SG-0483",
+          "title": "Apply ownership checks to node lookups by global identifier."
+        },
+        {
+          "id": "SG-0484",
+          "title": "Keep aliases from bypassing per-operation policy."
+        },
+        {
+          "id": "SG-0485",
+          "title": "Bound query depth according to documented limits."
+        },
+        {
+          "id": "SG-0486",
+          "title": "Bound query cost using an appropriate cost model."
+        },
+        {
+          "id": "SG-0487",
+          "title": "Limit batch operations where batching is supported."
+        },
+        {
+          "id": "SG-0488",
+          "title": "Apply pagination bounds to nested collections."
+        },
+        {
+          "id": "SG-0489",
+          "title": "Prevent unapproved fields from being writable through input objects."
+        },
+        {
+          "id": "SG-0490",
+          "title": "Protect introspection according to the deployment's intended exposure."
+        },
+        {
+          "id": "SG-0491",
+          "title": "Avoid leaking secrets through detailed resolver errors."
+        },
+        {
+          "id": "SG-0492",
+          "title": "Preserve tenant boundaries in data-loader caches."
+        },
+        {
+          "id": "SG-0493",
+          "title": "Apply access checks before resolving related objects."
+        },
+        {
+          "id": "SG-0494",
+          "title": "Ensure subscriptions respect current membership changes."
+        },
+        {
+          "id": "SG-0495",
+          "title": "Keep persisted-query registries from accepting unauthorized replacements."
+        },
+        {
+          "id": "SG-0496",
+          "title": "Protect file-upload mutations with normal upload controls."
+        },
+        {
+          "id": "SG-0497",
+          "title": "Enforce anti-forgery protection for cookie-authenticated mutations."
+        },
+        {
+          "id": "SG-0498",
+          "title": "Keep query response caches separated by authorization context."
+        },
+        {
+          "id": "SG-0499",
+          "title": "Validate custom scalar parsing without evaluating executable syntax."
+        },
+        {
+          "id": "SG-0500",
+          "title": "Use small local queries when assessing resource-limit enforcement."
+        }
+      ]
+    },
+    {
+      "id": "area-26",
+      "title": "Streaming, WebSockets, and RPC",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "api",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0501",
+          "title": "Authenticate before accepting a privileged WebSocket session."
+        },
+        {
+          "id": "SG-0502",
+          "title": "Validate browser origins for cookie-authenticated WebSockets."
+        },
+        {
+          "id": "SG-0503",
+          "title": "Authorize each WebSocket message action."
+        },
+        {
+          "id": "SG-0504",
+          "title": "Recheck permissions after a socket user's role changes."
+        },
+        {
+          "id": "SG-0505",
+          "title": "Expire or reauthenticate long-lived socket sessions."
+        },
+        {
+          "id": "SG-0506",
+          "title": "Validate message schemas before dispatch."
+        },
+        {
+          "id": "SG-0507",
+          "title": "Bound individual streaming message sizes."
+        },
+        {
+          "id": "SG-0508",
+          "title": "Keep broadcast channels separated by tenant membership."
+        },
+        {
+          "id": "SG-0509",
+          "title": "Protect subscription identifiers from unauthorized reuse."
+        },
+        {
+          "id": "SG-0510",
+          "title": "Handle reconnect tokens as scoped authentication material."
+        },
+        {
+          "id": "SG-0511",
+          "title": "Authenticate gRPC calls at the correct service boundary."
+        },
+        {
+          "id": "SG-0512",
+          "title": "Authorize gRPC methods independently from connection authentication."
+        },
+        {
+          "id": "SG-0513",
+          "title": "Validate protobuf fields used for ownership decisions."
+        },
+        {
+          "id": "SG-0514",
+          "title": "Keep RPC metadata from overriding trusted identity."
+        },
+        {
+          "id": "SG-0515",
+          "title": "Restrict reflection services according to deployment policy."
+        },
+        {
+          "id": "SG-0516",
+          "title": "Bound streaming duration and outstanding messages in a local fixture."
+        },
+        {
+          "id": "SG-0517",
+          "title": "Clean up subscriptions after account suspension."
+        },
+        {
+          "id": "SG-0518",
+          "title": "Avoid returning internal stack traces through streaming errors."
+        },
+        {
+          "id": "SG-0519",
+          "title": "Protect event replay endpoints with the original subscription permissions."
+        },
+        {
+          "id": "SG-0520",
+          "title": "Record message direction and identity in reproducible stream evidence."
+        }
+      ]
+    },
+    {
+      "id": "area-27",
+      "title": "Business workflow integrity",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0521",
+          "title": "Enforce required workflow steps on the server."
+        },
+        {
+          "id": "SG-0522",
+          "title": "Reject state transitions that skip mandatory approval."
+        },
+        {
+          "id": "SG-0523",
+          "title": "Bind approval to the exact item and version reviewed."
+        },
+        {
+          "id": "SG-0524",
+          "title": "Revoke an approval when material input changes."
+        },
+        {
+          "id": "SG-0525",
+          "title": "Keep canceled operations from being completed later."
+        },
+        {
+          "id": "SG-0526",
+          "title": "Require separate privileges for proposing and approving sensitive changes."
+        },
+        {
+          "id": "SG-0527",
+          "title": "Prevent users from approving their own request where separation is required."
+        },
+        {
+          "id": "SG-0528",
+          "title": "Enforce per-user limits using trusted identity data."
+        },
+        {
+          "id": "SG-0529",
+          "title": "Apply organization limits across alternate client channels."
+        },
+        {
+          "id": "SG-0530",
+          "title": "Handle negative quantities according to business rules."
+        },
+        {
+          "id": "SG-0531",
+          "title": "Handle zero quantities without granting unintended benefits."
+        },
+        {
+          "id": "SG-0532",
+          "title": "Bound monetary and quantity precision before calculations."
+        },
+        {
+          "id": "SG-0533",
+          "title": "Recalculate authoritative totals on the server."
+        },
+        {
+          "id": "SG-0534",
+          "title": "Keep promotional eligibility independent of client-supplied labels."
+        },
+        {
+          "id": "SG-0535",
+          "title": "Prevent expired offers from being redeemed through stale requests."
+        },
+        {
+          "id": "SG-0536",
+          "title": "Validate ownership when transferring credits or entitlements."
+        },
+        {
+          "id": "SG-0537",
+          "title": "Keep trial conversion from restoring already consumed benefits."
+        },
+        {
+          "id": "SG-0538",
+          "title": "Protect administrative workflow overrides with explicit privilege."
+        },
+        {
+          "id": "SG-0539",
+          "title": "Model abuse cases with synthetic balances and harmless objects."
+        },
+        {
+          "id": "SG-0540",
+          "title": "Distinguish unexpected business behavior from a security boundary violation."
+        }
+      ]
+    },
+    {
+      "id": "area-28",
+      "title": "Payments, billing, and value transfer",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0541",
+          "title": "Derive payable amounts from trusted product and pricing data."
+        },
+        {
+          "id": "SG-0542",
+          "title": "Validate currency consistently across checkout and settlement."
+        },
+        {
+          "id": "SG-0543",
+          "title": "Bind a payment intent to its intended customer."
+        },
+        {
+          "id": "SG-0544",
+          "title": "Bind a payment intent to the intended order."
+        },
+        {
+          "id": "SG-0545",
+          "title": "Verify payment-provider notifications before granting value."
+        },
+        {
+          "id": "SG-0546",
+          "title": "Prevent a canceled payment from fulfilling an order."
+        },
+        {
+          "id": "SG-0547",
+          "title": "Prevent duplicate payment callbacks from duplicating fulfillment."
+        },
+        {
+          "id": "SG-0548",
+          "title": "Keep refund amounts within the settled amount."
+        },
+        {
+          "id": "SG-0549",
+          "title": "Require authorization before changing a payout destination."
+        },
+        {
+          "id": "SG-0550",
+          "title": "Reauthenticate sensitive billing-profile changes."
+        },
+        {
+          "id": "SG-0551",
+          "title": "Apply coupon limits after calculating eligible items."
+        },
+        {
+          "id": "SG-0552",
+          "title": "Keep tax and shipping inputs from overriding the payable total."
+        },
+        {
+          "id": "SG-0553",
+          "title": "Handle partial refunds without restoring excess credits."
+        },
+        {
+          "id": "SG-0554",
+          "title": "Preserve ledger balance invariants across failed transactions."
+        },
+        {
+          "id": "SG-0555",
+          "title": "Restrict invoice access to authorized customer identities."
+        },
+        {
+          "id": "SG-0556",
+          "title": "Keep test payment credentials separate from production credentials."
+        },
+        {
+          "id": "SG-0557",
+          "title": "Verify subscription cancellation stops future entitlement renewal as designed."
+        },
+        {
+          "id": "SG-0558",
+          "title": "Apply proration rules without creating negative payment obligations unexpectedly."
+        },
+        {
+          "id": "SG-0559",
+          "title": "Use provider sandboxes without placing real charges or orders."
+        },
+        {
+          "id": "SG-0560",
+          "title": "Record financial impact as a bounded hypothesis until independently validated."
+        }
+      ]
+    },
+    {
+      "id": "area-29",
+      "title": "Concurrency and retry safety",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Owned local fixture, operation order, expected invariant, observed state, and a sequential negative control. No production concurrency exercise.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0561",
+          "title": "Make single-use token consumption atomic."
+        },
+        {
+          "id": "SG-0562",
+          "title": "Make inventory reservation atomic with order acceptance."
+        },
+        {
+          "id": "SG-0563",
+          "title": "Enforce invitation redemption limits under concurrent requests."
+        },
+        {
+          "id": "SG-0564",
+          "title": "Prevent simultaneous withdrawals from exceeding an authorized balance."
+        },
+        {
+          "id": "SG-0565",
+          "title": "Apply coupon-use limits atomically."
+        },
+        {
+          "id": "SG-0566",
+          "title": "Prevent repeated task retries from duplicating value transfers."
+        },
+        {
+          "id": "SG-0567",
+          "title": "Keep account deletion and update races from restoring deleted data."
+        },
+        {
+          "id": "SG-0568",
+          "title": "Recheck authorization when an asynchronous job begins execution."
+        },
+        {
+          "id": "SG-0569",
+          "title": "Protect permission changes against stale writes."
+        },
+        {
+          "id": "SG-0570",
+          "title": "Use consistent version checks for approval-state updates."
+        },
+        {
+          "id": "SG-0571",
+          "title": "Ensure retry tokens cannot be reused for a different operation."
+        },
+        {
+          "id": "SG-0572",
+          "title": "Keep lock ownership from surviving an expired transaction unexpectedly."
+        },
+        {
+          "id": "SG-0573",
+          "title": "Handle worker crashes without losing required rollback actions."
+        },
+        {
+          "id": "SG-0574",
+          "title": "Bound the lifetime of distributed transaction leases."
+        },
+        {
+          "id": "SG-0575",
+          "title": "Avoid performing an external side effect before the durable intent is saved."
+        },
+        {
+          "id": "SG-0576",
+          "title": "Detect duplicate events before applying irreversible changes."
+        },
+        {
+          "id": "SG-0577",
+          "title": "Keep cancellation effective against queued but unstarted work."
+        },
+        {
+          "id": "SG-0578",
+          "title": "Preserve quota limits across multiple application instances."
+        },
+        {
+          "id": "SG-0579",
+          "title": "Reproduce concurrency hypotheses only in an authorized controlled environment."
+        },
+        {
+          "id": "SG-0580",
+          "title": "Record operation order and negative controls for a race hypothesis."
+        }
+      ]
+    },
+    {
+      "id": "area-30",
+      "title": "Caches, proxies, and routing",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0581",
+          "title": "Partition private cached responses by authorization context."
+        },
+        {
+          "id": "SG-0582",
+          "title": "Keep tenant-specific responses out of shared public cache entries."
+        },
+        {
+          "id": "SG-0583",
+          "title": "Include relevant content-negotiation fields in cache variation."
+        },
+        {
+          "id": "SG-0584",
+          "title": "Avoid trusting unvalidated forwarded-host values."
+        },
+        {
+          "id": "SG-0585",
+          "title": "Keep proxy rewrite rules consistent with application authorization."
+        },
+        {
+          "id": "SG-0586",
+          "title": "Treat ambiguous request framing as a controlled-lab investigation."
+        },
+        {
+          "id": "SG-0587",
+          "title": "Ensure frontend and backend parsers agree on message boundaries."
+        },
+        {
+          "id": "SG-0588",
+          "title": "Avoid using unkeyed user input to construct cached security-sensitive output."
+        },
+        {
+          "id": "SG-0589",
+          "title": "Keep redirects generated from untrusted input out of shared caches."
+        },
+        {
+          "id": "SG-0590",
+          "title": "Protect cache invalidation endpoints from unauthorized use."
+        },
+        {
+          "id": "SG-0591",
+          "title": "Avoid caching authentication and recovery responses publicly."
+        },
+        {
+          "id": "SG-0592",
+          "title": "Handle path normalization consistently across CDN and origin."
+        },
+        {
+          "id": "SG-0593",
+          "title": "Separate static asset caching from authenticated document caching."
+        },
+        {
+          "id": "SG-0594",
+          "title": "Ensure error responses cannot expose another user's cached body."
+        },
+        {
+          "id": "SG-0595",
+          "title": "Preserve authentication headers only across intended trusted hops."
+        },
+        {
+          "id": "SG-0596",
+          "title": "Prevent alternate hostnames from bypassing origin access rules."
+        },
+        {
+          "id": "SG-0597",
+          "title": "Keep debug routing headers inaccessible to untrusted clients."
+        },
+        {
+          "id": "SG-0598",
+          "title": "Validate cache lifetimes for signed private content."
+        },
+        {
+          "id": "SG-0599",
+          "title": "Use isolated caches and synthetic responses for poisoning experiments."
+        },
+        {
+          "id": "SG-0600",
+          "title": "Do not infer exploitable cache behavior from a single response header."
+        }
+      ]
+    },
+    {
+      "id": "area-31",
+      "title": "Transport and browser response controls",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0601",
+          "title": "Verify certificate validation is enabled for outbound HTTPS clients."
+        },
+        {
+          "id": "SG-0602",
+          "title": "Check the intended hostname during certificate validation."
+        },
+        {
+          "id": "SG-0603",
+          "title": "Require encrypted transport for authentication and private data."
+        },
+        {
+          "id": "SG-0604",
+          "title": "Record HSTS behavior on the exact observed response."
+        },
+        {
+          "id": "SG-0605",
+          "title": "Record content-type sniffing protection on untrusted downloads."
+        },
+        {
+          "id": "SG-0606",
+          "title": "Record frame restrictions on sensitive interactive pages."
+        },
+        {
+          "id": "SG-0607",
+          "title": "Assess content security policy against the application's actual script needs."
+        },
+        {
+          "id": "SG-0608",
+          "title": "Avoid treating a missing header alone as a bounty-worthy vulnerability."
+        },
+        {
+          "id": "SG-0609",
+          "title": "Prevent insecure mixed content on authenticated pages."
+        },
+        {
+          "id": "SG-0610",
+          "title": "Set referrer behavior appropriate to sensitive navigation."
+        },
+        {
+          "id": "SG-0611",
+          "title": "Restrict browser permissions that the application does not need."
+        },
+        {
+          "id": "SG-0612",
+          "title": "Use cross-origin isolation controls where the feature requires them."
+        },
+        {
+          "id": "SG-0613",
+          "title": "Serve sensitive responses with an appropriate cache policy."
+        },
+        {
+          "id": "SG-0614",
+          "title": "Keep transport downgrades out of authentication redirect chains."
+        },
+        {
+          "id": "SG-0615",
+          "title": "Validate mutual-TLS client identity when it is an authorization factor."
+        },
+        {
+          "id": "SG-0616",
+          "title": "Protect internal service transport according to its trust model."
+        },
+        {
+          "id": "SG-0617",
+          "title": "Expire and rotate certificates without disabling verification."
+        },
+        {
+          "id": "SG-0618",
+          "title": "Keep certificate private keys outside distributable client assets."
+        },
+        {
+          "id": "SG-0619",
+          "title": "Distinguish HEAD observations from untested GET response behavior."
+        },
+        {
+          "id": "SG-0620",
+          "title": "Record exact timestamps and response context for transport observations."
+        }
+      ]
+    },
+    {
+      "id": "area-32",
+      "title": "Secrets and cryptographic use",
+      "profiles": [
+        "web",
+        "api",
+        "source",
+        "cloud"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0621",
+          "title": "Generate security tokens with a cryptographically appropriate random source."
+        },
+        {
+          "id": "SG-0622",
+          "title": "Keep encryption keys separate from the encrypted data where required."
+        },
+        {
+          "id": "SG-0623",
+          "title": "Use authenticated encryption for data requiring integrity protection."
+        },
+        {
+          "id": "SG-0624",
+          "title": "Avoid reusing nonces with algorithms that require unique nonces."
+        },
+        {
+          "id": "SG-0625",
+          "title": "Use algorithms and key sizes appropriate to the data lifetime."
+        },
+        {
+          "id": "SG-0626",
+          "title": "Keep encryption failures from returning partial plaintext."
+        },
+        {
+          "id": "SG-0627",
+          "title": "Use distinct keys for unrelated cryptographic purposes."
+        },
+        {
+          "id": "SG-0628",
+          "title": "Support rotation without exposing historical key material."
+        },
+        {
+          "id": "SG-0629",
+          "title": "Store service credentials in a controlled secret store."
+        },
+        {
+          "id": "SG-0630",
+          "title": "Keep production secrets out of source repositories."
+        },
+        {
+          "id": "SG-0631",
+          "title": "Keep secrets out of client-side bundles."
+        },
+        {
+          "id": "SG-0632",
+          "title": "Redact credentials in application telemetry."
+        },
+        {
+          "id": "SG-0633",
+          "title": "Apply least privilege to secret retrieval."
+        },
+        {
+          "id": "SG-0634",
+          "title": "Revoke secrets when their integration is removed."
+        },
+        {
+          "id": "SG-0635",
+          "title": "Protect backup copies of encryption keys."
+        },
+        {
+          "id": "SG-0636",
+          "title": "Compare authentication secrets using appropriate constant-time routines."
+        },
+        {
+          "id": "SG-0637",
+          "title": "Avoid inventing custom cryptographic protocols."
+        },
+        {
+          "id": "SG-0638",
+          "title": "Handle cryptographic exceptions without falling back to plaintext."
+        },
+        {
+          "id": "SG-0639",
+          "title": "Document what data a disclosed value could actually unlock."
+        },
+        {
+          "id": "SG-0640",
+          "title": "Never validate a suspected credential against an unrelated live service."
+        }
+      ]
+    },
+    {
+      "id": "area-33",
+      "title": "Errors, logging, and monitoring",
+      "profiles": [
+        "web",
+        "api",
+        "source",
+        "cloud"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0641",
+          "title": "Return generic client errors without internal stack traces."
+        },
+        {
+          "id": "SG-0642",
+          "title": "Keep database credentials out of exception messages."
+        },
+        {
+          "id": "SG-0643",
+          "title": "Keep session tokens out of access logs."
+        },
+        {
+          "id": "SG-0644",
+          "title": "Keep personal data out of unnecessary debug logs."
+        },
+        {
+          "id": "SG-0645",
+          "title": "Restrict access to application log viewers."
+        },
+        {
+          "id": "SG-0646",
+          "title": "Separate tenant-visible logs by organization."
+        },
+        {
+          "id": "SG-0647",
+          "title": "Encode untrusted text before displaying it in an administrative log viewer."
+        },
+        {
+          "id": "SG-0648",
+          "title": "Prevent line breaks in untrusted log fields from forging records."
+        },
+        {
+          "id": "SG-0649",
+          "title": "Record the actor for sensitive administrative actions."
+        },
+        {
+          "id": "SG-0650",
+          "title": "Record failed authorization attempts without retaining secrets."
+        },
+        {
+          "id": "SG-0651",
+          "title": "Preserve event timestamps with a consistent time basis."
+        },
+        {
+          "id": "SG-0652",
+          "title": "Protect audit-log integrity from ordinary application users."
+        },
+        {
+          "id": "SG-0653",
+          "title": "Bound log volume using controlled local tests."
+        },
+        {
+          "id": "SG-0654",
+          "title": "Handle log-delivery failures without disabling authorization."
+        },
+        {
+          "id": "SG-0655",
+          "title": "Keep correlation identifiers from becoming authorization credentials."
+        },
+        {
+          "id": "SG-0656",
+          "title": "Redact secrets in crash reports sent to third parties."
+        },
+        {
+          "id": "SG-0657",
+          "title": "Restrict debug endpoints in production configuration."
+        },
+        {
+          "id": "SG-0658",
+          "title": "Ensure alert destinations do not expose private tenant details."
+        },
+        {
+          "id": "SG-0659",
+          "title": "Apply documented retention limits to security logs."
+        },
+        {
+          "id": "SG-0660",
+          "title": "Separate an informational error disclosure from demonstrated material impact."
+        }
+      ]
+    },
+    {
+      "id": "area-34",
+      "title": "Privacy and data lifecycle",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0661",
+          "title": "Minimize personal fields returned by public profile endpoints."
+        },
+        {
+          "id": "SG-0662",
+          "title": "Honor privacy settings in search and discovery features."
+        },
+        {
+          "id": "SG-0663",
+          "title": "Enforce audience restrictions on shared personal content."
+        },
+        {
+          "id": "SG-0664",
+          "title": "Protect bulk personal-data export with fresh authentication."
+        },
+        {
+          "id": "SG-0665",
+          "title": "Bind export downloads to the requesting identity."
+        },
+        {
+          "id": "SG-0666",
+          "title": "Delete or revoke exports after their intended lifetime."
+        },
+        {
+          "id": "SG-0667",
+          "title": "Keep deleted personal records out of normal search results."
+        },
+        {
+          "id": "SG-0668",
+          "title": "Apply deletion rules to derived indexes and caches."
+        },
+        {
+          "id": "SG-0669",
+          "title": "Restrict access to historical versions containing removed private data."
+        },
+        {
+          "id": "SG-0670",
+          "title": "Preserve privacy settings during account migration."
+        },
+        {
+          "id": "SG-0671",
+          "title": "Avoid sending private input to third-party analytics unnecessarily."
+        },
+        {
+          "id": "SG-0672",
+          "title": "Keep sensitive query parameters out of referrer destinations."
+        },
+        {
+          "id": "SG-0673",
+          "title": "Review browser storage for unnecessary sensitive data retention."
+        },
+        {
+          "id": "SG-0674",
+          "title": "Protect consent changes from unauthorized modification."
+        },
+        {
+          "id": "SG-0675",
+          "title": "Keep private data out of notification previews where settings require it."
+        },
+        {
+          "id": "SG-0676",
+          "title": "Validate data masking for low-privilege support roles."
+        },
+        {
+          "id": "SG-0677",
+          "title": "Apply retention rules to abandoned drafts and temporary uploads."
+        },
+        {
+          "id": "SG-0678",
+          "title": "Document cross-border processing constraints relevant to the program."
+        },
+        {
+          "id": "SG-0679",
+          "title": "Use synthetic personal data in research evidence."
+        },
+        {
+          "id": "SG-0680",
+          "title": "Stop and minimize collection if unrelated private data appears."
+        }
+      ]
+    },
+    {
+      "id": "area-35",
+      "title": "Cloud object storage",
+      "profiles": [
+        "cloud"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0681",
+          "title": "Restrict bucket listing to intended identities."
+        },
+        {
+          "id": "SG-0682",
+          "title": "Restrict object reading according to the data classification."
+        },
+        {
+          "id": "SG-0683",
+          "title": "Restrict object writing to authorized principals."
+        },
+        {
+          "id": "SG-0684",
+          "title": "Prevent public overwrite of published application assets."
+        },
+        {
+          "id": "SG-0685",
+          "title": "Scope signed upload URLs to intended object names."
+        },
+        {
+          "id": "SG-0686",
+          "title": "Scope signed download URLs to intended objects."
+        },
+        {
+          "id": "SG-0687",
+          "title": "Expire signed storage URLs as documented."
+        },
+        {
+          "id": "SG-0688",
+          "title": "Bind upload constraints such as size and content type where supported."
+        },
+        {
+          "id": "SG-0689",
+          "title": "Keep storage service credentials out of frontend code."
+        },
+        {
+          "id": "SG-0690",
+          "title": "Separate tenant data by enforced authorization rather than prefix convention alone."
+        },
+        {
+          "id": "SG-0691",
+          "title": "Review access to prior object versions."
+        },
+        {
+          "id": "SG-0692",
+          "title": "Apply retention rules to object replicas and backups."
+        },
+        {
+          "id": "SG-0693",
+          "title": "Protect storage audit logs from modification by upload users."
+        },
+        {
+          "id": "SG-0694",
+          "title": "Require encryption settings appropriate to stored data."
+        },
+        {
+          "id": "SG-0695",
+          "title": "Keep custom storage-domain ownership under program control."
+        },
+        {
+          "id": "SG-0696",
+          "title": "Prevent lifecycle rules from exposing expired temporary artifacts."
+        },
+        {
+          "id": "SG-0697",
+          "title": "Protect object metadata that contains private information."
+        },
+        {
+          "id": "SG-0698",
+          "title": "Review cross-origin rules for private storage content."
+        },
+        {
+          "id": "SG-0699",
+          "title": "Validate storage policy changes using local policy evaluation where possible."
+        },
+        {
+          "id": "SG-0700",
+          "title": "Avoid uploading, deleting, or claiming resources without explicit permission."
+        }
+      ]
+    },
+    {
+      "id": "area-36",
+      "title": "Cloud identity and service boundaries",
+      "profiles": [
+        "cloud"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0701",
+          "title": "Limit workload roles to the operations they require."
+        },
+        {
+          "id": "SG-0702",
+          "title": "Scope role-assumption trust to intended principals."
+        },
+        {
+          "id": "SG-0703",
+          "title": "Validate external identifiers used in delegated cloud access."
+        },
+        {
+          "id": "SG-0704",
+          "title": "Avoid granting wildcard resource access where narrower scope is possible."
+        },
+        {
+          "id": "SG-0705",
+          "title": "Restrict identity-policy modification to authorized administrators."
+        },
+        {
+          "id": "SG-0706",
+          "title": "Separate deployment privileges from runtime privileges."
+        },
+        {
+          "id": "SG-0707",
+          "title": "Keep cloud metadata access outside untrusted request paths."
+        },
+        {
+          "id": "SG-0708",
+          "title": "Use temporary workload credentials where appropriate."
+        },
+        {
+          "id": "SG-0709",
+          "title": "Rotate and revoke long-lived cloud access keys."
+        },
+        {
+          "id": "SG-0710",
+          "title": "Restrict secret-store access by workload identity."
+        },
+        {
+          "id": "SG-0711",
+          "title": "Prevent lower-trust services from invoking privileged internal functions."
+        },
+        {
+          "id": "SG-0712",
+          "title": "Apply authorization to serverless function invocation."
+        },
+        {
+          "id": "SG-0713",
+          "title": "Validate event sources before processing cloud-triggered jobs."
+        },
+        {
+          "id": "SG-0714",
+          "title": "Keep network placement from substituting for service authentication."
+        },
+        {
+          "id": "SG-0715",
+          "title": "Restrict public management interfaces according to deployment intent."
+        },
+        {
+          "id": "SG-0716",
+          "title": "Record ownership before treating a dangling service reference as a lead."
+        },
+        {
+          "id": "SG-0717",
+          "title": "Review infrastructure templates for unintended public exposure."
+        },
+        {
+          "id": "SG-0718",
+          "title": "Protect cloud audit configuration from ordinary runtime roles."
+        },
+        {
+          "id": "SG-0719",
+          "title": "Use supplied policy documents rather than enumerating another account."
+        },
+        {
+          "id": "SG-0720",
+          "title": "Treat resource takeover hypotheses as unverified until explicitly permitted validation."
+        }
+      ]
+    },
+    {
+      "id": "area-37",
+      "title": "Containers and orchestration",
+      "profiles": [
+        "cloud"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0721",
+          "title": "Run application containers with only required privileges."
+        },
+        {
+          "id": "SG-0722",
+          "title": "Avoid unnecessary host filesystem mounts."
+        },
+        {
+          "id": "SG-0723",
+          "title": "Restrict access to container runtime sockets."
+        },
+        {
+          "id": "SG-0724",
+          "title": "Use an appropriate non-root runtime identity."
+        },
+        {
+          "id": "SG-0725",
+          "title": "Constrain Linux capabilities to those the workload needs."
+        },
+        {
+          "id": "SG-0726",
+          "title": "Keep container images free of production secrets."
+        },
+        {
+          "id": "SG-0727",
+          "title": "Pin deployed image identities where reproducibility requires it."
+        },
+        {
+          "id": "SG-0728",
+          "title": "Verify image provenance before deployment."
+        },
+        {
+          "id": "SG-0729",
+          "title": "Apply resource limits in controlled configuration review."
+        },
+        {
+          "id": "SG-0730",
+          "title": "Keep orchestration dashboards behind intended authentication."
+        },
+        {
+          "id": "SG-0731",
+          "title": "Scope service-account permissions to the workload's namespace and purpose."
+        },
+        {
+          "id": "SG-0732",
+          "title": "Prevent pods from reading unrelated workload secrets."
+        },
+        {
+          "id": "SG-0733",
+          "title": "Review network policies between trust zones."
+        },
+        {
+          "id": "SG-0734",
+          "title": "Disable automatic service-account token mounting where unnecessary."
+        },
+        {
+          "id": "SG-0735",
+          "title": "Protect admission policy from unprivileged modification."
+        },
+        {
+          "id": "SG-0736",
+          "title": "Keep debug containers subject to administrative authorization."
+        },
+        {
+          "id": "SG-0737",
+          "title": "Avoid exposing development ports in production manifests."
+        },
+        {
+          "id": "SG-0738",
+          "title": "Check secret-file permissions inside the container image."
+        },
+        {
+          "id": "SG-0739",
+          "title": "Review backup and snapshot handling for container volumes."
+        },
+        {
+          "id": "SG-0740",
+          "title": "Perform container escape research only in an explicitly authorized isolated lab."
+        }
+      ]
+    },
+    {
+      "id": "area-38",
+      "title": "Build and deployment pipelines",
+      "profiles": [
+        "source",
+        "cloud"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0741",
+          "title": "Keep untrusted pull-request code from receiving production secrets."
+        },
+        {
+          "id": "SG-0742",
+          "title": "Avoid executing untrusted metadata as shell syntax in CI."
+        },
+        {
+          "id": "SG-0743",
+          "title": "Pin third-party build actions according to project policy."
+        },
+        {
+          "id": "SG-0744",
+          "title": "Restrict workflow token permissions to required operations."
+        },
+        {
+          "id": "SG-0745",
+          "title": "Separate read-only tests from deployment credentials."
+        },
+        {
+          "id": "SG-0746",
+          "title": "Require appropriate approval for production deployment changes."
+        },
+        {
+          "id": "SG-0747",
+          "title": "Bind workload identity claims to the intended repository."
+        },
+        {
+          "id": "SG-0748",
+          "title": "Bind workload identity claims to the intended branch or environment."
+        },
+        {
+          "id": "SG-0749",
+          "title": "Validate artifact provenance before release promotion."
+        },
+        {
+          "id": "SG-0750",
+          "title": "Keep build caches separated across incompatible trust contexts."
+        },
+        {
+          "id": "SG-0751",
+          "title": "Protect release signing keys from ordinary test jobs."
+        },
+        {
+          "id": "SG-0752",
+          "title": "Prevent downloaded artifacts from overwriting sensitive runner paths."
+        },
+        {
+          "id": "SG-0753",
+          "title": "Keep secrets out of archived build logs."
+        },
+        {
+          "id": "SG-0754",
+          "title": "Restrict who can alter deployment environment variables."
+        },
+        {
+          "id": "SG-0755",
+          "title": "Expire temporary runner credentials after the job."
+        },
+        {
+          "id": "SG-0756",
+          "title": "Preserve verification steps when retrying a failed deployment."
+        },
+        {
+          "id": "SG-0757",
+          "title": "Keep preview deployments from receiving production customer data."
+        },
+        {
+          "id": "SG-0758",
+          "title": "Restrict deployment hooks to intended authorized callers."
+        },
+        {
+          "id": "SG-0759",
+          "title": "Audit dependency-install scripts before running untrusted builds."
+        },
+        {
+          "id": "SG-0760",
+          "title": "Investigate pipeline hypotheses using local fixtures or owned repositories."
+        }
+      ]
+    },
+    {
+      "id": "area-39",
+      "title": "Dependencies and software supply chain",
+      "profiles": [
+        "source"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0761",
+          "title": "Record exact installed dependency versions from a lockfile."
+        },
+        {
+          "id": "SG-0762",
+          "title": "Distinguish direct dependencies from transitive dependencies."
+        },
+        {
+          "id": "SG-0763",
+          "title": "Match advisories to the correct package ecosystem."
+        },
+        {
+          "id": "SG-0764",
+          "title": "Check whether the installed version is in the affected range."
+        },
+        {
+          "id": "SG-0765",
+          "title": "Verify whether vulnerable functionality is reachable in the application."
+        },
+        {
+          "id": "SG-0766",
+          "title": "Record mitigations that alter advisory applicability."
+        },
+        {
+          "id": "SG-0767",
+          "title": "Avoid treating a package-name match as a confirmed vulnerability."
+        },
+        {
+          "id": "SG-0768",
+          "title": "Check for unsupported dependencies with no maintained security path."
+        },
+        {
+          "id": "SG-0769",
+          "title": "Keep private package namespaces from resolving to unintended public packages."
+        },
+        {
+          "id": "SG-0770",
+          "title": "Verify package integrity against trusted lockfile hashes."
+        },
+        {
+          "id": "SG-0771",
+          "title": "Review installation hooks that run during dependency setup."
+        },
+        {
+          "id": "SG-0772",
+          "title": "Preserve lockfile changes in code review."
+        },
+        {
+          "id": "SG-0773",
+          "title": "Keep development-only dependencies separate from runtime exposure."
+        },
+        {
+          "id": "SG-0774",
+          "title": "Check whether bundled copies remain after an apparent upgrade."
+        },
+        {
+          "id": "SG-0775",
+          "title": "Track container base-image components in the software inventory."
+        },
+        {
+          "id": "SG-0776",
+          "title": "Validate the origin of downloaded binaries."
+        },
+        {
+          "id": "SG-0777",
+          "title": "Avoid loading plugins from user-writable search paths."
+        },
+        {
+          "id": "SG-0778",
+          "title": "Review trust in remotely hosted scripts used by the application."
+        },
+        {
+          "id": "SG-0779",
+          "title": "Record advisory publication and last-check dates."
+        },
+        {
+          "id": "SG-0780",
+          "title": "Validate suspected dependency impact without exploiting unrelated deployments."
+        }
+      ]
+    },
+    {
+      "id": "area-40",
+      "title": "Python source and data-flow review",
+      "profiles": [
+        "source"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Authorized Python file digest, analyzer version, line and input path where available, safe control, and unsupported-language/runtime limits.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0781",
+          "title": "Trace untrusted input reaching Python eval or exec."
+        },
+        {
+          "id": "SG-0782",
+          "title": "Trace untrusted input reaching a Python shell command."
+        },
+        {
+          "id": "SG-0783",
+          "title": "Trace untrusted input reaching Python pickle deserialization."
+        },
+        {
+          "id": "SG-0784",
+          "title": "Trace untrusted input reaching an unsafe Python YAML loader."
+        },
+        {
+          "id": "SG-0785",
+          "title": "Review Python HTTP calls that disable TLS certificate verification."
+        },
+        {
+          "id": "SG-0786",
+          "title": "Trace untrusted input reaching dynamically constructed Python SQL."
+        },
+        {
+          "id": "SG-0787",
+          "title": "Review Python pseudorandom generators used for security tokens."
+        },
+        {
+          "id": "SG-0788",
+          "title": "Check whether Python route decorators enforce intended authentication."
+        },
+        {
+          "id": "SG-0789",
+          "title": "Check whether exceptions bypass an authorization return path."
+        },
+        {
+          "id": "SG-0790",
+          "title": "Follow tainted values through helper function aliases."
+        },
+        {
+          "id": "SG-0791",
+          "title": "Follow tainted values across supported source modules."
+        },
+        {
+          "id": "SG-0792",
+          "title": "Recheck validation after a variable is reassigned."
+        },
+        {
+          "id": "SG-0793",
+          "title": "Distinguish fixed SQL constants from externally influenced SQL fragments."
+        },
+        {
+          "id": "SG-0794",
+          "title": "Check whether numeric conversion genuinely constrains the later query value."
+        },
+        {
+          "id": "SG-0795",
+          "title": "Review sensitive Python default arguments with shared mutable state."
+        },
+        {
+          "id": "SG-0796",
+          "title": "Keep dynamic import targets separate from untrusted request fields."
+        },
+        {
+          "id": "SG-0797",
+          "title": "Review temporary-file creation for unsafe name reuse."
+        },
+        {
+          "id": "SG-0798",
+          "title": "Check filesystem permissions assigned by Python application code."
+        },
+        {
+          "id": "SG-0799",
+          "title": "Record analyzer limits for unsupported decorators and dynamic dispatch."
+        },
+        {
+          "id": "SG-0800",
+          "title": "Verify a source hypothesis with a safe negative control before reporting it."
+        }
+      ]
+    },
+    {
+      "id": "area-41",
+      "title": "Android application research",
+      "profiles": [
+        "android"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Permitted Android package/build, owned device context, relevant platform configuration, and redacted local observations.",
+      "references": [
+        "masvs",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0801",
+          "title": "Match the installed package to the explicitly listed Android asset."
+        },
+        {
+          "id": "SG-0802",
+          "title": "Record the build version and signing identity under review."
+        },
+        {
+          "id": "SG-0803",
+          "title": "Restrict exported activities to intended callers."
+        },
+        {
+          "id": "SG-0804",
+          "title": "Restrict exported services to intended callers."
+        },
+        {
+          "id": "SG-0805",
+          "title": "Restrict broadcast receivers handling sensitive actions."
+        },
+        {
+          "id": "SG-0806",
+          "title": "Protect content providers exposing private records."
+        },
+        {
+          "id": "SG-0807",
+          "title": "Validate deep-link parameters before privileged navigation."
+        },
+        {
+          "id": "SG-0808",
+          "title": "Verify ownership of Android App Links where used."
+        },
+        {
+          "id": "SG-0809",
+          "title": "Keep authentication secrets out of world-readable storage."
+        },
+        {
+          "id": "SG-0810",
+          "title": "Protect sensitive preferences with appropriate platform storage."
+        },
+        {
+          "id": "SG-0811",
+          "title": "Review backup inclusion of private application data."
+        },
+        {
+          "id": "SG-0812",
+          "title": "Avoid logging tokens through Android diagnostic output."
+        },
+        {
+          "id": "SG-0813",
+          "title": "Restrict JavaScript interfaces exposed to untrusted WebView content."
+        },
+        {
+          "id": "SG-0814",
+          "title": "Keep WebView navigation within intended trust boundaries."
+        },
+        {
+          "id": "SG-0815",
+          "title": "Validate TLS connections using the expected trust policy."
+        },
+        {
+          "id": "SG-0816",
+          "title": "Keep release builds from enabling unnecessary debugging."
+        },
+        {
+          "id": "SG-0817",
+          "title": "Protect clipboard use for sensitive values."
+        },
+        {
+          "id": "SG-0818",
+          "title": "Handle biometric fallback according to the intended authentication policy."
+        },
+        {
+          "id": "SG-0819",
+          "title": "Require server-side authorization despite client-side interface restrictions."
+        },
+        {
+          "id": "SG-0820",
+          "title": "Use an owned test device and expressly permitted application build."
+        }
+      ]
+    },
+    {
+      "id": "area-42",
+      "title": "iOS application research",
+      "profiles": [
+        "ios"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Permitted iOS bundle/build, owned device context, relevant platform configuration, and redacted local observations.",
+      "references": [
+        "masvs",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0821",
+          "title": "Match the installed bundle identifier to the listed iOS asset."
+        },
+        {
+          "id": "SG-0822",
+          "title": "Record the application version and distribution channel."
+        },
+        {
+          "id": "SG-0823",
+          "title": "Store sensitive credentials using appropriate Keychain access controls."
+        },
+        {
+          "id": "SG-0824",
+          "title": "Keep private data out of unnecessarily shared app groups."
+        },
+        {
+          "id": "SG-0825",
+          "title": "Review iCloud and device backup exposure of sensitive files."
+        },
+        {
+          "id": "SG-0826",
+          "title": "Apply appropriate file data-protection classes."
+        },
+        {
+          "id": "SG-0827",
+          "title": "Validate custom URL scheme inputs before privileged actions."
+        },
+        {
+          "id": "SG-0828",
+          "title": "Verify Universal Link association ownership where used."
+        },
+        {
+          "id": "SG-0829",
+          "title": "Keep WKWebView message handlers away from untrusted origins."
+        },
+        {
+          "id": "SG-0830",
+          "title": "Restrict WebView navigation carrying authenticated context."
+        },
+        {
+          "id": "SG-0831",
+          "title": "Review App Transport Security exceptions for necessity."
+        },
+        {
+          "id": "SG-0832",
+          "title": "Validate server trust without blanket certificate acceptance."
+        },
+        {
+          "id": "SG-0833",
+          "title": "Keep sensitive values out of system logs."
+        },
+        {
+          "id": "SG-0834",
+          "title": "Avoid exposing private information in app-switcher snapshots."
+        },
+        {
+          "id": "SG-0835",
+          "title": "Protect sensitive pasteboard data according to the product's needs."
+        },
+        {
+          "id": "SG-0836",
+          "title": "Handle biometric enrollment changes according to authentication policy."
+        },
+        {
+          "id": "SG-0837",
+          "title": "Keep local authentication success separate from server authorization."
+        },
+        {
+          "id": "SG-0838",
+          "title": "Restrict extensions to the minimum shared data they need."
+        },
+        {
+          "id": "SG-0839",
+          "title": "Review release entitlements for unnecessary privileged capabilities."
+        },
+        {
+          "id": "SG-0840",
+          "title": "Use an owned device and a build allowed by the program."
+        }
+      ]
+    },
+    {
+      "id": "area-43",
+      "title": "Desktop apps and browser extensions",
+      "profiles": [
+        "desktop"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Permitted desktop/extension build, owned local environment, relevant privilege boundary, and redacted configuration or test evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0841",
+          "title": "Verify the desktop application identifier is explicitly in scope."
+        },
+        {
+          "id": "SG-0842",
+          "title": "Validate desktop update signatures before installation."
+        },
+        {
+          "id": "SG-0843",
+          "title": "Keep updater metadata within a trusted source policy."
+        },
+        {
+          "id": "SG-0844",
+          "title": "Restrict local IPC methods to intended callers."
+        },
+        {
+          "id": "SG-0845",
+          "title": "Authenticate privileged IPC operations independently of window visibility."
+        },
+        {
+          "id": "SG-0846",
+          "title": "Keep untrusted renderer content away from native execution APIs."
+        },
+        {
+          "id": "SG-0847",
+          "title": "Apply appropriate Electron context isolation where relevant."
+        },
+        {
+          "id": "SG-0848",
+          "title": "Disable unnecessary Node integration in untrusted renderer contexts."
+        },
+        {
+          "id": "SG-0849",
+          "title": "Validate custom protocol handler parameters."
+        },
+        {
+          "id": "SG-0850",
+          "title": "Protect local credential stores using appropriate OS facilities."
+        },
+        {
+          "id": "SG-0851",
+          "title": "Restrict browser-extension host permissions to required sites."
+        },
+        {
+          "id": "SG-0852",
+          "title": "Validate the sender of extension messages."
+        },
+        {
+          "id": "SG-0853",
+          "title": "Keep content-script input from invoking privileged extension actions."
+        },
+        {
+          "id": "SG-0854",
+          "title": "Protect extension storage containing authentication state."
+        },
+        {
+          "id": "SG-0855",
+          "title": "Avoid injecting remote executable code into an extension."
+        },
+        {
+          "id": "SG-0856",
+          "title": "Restrict web-accessible extension resources according to their sensitivity."
+        },
+        {
+          "id": "SG-0857",
+          "title": "Validate native-messaging requests against a strict schema."
+        },
+        {
+          "id": "SG-0858",
+          "title": "Keep desktop diagnostic bundles free of unnecessary secrets."
+        },
+        {
+          "id": "SG-0859",
+          "title": "Review local service binding and authentication in an owned lab."
+        },
+        {
+          "id": "SG-0860",
+          "title": "Separate client hardening observations from a proven server-side vulnerability."
+        }
+      ]
+    },
+    {
+      "id": "area-44",
+      "title": "Webhooks, queues, and asynchronous jobs",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "api",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0861",
+          "title": "Verify webhook signatures before processing events."
+        },
+        {
+          "id": "SG-0862",
+          "title": "Bind signature verification to the raw bytes actually received."
+        },
+        {
+          "id": "SG-0863",
+          "title": "Enforce webhook timestamp freshness where supported."
+        },
+        {
+          "id": "SG-0864",
+          "title": "Reject duplicate webhook delivery identifiers after successful processing."
+        },
+        {
+          "id": "SG-0865",
+          "title": "Bind webhook events to the intended customer integration."
+        },
+        {
+          "id": "SG-0866",
+          "title": "Keep webhook destinations within approved outbound restrictions."
+        },
+        {
+          "id": "SG-0867",
+          "title": "Avoid forwarding internal credentials in webhook requests."
+        },
+        {
+          "id": "SG-0868",
+          "title": "Protect webhook secret rotation with administrative authorization."
+        },
+        {
+          "id": "SG-0869",
+          "title": "Authenticate producers before accepting queue messages."
+        },
+        {
+          "id": "SG-0870",
+          "title": "Validate message schemas before starting background work."
+        },
+        {
+          "id": "SG-0871",
+          "title": "Recheck object authorization at job execution time."
+        },
+        {
+          "id": "SG-0872",
+          "title": "Bind job-result retrieval to the requesting identity."
+        },
+        {
+          "id": "SG-0873",
+          "title": "Isolate queue consumers across tenant boundaries."
+        },
+        {
+          "id": "SG-0874",
+          "title": "Handle dead-letter messages without exposing secrets."
+        },
+        {
+          "id": "SG-0875",
+          "title": "Keep retries from repeating non-idempotent side effects."
+        },
+        {
+          "id": "SG-0876",
+          "title": "Bound retry schedules to avoid unbounded job accumulation."
+        },
+        {
+          "id": "SG-0877",
+          "title": "Honor cancellation before a queued job performs a side effect."
+        },
+        {
+          "id": "SG-0878",
+          "title": "Prevent low-trust messages from selecting arbitrary job handlers."
+        },
+        {
+          "id": "SG-0879",
+          "title": "Avoid logging sensitive message bodies by default."
+        },
+        {
+          "id": "SG-0880",
+          "title": "Use synthetic events in an owned queue when validating behavior."
+        }
+      ]
+    },
+    {
+      "id": "area-45",
+      "title": "Email, notifications, and shared links",
+      "profiles": [
+        "web",
+        "api",
+        "source"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Relevant authorized source/configuration or an expressly permitted owned-account observation; exact version and context, expected behavior, a safe baseline, and minimal redacted evidence.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0881",
+          "title": "Prevent user-controlled email fields from injecting message headers."
+        },
+        {
+          "id": "SG-0882",
+          "title": "Construct action links from trusted application origins."
+        },
+        {
+          "id": "SG-0883",
+          "title": "Keep private data out of email subjects where unnecessary."
+        },
+        {
+          "id": "SG-0884",
+          "title": "Protect notification preferences from unauthorized changes."
+        },
+        {
+          "id": "SG-0885",
+          "title": "Recheck recipient authorization before sending private notifications."
+        },
+        {
+          "id": "SG-0886",
+          "title": "Avoid sending one tenant's notification to another tenant's address list."
+        },
+        {
+          "id": "SG-0887",
+          "title": "Escape untrusted content in HTML email templates."
+        },
+        {
+          "id": "SG-0888",
+          "title": "Keep mail preview pages behind appropriate access checks."
+        },
+        {
+          "id": "SG-0889",
+          "title": "Expire sensitive shared links according to their purpose."
+        },
+        {
+          "id": "SG-0890",
+          "title": "Revoke shared links when the owner disables sharing."
+        },
+        {
+          "id": "SG-0891",
+          "title": "Bind invitation links to their original organization and role."
+        },
+        {
+          "id": "SG-0892",
+          "title": "Keep shared-link permissions narrower than owner privileges."
+        },
+        {
+          "id": "SG-0893",
+          "title": "Avoid exposing passwords or reusable secrets through notifications."
+        },
+        {
+          "id": "SG-0894",
+          "title": "Limit security-notification detail visible on a locked device."
+        },
+        {
+          "id": "SG-0895",
+          "title": "Prevent unsubscribe tokens from authorizing unrelated account operations."
+        },
+        {
+          "id": "SG-0896",
+          "title": "Protect group recipient expansion from untrusted membership input."
+        },
+        {
+          "id": "SG-0897",
+          "title": "Check that removed collaborators stop receiving private updates."
+        },
+        {
+          "id": "SG-0898",
+          "title": "Handle bounced or reassigned contact addresses without identity confusion."
+        },
+        {
+          "id": "SG-0899",
+          "title": "Use researcher-owned destinations for permitted delivery tests."
+        },
+        {
+          "id": "SG-0900",
+          "title": "Do not send real users messages as part of an unapproved experiment."
+        }
+      ]
+    },
+    {
+      "id": "area-46",
+      "title": "AI instructions and untrusted content",
+      "profiles": [
+        "ai"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Synthetic instructions and canary data, model/configuration identity, observed tool behavior, and a benign baseline.",
+      "references": [
+        "genai",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0901",
+          "title": "Keep retrieved text separate from higher-trust application instructions."
+        },
+        {
+          "id": "SG-0902",
+          "title": "Treat uploaded documents as data rather than operational commands."
+        },
+        {
+          "id": "SG-0903",
+          "title": "Keep tool-returned text from changing the agent's authorization scope."
+        },
+        {
+          "id": "SG-0904",
+          "title": "Preserve user intent when a web page requests an unrelated action."
+        },
+        {
+          "id": "SG-0905",
+          "title": "Prevent quoted instructions from silently becoming executable directives."
+        },
+        {
+          "id": "SG-0906",
+          "title": "Keep hidden document text from overriding the requested task."
+        },
+        {
+          "id": "SG-0907",
+          "title": "Handle conflicting tool output with an explicit trust policy."
+        },
+        {
+          "id": "SG-0908",
+          "title": "Restrict model-selected destinations to independently validated resources."
+        },
+        {
+          "id": "SG-0909",
+          "title": "Prevent generated text from being executed as application code implicitly."
+        },
+        {
+          "id": "SG-0910",
+          "title": "Validate structured model outputs before consuming their fields."
+        },
+        {
+          "id": "SG-0911",
+          "title": "Apply output encoding when rendering generated HTML-like content."
+        },
+        {
+          "id": "SG-0912",
+          "title": "Keep prompts from being the sole enforcement of access controls."
+        },
+        {
+          "id": "SG-0913",
+          "title": "Separate public prompt disclosure from disclosure of actual secrets."
+        },
+        {
+          "id": "SG-0914",
+          "title": "Avoid placing secrets in model context when the task does not require them."
+        },
+        {
+          "id": "SG-0915",
+          "title": "Preserve approval requirements when the model proposes a tool call."
+        },
+        {
+          "id": "SG-0916",
+          "title": "Treat model-generated claims of permission as unverified."
+        },
+        {
+          "id": "SG-0917",
+          "title": "Test injection resistance with harmless synthetic instructions and canary data."
+        },
+        {
+          "id": "SG-0918",
+          "title": "Record the model and application configuration for a reproducible evaluation."
+        },
+        {
+          "id": "SG-0919",
+          "title": "Measure whether a harmful action occurred rather than relying on suggestive wording."
+        },
+        {
+          "id": "SG-0920",
+          "title": "Distinguish a model safety refusal from application-level authorization enforcement."
+        }
+      ]
+    },
+    {
+      "id": "area-47",
+      "title": "Retrieval, embeddings, and AI memory",
+      "profiles": [
+        "ai"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Synthetic source documents, two authorized identities where needed, provenance, access policy, and observed retrieval behavior.",
+      "references": [
+        "genai",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0921",
+          "title": "Apply user authorization before retrieving private documents."
+        },
+        {
+          "id": "SG-0922",
+          "title": "Partition vector searches by the authorized tenant."
+        },
+        {
+          "id": "SG-0923",
+          "title": "Preserve source permissions when creating an embedding index."
+        },
+        {
+          "id": "SG-0924",
+          "title": "Remove deleted documents from retrievable indexes as required."
+        },
+        {
+          "id": "SG-0925",
+          "title": "Recheck permissions after a source document's audience changes."
+        },
+        {
+          "id": "SG-0926",
+          "title": "Keep retrieval caches separated by identity and tenant."
+        },
+        {
+          "id": "SG-0927",
+          "title": "Store provenance for retrieved passages."
+        },
+        {
+          "id": "SG-0928",
+          "title": "Prevent untrusted source text from changing retrieval filters."
+        },
+        {
+          "id": "SG-0929",
+          "title": "Validate document ingestion destinations and file types."
+        },
+        {
+          "id": "SG-0930",
+          "title": "Protect ingestion jobs from unauthorized source replacement."
+        },
+        {
+          "id": "SG-0931",
+          "title": "Keep private snippets out of public search previews."
+        },
+        {
+          "id": "SG-0932",
+          "title": "Restrict access to raw embeddings according to their data sensitivity."
+        },
+        {
+          "id": "SG-0933",
+          "title": "Avoid treating semantic similarity as proof that two identities are equivalent."
+        },
+        {
+          "id": "SG-0934",
+          "title": "Keep long-term agent memory within the user's intended scope."
+        },
+        {
+          "id": "SG-0935",
+          "title": "Require authorization before sharing memory across workspaces."
+        },
+        {
+          "id": "SG-0936",
+          "title": "Apply retention rules to conversation summaries and derived memories."
+        },
+        {
+          "id": "SG-0937",
+          "title": "Label stale retrieved information instead of presenting it as current evidence."
+        },
+        {
+          "id": "SG-0938",
+          "title": "Validate citations against actually retrieved sources."
+        },
+        {
+          "id": "SG-0939",
+          "title": "Use synthetic documents to test cross-user retrieval isolation."
+        },
+        {
+          "id": "SG-0940",
+          "title": "Record whether an apparent leak came from retrieval, cache, or generated guesswork."
+        }
+      ]
+    },
+    {
+      "id": "area-48",
+      "title": "AI agents and tool permissions",
+      "profiles": [
+        "ai"
+      ],
+      "method": "controlled_manual_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Mock tool calls, allowed user intent, tool authorization decision, side effects if any, and a safe baseline.",
+      "references": [
+        "genai",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0941",
+          "title": "Grant each agent only the tools required for its task."
+        },
+        {
+          "id": "SG-0942",
+          "title": "Validate tool arguments independently of model-generated explanations."
+        },
+        {
+          "id": "SG-0943",
+          "title": "Bind tool credentials to the correct user identity."
+        },
+        {
+          "id": "SG-0944",
+          "title": "Keep tool output from requesting broader credentials."
+        },
+        {
+          "id": "SG-0945",
+          "title": "Require explicit approval for actions outside existing authorization."
+        },
+        {
+          "id": "SG-0946",
+          "title": "Preserve approval checks across tool retries."
+        },
+        {
+          "id": "SG-0947",
+          "title": "Separate read permissions from write permissions."
+        },
+        {
+          "id": "SG-0948",
+          "title": "Constrain filesystem tools to the permitted workspace."
+        },
+        {
+          "id": "SG-0949",
+          "title": "Constrain network tools to permitted destinations and methods."
+        },
+        {
+          "id": "SG-0950",
+          "title": "Keep scheduling tools from creating unauthorized recurring actions."
+        },
+        {
+          "id": "SG-0951",
+          "title": "Prevent child agents from receiving broader authority than their parent."
+        },
+        {
+          "id": "SG-0952",
+          "title": "Track delegated actions to the initiating user's request."
+        },
+        {
+          "id": "SG-0953",
+          "title": "Validate recipient identity before external message delivery."
+        },
+        {
+          "id": "SG-0954",
+          "title": "Keep secret-bearing tool output out of public artifacts."
+        },
+        {
+          "id": "SG-0955",
+          "title": "Apply spending limits before invoking paid resources."
+        },
+        {
+          "id": "SG-0956",
+          "title": "Stop dependent actions after a permission or access denial."
+        },
+        {
+          "id": "SG-0957",
+          "title": "Ensure cancellation reaches queued agent actions."
+        },
+        {
+          "id": "SG-0958",
+          "title": "Require evidence for a tool action's reported completion."
+        },
+        {
+          "id": "SG-0959",
+          "title": "Use mock tools to test destructive-action boundaries safely."
+        },
+        {
+          "id": "SG-0960",
+          "title": "Record unresolved tool errors without claiming task success."
+        }
+      ]
+    },
+    {
+      "id": "area-49",
+      "title": "AI model and data pipelines",
+      "profiles": [
+        "ai"
+      ],
+      "method": "source_or_configuration_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Model/artifact identity, authorized configuration or synthetic dataset, repeatable evaluation, and documented uncertainty.",
+      "references": [
+        "genai",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0961",
+          "title": "Document which model version produced a research result."
+        },
+        {
+          "id": "SG-0962",
+          "title": "Validate the provenance of downloaded model artifacts."
+        },
+        {
+          "id": "SG-0963",
+          "title": "Avoid unsafe object loading when opening model files."
+        },
+        {
+          "id": "SG-0964",
+          "title": "Separate model configuration from untrusted evaluation inputs."
+        },
+        {
+          "id": "SG-0965",
+          "title": "Protect training and fine-tuning datasets according to their sensitivity."
+        },
+        {
+          "id": "SG-0966",
+          "title": "Require consent before using private user data for training."
+        },
+        {
+          "id": "SG-0967",
+          "title": "Keep evaluation data separate from the training set."
+        },
+        {
+          "id": "SG-0968",
+          "title": "Record contamination risks in benchmark results."
+        },
+        {
+          "id": "SG-0969",
+          "title": "Review access to model-serving administration endpoints."
+        },
+        {
+          "id": "SG-0970",
+          "title": "Apply request budgets to expensive inference operations."
+        },
+        {
+          "id": "SG-0971",
+          "title": "Bound context size before allocating model resources."
+        },
+        {
+          "id": "SG-0972",
+          "title": "Keep inference caches isolated when requests contain private data."
+        },
+        {
+          "id": "SG-0973",
+          "title": "Redact sensitive inputs from model telemetry."
+        },
+        {
+          "id": "SG-0974",
+          "title": "Validate generated dependency names before installing packages."
+        },
+        {
+          "id": "SG-0975",
+          "title": "Review generated code before granting it execution privileges."
+        },
+        {
+          "id": "SG-0976",
+          "title": "Protect model deployment credentials from inference requests."
+        },
+        {
+          "id": "SG-0977",
+          "title": "Track human-reviewed false positives in research evaluations."
+        },
+        {
+          "id": "SG-0978",
+          "title": "Use deterministic local fixtures where they adequately test the boundary."
+        },
+        {
+          "id": "SG-0979",
+          "title": "Avoid claiming benchmark performance as proof of real-world vulnerability discovery."
+        },
+        {
+          "id": "SG-0980",
+          "title": "Record uncertainty and unsupported capabilities in every AI-assisted finding."
+        }
+      ]
+    },
+    {
+      "id": "area-50",
+      "title": "Evidence, validation, and reporting",
+      "profiles": [
+        "all"
+      ],
+      "method": "document_review",
+      "prerequisites": "Current permission for the exact asset and method; owned test identities where needed. Use local synthetic fixtures when an operation could change data, spend money, or affect availability.",
+      "evidence": "Minimal reproducible evidence, permission record, negative control, impact reasoning, redaction, and the remaining validation questions.",
+      "references": [
+        "wstg",
+        "cheatsheets"
+      ],
+      "checks": [
+        {
+          "id": "SG-0981",
+          "title": "Record the exact permitted asset associated with a hypothesis."
+        },
+        {
+          "id": "SG-0982",
+          "title": "Record the time and environment of each observation."
+        },
+        {
+          "id": "SG-0983",
+          "title": "Separate raw observation from interpretation."
+        },
+        {
+          "id": "SG-0984",
+          "title": "Document the prerequisites needed to reproduce a result."
+        },
+        {
+          "id": "SG-0985",
+          "title": "Use a benign baseline that demonstrates expected behavior."
+        },
+        {
+          "id": "SG-0986",
+          "title": "Use a negative control that rules out an obvious alternate explanation."
+        },
+        {
+          "id": "SG-0987",
+          "title": "Repeat a result only within the permitted request budget."
+        },
+        {
+          "id": "SG-0988",
+          "title": "Record the affected user's role using synthetic identifiers."
+        },
+        {
+          "id": "SG-0989",
+          "title": "Minimize sensitive data in screenshots and saved responses."
+        },
+        {
+          "id": "SG-0990",
+          "title": "Redact authentication material before storing a report draft."
+        },
+        {
+          "id": "SG-0991",
+          "title": "Describe the security boundary that was crossed."
+        },
+        {
+          "id": "SG-0992",
+          "title": "Explain practical impact without overstating the evidence."
+        },
+        {
+          "id": "SG-0993",
+          "title": "Check program exclusions before classifying a lead as reportable."
+        },
+        {
+          "id": "SG-0994",
+          "title": "Check whether the same root cause already has a saved investigation."
+        },
+        {
+          "id": "SG-0995",
+          "title": "Record unsuccessful and inconclusive attempts honestly."
+        },
+        {
+          "id": "SG-0996",
+          "title": "Keep laboratory reproduction separate from proof on a live asset."
+        },
+        {
+          "id": "SG-0997",
+          "title": "Link a code hypothesis to the actual deployed version where known."
+        },
+        {
+          "id": "SG-0998",
+          "title": "Include an appropriate remediation direction in a validated draft."
+        },
+        {
+          "id": "SG-0999",
+          "title": "Require separate authorization before submitting or contacting a program."
+        },
+        {
+          "id": "SG-1000",
+          "title": "Keep accepted reports, confirmed bugs, and paid bounties as separate outcomes."
+        }
+      ]
+    }
+  ],
+  "ai_context": {
+    "app.py": [
+      "SG-0261",
+      "SG-0263",
+      "SG-0264",
+      "SG-0266",
+      "SG-0268",
+      "SG-0789"
+    ],
+    "ci_identity.py": [
+      "SG-0241",
+      "SG-0242",
+      "SG-0245",
+      "SG-0246",
+      "SG-0247",
+      "SG-0250"
+    ]
+  }
+}

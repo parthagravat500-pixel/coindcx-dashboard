@@ -4,6 +4,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -
 WORKDIR /app
 COPY *.py index.html ui.js /app/
 COPY ci/isolated_checks.py ci/ai_review.py ci/ai_bridge.py /app/ci/
+COPY ci/export_checkpoints.py /app/ci/
+COPY checkpoints/catalog.json checkpoints/CHECKPOINTS.md /app/checkpoints/
 USER 65532:65532
 ENV DATA_DIR=/tmp/scopeguard-test-data PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 CMD ["python", "-m", "ci.isolated_checks"]

@@ -33,6 +33,7 @@ import autopilot
 import leadwork
 import programapi
 import programresearch
+import researchcheckpoints
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -55,6 +56,7 @@ def db():
 
 
 def init():
+    researchcheckpoints.inventory()
     with db() as c:
         c.executescript('''
         PRAGMA journal_mode=WAL;
@@ -226,6 +228,7 @@ def program_research_worker():
             if time.time()>=next_receipt:
                 with db() as c:
                     print(json.dumps(programresearch.receipt(c,DATA,os.environ.get('RENDER_GIT_COMMIT',''))),flush=True)
+                    print(json.dumps(researchcheckpoints.receipt(c,os.environ.get('RENDER_GIT_COMMIT',''),ROOT)),flush=True)
                 next_receipt=time.time()+300
         except Exception:
             # No external error text or credentials enter events or host logs.
@@ -356,6 +359,7 @@ def snapshot():
                 'autopilot': autopilot.snapshot(c),
                 'lead_inbox': leadwork.snapshot(c),
                 'program_research': programresearch.snapshot(c,DATA),
+                'research_checkpoints': researchcheckpoints.summary(c,ROOT),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
@@ -539,6 +543,15 @@ class Handler(BaseHTTPRequestHandler):
                                                'Set-Cookie': uberconnect.cookie(clear=True)})
         if self.path == '/api/state':
             return self.reply(200, json.dumps(snapshot()))
+        if self.path == '/api/checkpoints' or self.path.startswith('/api/checkpoints?'):
+            try:
+                with db() as c:result=researchcheckpoints.browse(c,self.path.partition('?')[2],ROOT)
+                return self.reply(200,json.dumps(result))
+            except ValueError as error:
+                return self.reply(400,json.dumps({'error':str(error)}))
+        if self.path == '/research-checkpoints.md':
+            return self.reply(200,(ROOT/'checkpoints/CHECKPOINTS.md').read_text(),'text/plain',
+                              headers={'Content-Disposition':'attachment; filename="ScopeGuard-1000-checkpoints.md"'})
         if self.path.startswith('/api/program-research?'):
             from urllib.parse import parse_qs
             try:

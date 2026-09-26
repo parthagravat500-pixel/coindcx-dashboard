@@ -1,5 +1,6 @@
 """Offline preparation from saved scope. Never grants permission or makes requests."""
 import re
+import researchcheckpoints
 from urllib.parse import urlsplit
 
 LIMIT = 80
@@ -76,6 +77,7 @@ def build(evidence,*,fresh=False,status='',assets=False):
         ('automation','Automation rules'),('accounts','Account and identity requirements'),
         ('limits','Request limits'),('exclusions','Exclusions and special conditions'))]
     out={'prepared':prepared,'counts':counts,'candidate_count':counts['web']+counts['source'],
+         'checkpoints':researchcheckpoints.plan_summary(evidence,fresh=fresh,status=status),
          'next_step':next_step,'conditions':conditions,'testing_enabled':False,
          'no_login_testing':'unverified','confirmed_bugs':0,
          'limitation':'Capability matches are research preparation, not testing permission or vulnerability findings. Full policy, scope instructions, exclusions and linked rules still apply.'}
