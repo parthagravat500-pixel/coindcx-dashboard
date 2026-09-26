@@ -287,6 +287,9 @@ def finalize(evidence):
     if programapi.canonical(evidence['policy_url'])=='hackerone:mozilla':
         evidence['automation_permission']='restricted'
         evidence['unresolved'].append('Mozilla production automation remains blocked.')
+    if programapi.canonical(evidence['policy_url'])=='hackerone:flipkart':
+        evidence['automation_permission']='restricted'
+        evidence['unresolved'].append('Flipkart rules ask researchers to refrain from automated scanners and tools. The mobile-app policy conflicts with scope entries; clarification is needed.')
     kinds={x['type'].lower() for x in evidence['scope']}
     evidence['method_candidates']=[]
     if any('source' in k or 'code' in k for k in kinds):evidence['method_candidates'].append('Source review is supported for authorized Python repositories; no repository is enrolled automatically.')

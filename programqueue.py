@@ -29,6 +29,9 @@ def automation_blocker(policy, url=''):
     """Restrictive standing policy; this never grants testing permission."""
     p = urlsplit(policy)
     hosts = ((urlsplit(url).hostname or '').lower(), (p.hostname or '').lower())
+    if (any(h in ('flipkart.com', 'myntra.com', 'payzippy.com') or h.endswith(('.flipkart.com', '.myntra.com', '.payzippy.com')) for h in hosts)
+            or p.hostname == 'hackerone.com' and p.path.strip('/').split('/')[0] == 'flipkart'):
+        return 'Flipkart program rules restrict automated scanners and tools'
     if (any(h in ('mozilla.org','mozilla.com') or h.endswith(('.mozilla.org','.mozilla.com')) for h in hosts)
             or p.hostname == 'hackerone.com' and p.path.strip('/').split('/')[0] == 'mozilla'):
         return 'Mozilla automated production testing is blocked'

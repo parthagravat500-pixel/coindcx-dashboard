@@ -23,6 +23,13 @@ vm.runInContext(fs.readFileSync('ui.js','utf8'),context);
 setImmediate(async()=>{
  const descendants=n=>[n,...(n.children||[]).filter(x=>x&&typeof x==='object').flatMap(descendants)];
  const savedHunt=state.focused_research;
+ const savedPublic=state.account_free;
+ state.account_free={healthy:true,paused:false,window_finished:false,expires:1790478000,pages_reviewed:2,candidates:1,policy_reviewed:4,requests:3,confirmed_bugs:0,limitation:'Patterns need validation.',policy_counts:{document_collected:4,queued:10},programs:[{name:'<script>Program</script>',policy:'https://example.com/security',state:'complete',requests:3,result:{pages:[{kind:'script',state:'reviewed',url:'https://example.com/app.js',patterns:[{rule:'direct_url_to_html'}]}]}}]};
+ vm.runInContext('renderPublicResearch();openPublicResearch()',context);
+ assert.match(nodes.get('publicResearchSummary').textContent,/2 public pages\/scripts reviewed/);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Program</script>'));
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent.includes('Confirmed bugs: 0')));
+ state.account_free=savedPublic;vm.runInContext('renderPublicResearch()',context);
  state.focused_research={healthy:true,paused:false,browser_available:false,metrics:{programs_testing:0,features_mapped:0,suspected:1,reproduced:1,reports_ready:0},
   profiles:[],maps:[],recent_runs:[],learning:[],limitation:'Exact owned resources only.',
   focus:[{id:'a'.repeat(24),name:'<script>Untrusted program</script>',policy:'https://hackerone.com/example',status:'Preparing',existing_jobs:0,blockers:['Owned accounts required'],candidates:[]}],

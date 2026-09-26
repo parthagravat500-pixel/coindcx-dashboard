@@ -37,6 +37,7 @@ import researchcheckpoints
 import checkpointengine
 import huntops
 import browserruntime
+import accountfree
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -93,6 +94,7 @@ def init():
         leadwork.init(c)
         programresearch.init(c)
         huntops.init(c)
+        accountfree.init(c)
         checkpointengine.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
@@ -268,6 +270,19 @@ def focused_research_worker():
         WAKE.wait(10)
 
 
+def accountfree_worker():
+    next_receipt = 0
+    while True:
+        try:
+            accountfree.tick(db, log)
+            if time.time() >= next_receipt:
+                with db() as c: print(json.dumps(accountfree.receipt(c)), flush=True)
+                next_receipt = time.time() + 120
+        except Exception:
+            print('{"kind":"scopeguard_accountfree_health","healthy":false}', flush=True)
+        WAKE.wait(10)
+
+
 def supervisor_worker():
     while True:
         try:
@@ -394,6 +409,7 @@ def snapshot():
                 'research_checkpoints': researchcheckpoints.summary(c,ROOT),
                 'checkpoint_automation': checkpointengine.summary(c),
                 'focused_research': huntops.snapshot(c),
+                'account_free': accountfree.snapshot(c),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
@@ -704,6 +720,7 @@ if __name__ == '__main__':
     threading.Thread(target=program_research_worker, daemon=True).start()
     threading.Thread(target=checkpoint_worker, daemon=True).start()
     threading.Thread(target=focused_research_worker, daemon=True).start()
+    threading.Thread(target=accountfree_worker, daemon=True).start()
     threading.Thread(target=reporting_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
     threading.Thread(target=autonomous_worker, args=(server.server_address[1],), daemon=True).start()

@@ -520,6 +520,7 @@ function homeHistory(){
  return rows.sort((a,b)=>b.at-a.at);
 }
 function renderHome(){
+ renderPublicResearch();
  renderHunt();
  renderCheckpointSummary();
  renderProgramResearch();
@@ -959,6 +960,25 @@ function renderHunt(){
  $('huntNext').textContent=!h?'':h.profiles.length?'Open a workflow to see covered resources, its next permitted run and saved evidence.':'The shortlist is prepared automatically. Deeper tests start when a program has verified permission, working test accounts and owned test records.';
  $('openHunt').disabled=$('openHuntQuality').disabled=!h;
 }
+function renderPublicResearch(){
+ const p=state.account_free;
+ $('publicResearchBadge').textContent=!p?'Unavailable':p.paused?'Paused':p.window_finished?'Window ended':p.healthy?'Running':'Checking';
+ $('publicResearchSummary').textContent=p?p.pages_reviewed+' public pages/scripts reviewed · '+p.candidates+' code patterns need validation · '+p.policy_reviewed+' policy requests finished.':'This server has no account-free batch results yet.';
+ $('publicResearchNext').textContent=p?'Batch deadline: '+date(p.expires)+'. The main pause button stops requests. Policy collection never adds scan targets.':'';
+ $('openPublicResearch').disabled=!p;
+}
+function openPublicResearch(){
+ const p=state.account_free,root=modal('Research without accounts');if(!p)return;
+ root.append(el('p',p.limitation),el('p','Public-page requests made: '+p.requests+' · Confirmed bugs: '+p.confirmed_bugs));
+ for(const batch of p.programs){const box=el('article',undefined,'item');box.append(el('strong',batch.name),el('p',batch.state.replaceAll('_',' ')+' · '+batch.requests+' requests'),safeLink('Reviewed program rules ↗',batch.policy));
+  for(const page of batch.result.pages||[]){box.append(el('small',page.kind+' · '+page.state.replaceAll('_',' ')),safeLink('Inspected URL ↗',page.url));for(const pattern of page.patterns||[])box.append(el('p',pattern.rule.replaceAll('_',' ')+' · unverified syntax candidate'));}
+  root.append(box);
+ }
+ root.append(el('h3','Independent program policy collection'));
+ for(const [status,count] of Object.entries(p.policy_counts))root.append(el('p',status.replaceAll('_',' ')+': '+count));
+ root.append(el('p','These are document requests, not completed security tests. No reports have been submitted.'));
+}
+$('openPublicResearch').onclick=openPublicResearch;
 function openHunt(){
  const h=state.focused_research,root=modal('Focused bug research');if(!h)return;
  root.append(el('p',h.limitation),el('h3','Your five-program shortlist'));

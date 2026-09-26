@@ -1,0 +1,61 @@
+{
+  "id": "overnight-2026-09-27",
+  "reviewed": 1790460745,
+  "expires": 1790478000,
+  "programs": [
+    {
+      "id": "github",
+      "name": "GitHub and npm",
+      "policy": "https://bounty.github.com/rules",
+      "scope_sources": [
+        "https://bounty.github.com/scope",
+        "https://bounty.github.com/targets/github.html",
+        "https://bounty.github.com/targets/npm-registry.html",
+        "https://bounty.github.com/ineligible"
+      ],
+      "review": "Low-volume automation allowed. Limit to public login HTML and referenced first-party scripts. No repositories, user information, accounts, upstream dependencies, payloads or form actions.",
+      "pages": [
+        "https://github.com/login",
+        "https://www.npmjs.com/login"
+      ],
+      "script_hosts": [
+        "github.githubassets.com",
+        "www.npmjs.com"
+      ],
+      "budget": 6
+    },
+    {
+      "id": "hackerone",
+      "name": "HackerOne approved test pages",
+      "policy": "https://hackerone.com/security",
+      "review": "Policy reviewed in browser September 27 IST. AI research safe harbor; X-Bug-Bounty tool identifier accepted. Only specifically approved test-program pages and first-party scripts. No reports, customer programs, customer records or DoS testing.",
+      "pages": [
+        "https://hackerone.com/security-test-sandbox",
+        "https://hackerone.com/security-test-invite-only"
+      ],
+      "script_hosts": [
+        "hackerone.com"
+      ],
+      "headers": {
+        "X-Bug-Bounty": "ScopeGuard"
+      },
+      "budget": 6
+    },
+    {
+      "id": "livedune",
+      "name": "LiveDune",
+      "policy": "https://landing.cdn.livedune.com/files/en/bug_bounty.pdf",
+      "scope_sources": [
+        "https://livedune.com/"
+      ],
+      "review": "Published scope includes *.livedune.com and automation is limited to 3 requests/second. Only public sign-in page and directly referenced scripts on the same host, no customer data or login submission. Raw scanner reports are ineligible without demonstrated impact.",
+      "pages": [
+        "https://pro.livedune.com/auth/signIn?language=en"
+      ],
+      "script_hosts": [
+        "pro.livedune.com"
+      ],
+      "budget": 5
+    }
+  ]
+}
