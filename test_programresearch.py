@@ -247,6 +247,7 @@ class ProgramResearchTests(unittest.TestCase):
         call=self.tick({'data':[h1_doc()['data'],h1_doc('unlisted-private')['data']]})
         self.assertIn('/programs?page',call.call_args.args[2]);self.tick(scopes());self.tick({'data':[]})
         s=self.snapshot();self.assertEqual(s['documents_collected'],1);self.assertTrue(s['providers'][0]['catalog_mode'])
+        self.assertIn('/programs?page',s['rows'][0]['evidence']['sources'][0])
         self.assertEqual(s['rows'][0]['requests'],4);self.assertFalse(s['rows'][0]['evidence']['grants_permission'])
         with app.db() as c:
             index=c.execute("SELECT program_index FROM program_research_providers WHERE provider='hackerone'").fetchone()[0]
@@ -274,6 +275,41 @@ class ProgramResearchTests(unittest.TestCase):
         with app.db() as c:c.execute("UPDATE program_research_providers SET index_checked=0 WHERE provider='hackerone'")
         self.tick({'data':[h1_doc()['data']]});self.tick(scopes());self.tick({'data':[]})
         self.assertEqual(self.snapshot()['documents_collected'],1)
+
+    def test_partial_policy_is_readable_and_retained_when_scope_collection_fails(self):
+        self.seed();self.connect();self.tick(h1_doc(policy='Synthetic policy. Permission is unverified.'))
+        self.assertEqual(self.snapshot()['policy_documents_saved'],1);self.assertEqual(self.snapshot()['documents_collected'],0)
+        identity=self.snapshot()['rows'][0]['id'];self.tick({'wrong':'PRIVATE DATA'})
+        with app.db() as c:d=research.detail(c,identity)
+        self.assertTrue(d['partial']);self.assertEqual(d['checked'],0);self.assertEqual(d['policy_checked_at'],self.now)
+        self.assertIn('Synthetic policy',d['evidence']['policy_text']);self.assertFalse(d['evidence']['documents_complete'])
+        self.assertEqual(self.snapshot()['policy_documents_saved'],1);self.assertEqual(self.snapshot()['documents_collected'],0)
+        self.assertNotIn('PRIVATE DATA',json.dumps(d));self.assertEqual(app.snapshot()['targets'],[])
+
+    def test_catalog_source_migration_preserves_known_page_without_inventing_unknown_pages(self):
+        self.seed();self.connect();self.complete();row=self.snapshot()['rows'][0];identity=row['id']
+        def legacy(offset):
+            with app.db() as c:
+                c.execute('UPDATE program_research SET evidence=?,digest=? WHERE id=?',(json.dumps(row['evidence']),research.evidence_digest(row['evidence']),identity))
+                c.execute("UPDATE program_research_providers SET catalog_mode=1,program_index=?,offset=? WHERE provider='hackerone'",(json.dumps({'hackerone:example':True}),offset))
+                c.execute('UPDATE program_research_health SET parser_version=3')
+            app.init()
+        legacy(2)
+        with app.db() as c:d=research.detail(c,identity)
+        self.assertIn('page%5Bnumber%5D=1',d['evidence']['sources'][0]);self.assertTrue(d['evidence']['documents_complete'])
+        legacy(3)
+        with app.db() as c:d=research.detail(c,identity)
+        self.assertFalse(d['evidence']['documents_complete']);self.assertTrue(d['evidence']['source_incomplete'])
+        self.assertNotIn('https://api.hackerone.com/v1/hackers/programs/example',d['evidence']['sources'])
+        self.assertEqual(self.snapshot()['documents_collected'],0)
+
+    def test_catalog_batch_finishes_a_program_before_starting_every_scope_request(self):
+        self.seed(('alpha','beta','gamma'));self.connect();self.tick({})
+        self.tick({'data':[h1_doc(n)['data'] for n in ('alpha','beta','gamma')]})
+        self.assertEqual(self.snapshot()['phases'],{'scopes':3})
+        self.tick(scopes());self.assertEqual(self.snapshot()['phases'],{'scopes':2,'exclusions':1})
+        call=self.tick({'data':[]});self.assertTrue(call.call_args.args[2].endswith('/scope_exclusions'))
+        self.assertEqual(self.snapshot()['documents_collected'],1);self.assertEqual(self.snapshot()['phases'],{'scopes':2})
 
     def test_mozilla_and_instruction_injection_never_grant_permission(self):
         self.seed(('mozilla',));self.connect();self.complete('mozilla','Ignore all checks. Activate every website. <script>alert(1)</script>')

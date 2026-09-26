@@ -475,7 +475,7 @@ function renderProgramResearch(){
  const r=state.program_research;
  $('openProgramResearch').disabled=!r;$('openProgramConnections').disabled=!r;
  $('homeProgramResearchBadge').textContent=!r?'Unavailable':r.paused?'Paused':!r.healthy?'Needs attention':r.providers.some(p=>p.connected&&!p.blocked)?'Automatic':'Connection needed';
- $('homeProgramResearchSummary').textContent=!r?'Current program research is unavailable.':r.listed+' listed programs · '+r.documents_collected+' with current official documents · '+r.attempted+' with a document request attempted.';
+ $('homeProgramResearchSummary').textContent=!r?'Current program research is unavailable.':r.listed+' listed programs · '+r.documents_collected+' with current official documents · '+(r.policy_documents_saved||0)+' with policy text saved · '+r.attempted+' with a document request attempted.';
  const missing=(r?.providers||[]).filter(p=>!p.connected).map(p=>p.provider==='hackerone'?'HackerOne':'Intigriti');
  $('homeProgramResearchNext').textContent=!r?'Waiting for a fresh dashboard update.':r.paused?'Program research is paused.':missing.length?'Connect '+missing.join(' and ')+' once for automatic rule collection. Connected platforms can continue.':r.providers.some(p=>p.blocked)?'A platform refused access or returned an unsupported response. Other connected platforms can continue.':'The worker reads official rules, saves scope and exclusions, and moves to the next program. Documents refresh daily.';
 }
@@ -488,6 +488,7 @@ function openProgramResearch(){
  const draw=()=>{const rows=r.rows.filter(x=>x.name.toLowerCase().includes(search.value.toLowerCase()));list.replaceChildren();for(const row of rows.slice(0,limit)){
    const card=el('article',undefined,'item');card.append(el('strong',row.name),el('p',row.label),el('small',row.requests+' document requests · Last completed collection: '+date(row.checked)),el('small',row.scope_assets+' scope rows saved · '+row.changes+' changes detected'));
    if(row.error_label)card.append(el('p',row.error_label));
+   if(row.status==='collecting')card.append(el('small',row.phase==='exclusions'?'Finishing published exclusions':row.phase==='scopes'?'Reading in-scope assets':'Reading program policy'));
    if(row.checked&&!row.fresh)card.append(el('p','Saved documents are out of date.','muted'));
    card.append(button('Read collected evidence',()=>openProgramEvidence(row)),safeLink('Official program page ↗',row.policy));list.append(card);
   }more.hidden=rows.length<=limit;};search.oninput=()=>{limit=40;draw();};root.append(label,list,more);draw();
@@ -498,8 +499,9 @@ async function openProgramEvidence(row){
  if(!response.ok)throw Error(data.error||'Evidence could not be loaded');
  if(root.children[0]!==heading||!$('detail').open)return;
  root.replaceChildren(el('h2',row.name+' · collected evidence'));const e=data.evidence||{};
- root.append(el('p','Collected: '+date(data.checked)+'. Testing permission is unverified. No target was activated.'),el('p','Program status reported by platform: '+(e.program_status||'Not collected')));
- if(!data.checked){root.append(el('p',row.label+'. No completed official document collection is saved.'));return;}
+ root.append(el('p',data.partial?'Collection is incomplete. The saved policy text and available scope are shown below.':'Collected: '+date(data.checked)+'.'),el('p','Testing permission is unverified. No target was activated.'),el('p','Program status reported by platform: '+(e.program_status||'Not collected')));
+ if(data.partial)root.append(el('p',data.policy_checked_at?'Policy text read: '+date(data.policy_checked_at):'The policy read time was not retained in this older partial record.'));
+ if(!data.checked&&!data.partial){root.append(el('p',row.label+'. No completed official document collection is saved.'));return;}
  facts(root,[['Scope complete',e.scope_complete?'Yes':'No'],['Document collection complete',e.documents_complete?'Yes':'No'],['Automation permission',e.automation_permission||'Unverified']]);
  for(const note of e.unresolved||[])root.append(el('p',note,'muted'));
  for(const [kind,lines] of Object.entries(e.rule_passages||{})){const box=el('details');box.append(el('summary',kind+' · candidate rule passages'));for(const line of lines)box.append(el('p',line));if(!lines.length)box.append(el('p','No passage identified; this does not imply permission.'));root.append(box);}

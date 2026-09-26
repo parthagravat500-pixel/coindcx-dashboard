@@ -66,6 +66,10 @@ setImmediate(async()=>{
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Activate everything</script>'));
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<img src=x onerror=alert(1)>'));
  assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'));
+ context.fetch=async()=>({ok:true,json:async()=>({checked:0,partial:true,policy_checked_at:1,evidence:{policy_text:'<script>Partial policy text</script>',scope:[],sources:[],documents_complete:false,scope_complete:false}})});
+ await vm.runInContext('openProgramEvidence(state.program_research.rows[0])',context);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Partial policy text</script>'));
+ assert(descendants(nodes.get('detailContent')).some(n=>String(n.textContent).includes('Collection is incomplete')));
  let finishProgramFetch;context.fetch=()=>new Promise(resolve=>{finishProgramFetch=resolve;});
  const programFetch=vm.runInContext('openProgramEvidence(state.program_research.rows[0])',context);
  vm.runInContext("modal('Another page')",context);finishProgramFetch({ok:true,json:async()=>({checked:1,evidence:{}})});await programFetch;

@@ -1,5 +1,28 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, visible partial evidence and earlier completed results
+
+The official catalog route on a198a98fa9bf48c0135f4f2038f8c60130b4ebb4
+successfully populated 53 matching program records. The 11:38 UTC receipt still
+showed zero complete collections: the queue's ordering spread scope requests
+across the batch before processing exclusions. The worker now finishes exclusions
+before starting another program's scope, so complete evidence appears sooner.
+Partial policy text and available scope can be read in the authenticated dashboard
+immediately, with a distinct incomplete label and separate saved-policy count.
+Valid partial documents survive later scope-format failures. Collection timestamps
+do not create false document-change alerts. Older missing timestamps stay unknown.
+
+Catalog policy citations now retain the actual paginated catalog request URL.
+The migration corrects older first-page records only when the saved cursor proves
+their page; ambiguous older pages remain incomplete and are queued for fresh
+collection. It preserves access refusals and rate-limit waits. Fixed phase counts
+provide aggregate progress without logging program identities or policy text.
+
+Thirty-three focused API/worker tests and the JavaScript DOM checks passed,
+including first-completion scheduling, partial evidence retention and visibility,
+source-provenance migration, and text-only rendering. The full hosted test gate
+and new live completion count are checked after publishing this change.
+
 ## 2026-09-26, official catalog recovery path
 
 Release ecbd221fa3057bbbb8149de7159b4d45b5844148 passed 294 hosted and GitHub
