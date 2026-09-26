@@ -18,8 +18,10 @@ import checkpointstatic
 import programqueue
 import researchcheckpoints as catalog
 import sourceaudit
+import boundarysuite
+import huntops
 
-VERSION = '2026.09.26.2'
+VERSION = '2026.09.26.3'
 INTERVAL = 5
 REFRESH = 900
 BATCH = 16
@@ -42,6 +44,7 @@ ADAPTERS = {**{k: 'policy' for k in catalog.POLICY_RULES},
             **{k: 'source' for k in checkpointstatic.IDS},
             **{k: 'headers' for k in HEAD_RULES}, **{k: 'headers' for k in COOKIE_RULES},
             **{k: 'owned_validation' for k in OWNED_RULES}, 'SG-0161': 'access'}
+ADAPTERS.update({k:'workflow' for k in boundarysuite.CHECKPOINTS.values() if k not in ADAPTERS})
 LIMITATION = ('All 1,000 checkpoints receive a coverage decision. Only implemented adapters with current '
               'evidence count as executed. Response observations and source patterns do not validate a '
               'whole security control. Runtime results apply only to the recorded resource and method. '
@@ -202,6 +205,8 @@ def build(c, context, root=catalog.ROOT, now=None):
                     support[key] = {**row, 'job': receipt['job']}
             elif key not in support:
                 support[key] = observation('blocked', 'Saved evidence is stale or its permission/configuration changed. A fresh authorized run is required.')
+    for key,row in huntops.checkpoint_support(c,context).items():
+        if support.get(key,{}).get('state')!='runtime_failed' or row['state']=='runtime_failed':support[key]=row
     rows = []
     for group in catalog._catalog()['categories']:
         suggested = not plan or group['id'] in plan['category_ids']
@@ -220,6 +225,7 @@ def build(c, context, root=catalog.ROOT, now=None):
                     'headers': 'Waiting for an existing exact-URL HEAD job with valid program permission and a successful response.',
                     'access': 'Waiting for an approved owned-resource comparison with authenticated controls.',
                     'owned_validation': 'This adapter tests only the owned ScopeGuard app; other apps need a suitable authorized test profile.',
+                    'workflow': 'An approved owned-account workflow with this exact feature and resource is required.',
                 }[adapter]
                 result = observation(state, note)
             rows.append({**entry, 'category': group['title'], 'category_id': group['id'],

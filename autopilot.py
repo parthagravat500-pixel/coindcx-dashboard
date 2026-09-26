@@ -131,6 +131,9 @@ def jobs(c, now=None):
 def next_job(c, now=None, supported=KINDS):
     now = int(time.time()) if now is None else now
     if c.execute('SELECT paused FROM settings').fetchone()[0]: return None
+    # A focused workflow uses the same global dispatch boundary and program gap.
+    if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='hunt_runs'").fetchone():
+        if c.execute("SELECT 1 FROM hunt_runs WHERE state='running' AND lease_until>?",(now,)).fetchone():return None
     ready = [j for j in jobs(c,now) if j['kind'] in supported and not j['blocker'] and j['ready_at'] <= now]
     ranks = {'access':0,'gitlab_pair':0,'gitlab':1,'owned_validation':2,'headers':3}
     return min(ready,key=lambda j:(j['last_started'],ranks[j['kind']],j['ready_at'],j['key'])) if ready else None

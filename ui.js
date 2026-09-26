@@ -87,7 +87,7 @@ async function openCheckpoints(options={}){
 let state, gitlabSetupDraft=null, gitlabSetupOpened=false, liveConnected=false, refreshVersion=0;
 const $ = id => document.getElementById(id);
 function el(tag, text, cls) { const n = document.createElement(tag); if(text !== undefined) n.textContent = text; if(cls) n.className = cls; return n; }
-function button(text, action) { const b = el('button', text, 'secondary'); b.onclick = async () => {b.disabled=true;try{await action();}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};return b; }
+function button(text, action) { const b = el('button', text, 'secondary'); b.type='button'; b.onclick = async () => {b.disabled=true;try{await action();}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};return b; }
 async function change(path, data) {
   const r = await fetch(path, {method:'POST', headers:{'Content-Type':'application/json','X-CSRF-Token':state.csrf}, body:JSON.stringify(data)});
   const result = await r.json(); if(!r.ok) throw Error(result.error || 'Request failed'); $('message').textContent = ''; await refresh();
@@ -520,6 +520,7 @@ function homeHistory(){
  return rows.sort((a,b)=>b.at-a.at);
 }
 function renderHome(){
+ renderHunt();
  renderCheckpointSummary();
  renderProgramResearch();
  for(const id of ['openHomeResults','openHomeBlockers','openHomeActivity'])$(id).disabled=false;
@@ -949,3 +950,73 @@ function openSourceWatch(){
  form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/source-watch',{repository:inputs.repository.value.trim(),branch:inputs.branch.value.trim(),subdirectory:inputs.subdirectory.value.trim(),rules:rules.value,authorized:confirmed.checked,expires:Math.floor(Date.now()/1000)+7*86400-60});openSourceWatch();}catch(err){status.textContent=err.message;}finally{submit.disabled=false;}};root.append(form);
 }
 $('openSourceWatch').onclick=openSourceWatch;
+
+function renderHunt(){
+ const h=state.focused_research,m=h?.metrics||{};
+ $('huntBadge').textContent=!h?'Unavailable':h.paused?'Paused':h.healthy?'Running':'Checking';
+ $('huntSummary').textContent=h?(h.metrics.programs_testing+' programs ready for configured tests · '+m.suspected+' possible issues awaiting review.'):'Focused research is unavailable from this server version.';
+ for(const [id,key] of [['huntPrograms','programs_testing'],['huntFeatures','features_mapped'],['huntReproduced','reproduced'],['huntReports','reports_ready']])$(id).textContent=h?String(m[key]??0):'—';
+ $('huntNext').textContent=!h?'':h.profiles.length?'Open a workflow to see covered resources, its next permitted run and saved evidence.':'The shortlist is prepared automatically. Deeper tests start when a program has verified permission, working test accounts and owned test records.';
+ $('openHunt').disabled=$('openHuntQuality').disabled=!h;
+}
+function openHunt(){
+ const h=state.focused_research,root=modal('Focused bug research');if(!h)return;
+ root.append(el('p',h.limitation),el('h3','Your five-program shortlist'));
+ if(!h.focus.length)root.append(el('p','Waiting for the saved program directory.'));
+ for(const pack of h.focus){const box=el('article',undefined,'item');box.append(el('strong',pack.name),el('p',pack.status+' · '+pack.existing_jobs+' existing permitted jobs'),safeLink('Program rules ↗',pack.policy));
+  for(const reason of pack.blockers)box.append(el('p',reason,'muted'));
+  for(const asset of pack.candidates)box.append(el('p','Candidate for preparation: '+asset.asset));
+  const program=state.workflow?.programs?.find(p=>p.id===pack.id);if(program)box.append(button('Open program',()=>openProgram(program)));
+  root.append(box);
+ }
+ root.append(el('h3','Configured workflows'));
+ for(const p of h.profiles){const box=el('article',undefined,'item');box.append(el('strong',p.name),el('p',p.blocker||p.state),el('p','Next permitted run: '+date(p.due)));
+  const config=p.configuration;box.append(el('p',config.resources.length+' owned resources · '+config.accounts.length+' test accounts · maximum '+config.request_budget+' requests per run'));
+  for(const r of config.resources)box.append(el('small',r.id+' · '+r.feature.replaceAll('_',' ')+' · owner '+r.owner));
+  if(p.enabled)box.append(button('Disable workflow',()=>change('/api/workflows/disable',{id:p.id})));
+  root.append(box);
+ }
+ if(!h.profiles.length)root.append(el('p','No deeper external workflow has been configured. Listed programs are not counted as tests.'));
+ root.append(button('Prepare an owned-account workflow',()=>workflowForm()),el('h3','Workflow maps'));
+ for(const m of h.maps){const box=el('details');box.append(el('summary',m.engine+' · '+m.pages.length+' mapped pages · '+(m.current?'Current':'Needs refresh')),el('p',m.reason||'Exact permitted GET pages only.'),el('pre',JSON.stringify(m.pages,null,2)));root.append(box);}
+ root.append(el('h3','Investigations'));
+ if(!h.cases.length)root.append(el('p','No repeated access failure has been saved by the new workflow runner.'));
+ for(const item of h.cases)root.append(button(item.feature.replaceAll('_',' ')+' · '+item.disposition+(item.current?'':' · historical'),()=>openHuntCase(item)));
+ root.append(el('h3','Recent runs'));
+ for(const run of h.recent_runs)root.append(el('p',run.kind+' · '+run.state+' · '+date(run.finished||run.started)));
+}
+function openHuntQuality(){
+ const h=state.focused_research,root=modal('Detection quality');if(!h)return;const b=h.benchmark;
+ root.append(el('p','The benchmark checks whether the runner recognizes planted failures and rejects misleading responses. These results measure only the fixed lab cases.'));
+ facts(root,[['Lab cases passed',(b.passed??0)+' / '+(b.total??0)],['False alarms in these cases',b.false_positives??'Not measured'],['Missed planted bugs',b.misses??'Not measured'],['Browser engine',h.browser_available?'Available':'HTML mapping available; Chromium runtime needs installation']]);
+ for(const c of b.cases||[])root.append(el('p',c.name.replaceAll('_',' ')+' — '+(c.passed?'Passed':'Failed')));
+ root.append(el('h3','Learning from reviewed outcomes'),el('p','Review outcomes adjust which feature types receive attention. They never change scope, permission or request limits. Accepted outcomes here are operator-reported.'));
+ if(!h.learning.length)root.append(el('p','No reviewed workflow outcomes yet. Initial priorities remain neutral.'));
+ for(const l of h.learning)root.append(el('p',l.feature.replaceAll('_',' ')+' · '+JSON.stringify(l.outcomes)));
+}
+function workflowForm(){
+ const root=modal('Prepare an owned-account workflow'),targets=state.targets.filter(t=>t.enabled&&t.expires*1000>Date.now());
+ if(!targets.length){root.append(el('p','A saved URL with current program permission is required. Open program setup to review the exact resource first.'));return;}
+ root.append(el('p','Use accounts and private test records you own. This setup permits only the exact saved GET resources. Credentials stay private; evidence contains hashes and status results.'));
+ const form=el('form');const field=(label,type='text',value='')=>{const box=el('label',label),input=el(type==='textarea'?'textarea':'input');if(type!=='textarea')input.type=type;input.value=value;input.required=true;box.append(input);form.append(box);return input;};
+ const name=field('Workflow name'),rules=field('Current program rules permitting these comparisons and request limits','textarea');
+ const accounts=el('div'),resources=el('div');form.append(el('h3','Owned test accounts'),accounts);let accountRows=[],resourceRows=[];
+ function addAccount(){if(accountRows.length>=4)return;const box=el('fieldset');const label=el('label','Account label'),id=el('input');id.value='account'+(accountRows.length+1);label.append(id);const secretLabel=el('label','Authorization value for this owned account'),secret=el('input');secret.type='password';secret.autocomplete='off';secretLabel.append(secret);const roleLabel=el('label','Expected role'),role=el('select');for(const key of ['owner','admin','member','viewer']){const o=el('option',key);o.value=key;role.append(o);}role.value='member';roleLabel.append(role);box.append(label,secretLabel,roleLabel);accounts.append(box);accountRows.push({id,secret,role});}
+ addAccount();addAccount();form.append(button('Add test account',addAccount),el('h3','Owned private resources'),resources);
+ function addResource(){if(resourceRows.length>=12)return;const box=el('fieldset');const targetLabel=el('label','Saved exact URL'),target=el('select');for(const t of targets){const o=el('option',t.name+' · '+t.url);o.value=String(t.id);target.append(o);}targetLabel.append(target);const ownerLabel=el('label','Owner account label'),owner=el('input');owner.value='account1';ownerLabel.append(owner);const allowLabel=el('label','Account labels allowed to read this record (comma separated)'),allow=el('input');allow.value='account1';allowLabel.append(allow);const markerLabel=el('label','Unique synthetic marker already saved in this private record'),marker=el('input');marker.autocomplete='off';markerLabel.append(marker);const featureLabel=el('label','Feature'),feature=el('select');for(const key of ['private_object','nested_resource','admin_read','representation','export','search','preview']){const o=el('option',key.replaceAll('_',' '));o.value=key;feature.append(o);}featureLabel.append(feature);box.append(targetLabel,ownerLabel,allowLabel,markerLabel,featureLabel);resources.append(box);resourceRows.push({target,owner,allow,marker,feature});}
+ addResource();form.append(button('Add owned resource',addResource));
+ const interval=field('Minimum minutes between runs','number','60'),budget=field('Maximum requests per run','number','12'),gap=field('Minimum seconds between requests','number','2');
+ const checks={};for(const [key,label] of [['permission','The current program rules permit this exact test and budget.'],['own_accounts','All accounts belong to me and their intended access is known.'],['synthetic_data','All test records and markers are synthetic and belong to me.'],['read_only_get','Every chosen URL is safe to read with GET and has no state-changing effect.'],['expected_access_reviewed','I reviewed the allowed and denied account access for each resource.']]){const labelNode=el('label',label),input=el('input');input.type='checkbox';input.required=true;labelNode.append(input);checks[key]=input;form.append(labelNode);}
+ const mappingLabel=el('label','Also map these exact pages using the first account. The program permits these additional GET requests.'),mapping=el('input');mapping.type='checkbox';mappingLabel.append(mapping);form.append(mappingLabel);
+ const error=el('p',undefined,'muted'),submit=el('button','Save permitted workflow');submit.type='submit';form.append(error,submit);root.append(form);
+ form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{const resourceData=resourceRows.map((r,i)=>({id:'resource'+(i+1),target:Number(r.target.value),owner:r.owner.value.trim(),allow:r.allow.value.split(',').map(x=>x.trim()).filter(Boolean),marker:r.marker.value.trim(),feature:r.feature.value}));await change('/api/workflows/configure',{name:name.value,rules:rules.value,accounts:accountRows.map(a=>({id:a.id.value.trim(),role:a.role.value,authorization:a.secret.value.trim()})),resources:resourceData,interval:Number(interval.value)*60,request_budget:Number(budget.value),request_gap:Number(gap.value),...Object.fromEntries(Object.entries(checks).map(([k,v])=>[k,v.checked])),map_targets:mapping.checked?[...new Set(resourceData.map(r=>r.target))].slice(0,6):[],mapping_permission:mapping.checked,browser_account:accountRows[0].id.value.trim(),browser:true});for(const a of accountRows)a.secret.value='';openHunt();}catch(err){error.textContent=err.message;}finally{submit.disabled=false;}};
+}
+function openHuntCase(item){
+ const root=modal('Workflow investigation');root.append(el('p',item.label+' · '+(item.current?'Current evidence':'Historical evidence')),el('p',item.limitation),el('pre',JSON.stringify(item.evidence,null,2)));
+ const link=el('a','Download evidence and reproduction draft');link.href='/workflow-report/'+item.id;link.download='ScopeGuard-workflow-report.md';root.append(link);
+ const form=el('form'),select=el('select');for(const key of ['unreviewed','validated','false_positive','duplicate','out_of_scope','accepted']){const o=el('option',key.replaceAll('_',' '));o.value=key;select.append(o);}select.value=item.disposition;const choice=el('label','Review outcome');choice.append(select);const impactLabel=el('label','Actual impact and review notes'),impact=el('textarea');impact.value=item.impact;impactLabel.append(impact);form.append(choice,impactLabel);const fields={};
+ for(const [key,text] of [['identities_verified','The account identities are distinct and verified.'],['expected_access_verified','The observed access violates the intended rule.'],['scope_verified','The exact asset, method and impact are eligible under current program rules.'],['duplicates_checked','I checked known duplicates and earlier reports.']]){const label=el('label',text),input=el('input');input.type='checkbox';label.append(input);fields[key]=input;form.append(label);}
+ const error=el('p'),submit=el('button','Save review');submit.type='submit';form.append(error,submit);root.append(form);form.onsubmit=async e=>{e.preventDefault();submit.disabled=true;try{await change('/api/workflows/review',{id:item.id,disposition:select.value,impact:impact.value,...Object.fromEntries(Object.entries(fields).map(([k,v])=>[k,v.checked]))});openHunt();}catch(err){error.textContent=err.message;}finally{submit.disabled=false;}};
+}
+$('openHunt').onclick=openHunt;
+$('openHuntQuality').onclick=openHuntQuality;

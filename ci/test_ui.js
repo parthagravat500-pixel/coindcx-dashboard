@@ -22,6 +22,19 @@ const context=vm.createContext({document,URL,URLSearchParams,AbortController,set
 vm.runInContext(fs.readFileSync('ui.js','utf8'),context);
 setImmediate(async()=>{
  const descendants=n=>[n,...(n.children||[]).filter(x=>x&&typeof x==='object').flatMap(descendants)];
+ const savedHunt=state.focused_research;
+ state.focused_research={healthy:true,paused:false,browser_available:false,metrics:{programs_testing:0,features_mapped:0,suspected:1,reproduced:1,reports_ready:0},
+  profiles:[],maps:[],recent_runs:[],learning:[],limitation:'Exact owned resources only.',
+  focus:[{id:'a'.repeat(24),name:'<script>Untrusted program</script>',policy:'https://hackerone.com/example',status:'Preparing',existing_jobs:0,blockers:['Owned accounts required'],candidates:[]}],
+  cases:[{id:'b'.repeat(24),feature:'private_object',disposition:'unreviewed',current:true,label:'Reproduced access difference',limitation:'Impact remains unverified.',impact:'',evidence:{note:'<img src=x onerror=alert(1)>'}}],
+  benchmark:{passed:8,total:8,false_positives:0,misses:0,cases:[{name:'vulnerable',passed:true}]}};
+ vm.runInContext('renderHunt();openHunt()',context);
+ assert.equal(nodes.get('huntPrograms').textContent,'0');assert.equal(nodes.get('huntReports').textContent,'0');
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Untrusted program</script>'));
+ vm.runInContext('openHuntQuality();openHuntCase(state.focused_research.cases[0])',context);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.tagName==='pre'&&n.textContent.includes('<img src=x onerror=alert(1)>')));
+ assert(descendants(nodes.get('detailContent')).some(n=>n.href==='/workflow-report/'+'b'.repeat(24)));
+ state.focused_research=savedHunt;vm.runInContext('renderHunt()',context);
  assert.equal(nodes.get('message').textContent,'');
  assert.match(nodes.get('homeCheckpointsSummary').textContent,/1,000 research checkpoints in 50 areas/);
  assert.match(nodes.get('homeCheckpointsSummary').textContent,/11 have automatic evidence support; 989 need contextual review/);

@@ -18,6 +18,7 @@ FILES = ('app.py','engine.py','supervisor.py','workflow.py','workqueue.py','case
 MAX_BYTES=128000
 FILES += ('programapi.py','programresearch.py','researchbrief.py','methodgraph.py','discoveryfeeds.py','researchcheckpoints.py')
 FILES += ('checkpointengine.py', 'checkpointstatic.py')
+FILES += ('boundarysuite.py','workflowmap.py','huntops.py','browserruntime.py')
 
 
 def init(c):

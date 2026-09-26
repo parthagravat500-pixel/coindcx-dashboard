@@ -35,6 +35,8 @@ import programapi
 import programresearch
 import researchcheckpoints
 import checkpointengine
+import huntops
+import browserruntime
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -90,6 +92,7 @@ def init():
         autopilot.init(c)
         leadwork.init(c)
         programresearch.init(c)
+        huntops.init(c)
         checkpointengine.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
@@ -252,6 +255,19 @@ def checkpoint_worker():
         WAKE.wait(checkpointengine.INTERVAL)
 
 
+def focused_research_worker():
+    next_receipt=0
+    while True:
+        try:
+            huntops.tick(db,DATA,log)
+            if time.time()>=next_receipt:
+                with db() as c:print(json.dumps(huntops.receipt(c)),flush=True)
+                next_receipt=time.time()+300
+        except Exception:
+            print('{"kind":"scopeguard_focused_research_health","healthy":false}',flush=True)
+        WAKE.wait(10)
+
+
 def supervisor_worker():
     while True:
         try:
@@ -377,6 +393,7 @@ def snapshot():
                 'program_research': programresearch.snapshot(c,DATA),
                 'research_checkpoints': researchcheckpoints.summary(c,ROOT),
                 'checkpoint_automation': checkpointengine.summary(c),
+                'focused_research': huntops.snapshot(c),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
@@ -409,7 +426,15 @@ def mutate(path, data):
                 connections.disconnect(DATA)
         return
     with LOCK, db() as c:
-        if path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
+        if path == '/api/workflows/configure':
+            huntops.configure(c,DATA,data)
+            log(c,'Owned-account workflow saved with exact scope and a bounded request budget.')
+        elif path == '/api/workflows/disable':
+            c.execute("UPDATE hunt_profiles SET enabled=0,state='disabled',reason='Disabled by operator' WHERE id=?",(data.get('id'),))
+        elif path == '/api/workflows/review':
+            huntops.review(c,data)
+            log(c,'Workflow investigation review saved. No report sent.')
+        elif path.startswith('/api/discovery/') or path in ('/api/program-stage', '/api/submissions/record'):
             workflow.mutate(c, path, data)
         elif path == '/api/gitlab/connect':
             gitlabcheck.configure(c,DATA,data)
@@ -560,6 +585,11 @@ class Handler(BaseHTTPRequestHandler):
                                                'Set-Cookie': uberconnect.cookie(clear=True)})
         if self.path == '/api/state':
             return self.reply(200, json.dumps(snapshot()))
+        if self.path.startswith('/workflow-report/'):
+            try:
+                with db() as c:content=huntops.report(c,self.path.removeprefix('/workflow-report/'))
+                return self.reply(200,content,'text/plain',headers={'Content-Disposition':'attachment; filename="ScopeGuard-workflow-report.md"'})
+            except ValueError:return self.reply(404,'{"error":"Investigation not found"}')
         if self.path == '/api/checkpoints' or self.path.startswith('/api/checkpoints?'):
             try:
                 with db() as c:result=researchcheckpoints.browse(c,self.path.partition('?')[2],ROOT)
@@ -663,6 +693,7 @@ if __name__ == '__main__':
         raise SystemExit('Set ADMIN_PASSWORD to a unique password of at least 24 characters.')
     connections.load(DATA)
     init()
+    threading.Thread(target=browserruntime.prepare,args=(DATA,),daemon=True).start()
     threading.Thread(target=research_worker, daemon=True).start()
     threading.Thread(target=capital_worker, daemon=True).start()
     threading.Thread(target=dependency_worker, daemon=True).start()
@@ -672,6 +703,7 @@ if __name__ == '__main__':
     threading.Thread(target=discovery_worker, daemon=True).start()
     threading.Thread(target=program_research_worker, daemon=True).start()
     threading.Thread(target=checkpoint_worker, daemon=True).start()
+    threading.Thread(target=focused_research_worker, daemon=True).start()
     threading.Thread(target=reporting_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
     threading.Thread(target=autonomous_worker, args=(server.server_address[1],), daemon=True).start()

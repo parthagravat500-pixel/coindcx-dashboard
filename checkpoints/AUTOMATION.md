@@ -1,5 +1,11 @@
 # Automatic checklist execution
 
+The 2026.09.26.3 focused-research update adds five more mapped checkpoint IDs,
+bringing the total to 35 implemented adapters and 965 needing implementation or
+context. See [FOCUSED-RESEARCH.md](FOCUSED-RESEARCH.md) for the seven upgrade areas,
+exact coverage, browser requirements and evidence limits. The description below
+documents the original 30-adapter release.
+
 Version 2026.09.26.2 connects the entire 1,000-entry catalog to a durable coverage
 worker and a results view. The worker evaluates up to 16 contexts every five
 seconds, rotating through the owned app, listed programs and saved exact URLs.
