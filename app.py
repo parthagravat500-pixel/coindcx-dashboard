@@ -205,10 +205,14 @@ def reporting_worker():
 
 
 def discovery_worker():
+    next_receipt=0
     while True:
         try:
             workflow.tick(db)
             workflow.ai_tick(db)
+            if time.time()>=next_receipt:
+                with db() as c:print(json.dumps(workflow.receipt(c,os.environ.get('RENDER_GIT_COMMIT',''))),flush=True)
+                next_receipt=time.time()+300
         except Exception:
             pass
         WAKE.wait(30)
@@ -433,7 +437,7 @@ def mutate(path, data):
             if not isinstance(data.get('paused'), bool):
                 raise ValueError('Choose pause or resume')
             c.execute('UPDATE settings SET paused=?', (int(data['paused']),))
-            c.execute('UPDATE discovery_settings SET enabled=?', (int(not data['paused']),))
+            c.execute('UPDATE discovery_settings SET enabled=?,generation=generation+1', (int(not data['paused']),))
             log(c, 'All workers paused' if data['paused'] else 'Discovery and approved checks resumed')
         elif path == '/api/pause':
             c.execute('UPDATE settings SET paused=?', (int(bool(data['paused'])),))

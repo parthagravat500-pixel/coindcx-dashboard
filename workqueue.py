@@ -73,7 +73,7 @@ def snapshot(c):
     elif not s['healthy']:s['status']='Worker status unavailable'
     s['pending']=len(pending(c))
     s['next_website_check']=c.execute('SELECT MIN(due) FROM targets WHERE enabled=1 AND expires>?',(now,)).fetchone()[0]
-    s['next_directory_update']=c.execute('SELECT MIN(due) FROM discovery_sources').fetchone()[0]
+    s['next_directory_update']=c.execute('SELECT MIN(due) FROM discovery_sources WHERE blocked=0').fetchone()[0]
     s['directory_enabled']=bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0])
     s['poll_seconds']=10
     return s

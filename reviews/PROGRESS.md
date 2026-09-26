@@ -1,5 +1,54 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, wider automatic program discovery
+
+Baseline fdb8df466a9b592c8db40f75cd9aaf03d9ea4a02 and all 95 tracked blobs were
+verified before edits. Added Bugcrowd and YesWeHack adapters using the existing
+bounty-targets-data publisher, plus independent company bounty links from the
+disclose.io community database. Current raw schemas and the publisher's
+Bugcrowd/YesWeHack collectors were read on 26 September. These are third-party
+discovery records, not new official policy reviews, scope approvals or scans.
+
+The existing worker refreshes five fixed public feeds every 15 minutes, with a
+durable global 30-second minimum gap and a nonblocking overlap lock. All feeds
+use the same raw GitHub host; HTTP 429 delays the whole host using Retry-After
+and backoff. HTTP 401/403 stops that source's automatic requests across restart
+and ordinary refresh. Pause generations and database transactions discard late
+responses. No discovered company/policy/asset URL is fetched. Unsafe links are
+rejected without DNS resolution; data remains text in the dashboard.
+
+Only reported bounty programs are retained; non-paying disclosure programs and
+known platform duplicates in the independent feed are filtered out. Exact
+canonical policy URLs are deduplicated, but distinct URLs are not assumed to be
+the same program because a company name matches. Unknown currency is not assigned
+USD/EUR or used for reward comparison. Conditional bounties and unverified current
+availability are explicit. Existing shortlist/dismissal state is preserved and
+removed records remain unavailable. Failed feed reads retain prior data.
+
+On the fetched public-data projection, local import yielded 282 Bugcrowd listings
+from 287 rows, 59 YesWeHack listings from 60 rows, and 288 independent listings
+from 2,425 rows. Independent intake filtered 2,125 records, rejected nine unsafe
+or malformed records and collapsed three identical policy links. Four of the
+629 additional listings were unavailable; 625 received policy_review_needed.
+No targets or official-policy completions were created. These are local parser
+results; live worker counts must be verified after deployment.
+
+The home screen now exposes Finding new programs, source counts and searchable
+source filters. New-source rows say official policy review needed instead of
+inventing a platform-connection requirement. Official document APIs remain
+HackerOne/Intigriti only. This implements directory monitoring, not unrestricted
+internet crawling or automatic testing across these new listings.
+
+All 331 Python tests passed before final shared-host pacing/transaction guards;
+54 relevant tests plus dashboard DOM checks passed after pacing, and 18 intake
+tests passed after the transaction guard. Python compilation and JavaScript
+syntax passed. The hosted full-test gate verifies the published revision. Nine
+new synthetic regressions cover adapters, unknown rewards, filtering, unsafe
+links, duplicate/removal/restart behavior, truthful policy states, fixed-URL
+fetches, pause/concurrency, HTTP limits and old-schema migration. No private
+dashboard data, credentials or policy bodies were committed. No new target,
+external security scan, account, report, paid resource or model training was used.
+
 ## 2026-09-26, verified method-analysis release at 12:56 UTC
 
 Runtime 15413d1bbc7db6da468e97a9e19c95b3bd7c06ce became live on the existing

@@ -62,7 +62,8 @@ def build(evidence,*,fresh=False,status='',assets=False):
                                'testing_enabled':False})
     complete=evidence.get('documents_complete') is True and evidence.get('scope_complete') is True
     prepared=bool(complete and fresh and status in ('collected','changed'))
-    if not complete:next_step='Finish collecting current policy, scope and exclusions.'
+    if status=='policy_review_needed':next_step='Open the linked program policy and verify current rules. Automatic document collection is not connected for this source.'
+    elif not complete:next_step='Finish collecting current policy, scope and exclusions.'
     elif not fresh:next_step='Refresh the saved rules before preparing new testing.'
     elif status not in ('collected','changed'):next_step='Resolve the program or platform access block before new testing.'
     elif status=='changed':next_step='Review the changed rules before using any earlier test setup.'

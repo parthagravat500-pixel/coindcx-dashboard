@@ -3,21 +3,24 @@ import connections
 import rewards
 import readiness
 import policyevidence
+import discoveryfeeds
 import hashlib
 import json
 import math
 import os
 import time
+import threading
+import urllib.error
 import urllib.request
+from email.utils import parsedate_to_datetime
 from urllib.parse import urlsplit
 
 INTERVAL = 15 * 60
-BASE = 'https://raw.githubusercontent.com/arkadiyt/bounty-targets-data/main/data/'
-SOURCES = {
-    'intigriti': (BASE + 'intigriti_data.json', {'www.intigriti.com', 'app.intigriti.com'}),
-    'hackerone': (BASE + 'hackerone_data.json', {'hackerone.com'}),
-}
+BASE = discoveryfeeds.BASE
+SOURCES = discoveryfeeds.SOURCES
 MAX_BYTES = 20 * 1024 * 1024
+RUN_LOCK = threading.Lock()
+REQUEST_GAP = 30
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -45,6 +48,8 @@ def amount(value):
 
 
 def normalize(source, p):
+    if source in discoveryfeeds.DIRECTORY_ONLY:
+        return discoveryfeeds.normalize(source,p)
     if not isinstance(p, dict):
         raise ValueError('Invalid program record')
     url = p.get('url', '')
@@ -88,7 +93,7 @@ def init(c):
     rewards.init(c)
     c.executescript('''
     CREATE TABLE IF NOT EXISTS discovery_settings (id INTEGER PRIMARY KEY, enabled INTEGER NOT NULL);
-    INSERT OR IGNORE INTO discovery_settings VALUES (1,1);
+    INSERT OR IGNORE INTO discovery_settings(id,enabled) VALUES (1,1);
     CREATE TABLE IF NOT EXISTS discovery_sources (id TEXT PRIMARY KEY, due INTEGER NOT NULL DEFAULT 0,
         last_attempt INTEGER NOT NULL DEFAULT 0, last_success INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'Waiting for first sync', failures INTEGER NOT NULL DEFAULT 0);
@@ -102,46 +107,110 @@ def init(c):
     ''')
     for source in SOURCES:
         c.execute('INSERT OR IGNORE INTO discovery_sources(id) VALUES (?)', (source,))
+    columns={r[1] for r in c.execute('PRAGMA table_info(discovery_sources)')}
+    for name in ('blocked','input_rows','accepted_rows','filtered_rows','invalid_rows','duplicate_rows'):
+        if name not in columns:c.execute('ALTER TABLE discovery_sources ADD COLUMN '+name+' INTEGER NOT NULL DEFAULT 0')
+    if 'generation' not in {r[1] for r in c.execute('PRAGMA table_info(discovery_settings)')}:
+        c.execute('ALTER TABLE discovery_settings ADD COLUMN generation INTEGER NOT NULL DEFAULT 0')
+    c.execute('CREATE TABLE IF NOT EXISTS discovery_health(id INTEGER PRIMARY KEY,heartbeat INTEGER)')
+    c.execute('INSERT OR IGNORE INTO discovery_health(id,heartbeat) VALUES(1,0)')
+    if 'next_request' not in {r[1] for r in c.execute('PRAGMA table_info(discovery_health)')}:
+        c.execute('ALTER TABLE discovery_health ADD COLUMN next_request INTEGER NOT NULL DEFAULT 0')
 
 
-def sync(db, source, data, now):
-    rows = [normalize(source, p) for p in data]
+def sync(db, source, data, now, generation=None):
+    if source not in SOURCES or not isinstance(data,list) or len(data)>10000:
+        raise ValueError('Invalid directory response')
+    rows={};filtered=invalid=duplicates=0
+    for entry in data:
+        try:p=normalize(source,entry)
+        except (ValueError,TypeError,AttributeError):
+            if source not in discoveryfeeds.DIRECTORY_ONLY:raise
+            invalid+=1;continue
+        if p is None:filtered+=1;continue
+        if p['id'] in rows:
+            # Conflicting copies must not turn a disabled entry back on or
+            # introduce an arbitrary reward; retain the conservative state.
+            duplicates+=1
+            old=rows[p['id']]
+            old['open']=old['open'] and p['open']
+            if not old['open'] and p.get('extra'):old['extra']=p['extra']
+            continue
+        rows[p['id']]=p
+    if invalid and not rows:raise ValueError('No usable directory records')
     with db() as c:
+        if generation is not None:
+            c.execute('BEGIN IMMEDIATE')
+            current=c.execute('SELECT enabled,generation FROM discovery_settings WHERE id=1').fetchone()
+            if not current['enabled'] or current['generation']!=generation:return False
         c.execute('UPDATE programs SET available=0 WHERE source=?', (source,))
-        for p in rows:
-            if p is None: continue
+        for p in rows.values():
             c.execute('''INSERT INTO programs(id,source,name,url,minimum,maximum,currency,available,first_seen,last_seen,details)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,
                 minimum=excluded.minimum,maximum=excluded.maximum,currency=excluded.currency,
                 available=excluded.available,last_seen=excluded.last_seen,details=excluded.details''',
                 (p['id'],source,p['name'],p['url'],p['minimum'],p['maximum'],p['currency'],int(p['open']),now,now,
-                 json.dumps({'requirements': p['requirements'], 'scope_count':p['scope_count']})))
-        c.execute('UPDATE discovery_sources SET last_success=?,status=?,failures=0,due=? WHERE id=?',
-                  (now,'Updated public program directory',now+INTERVAL,source))
+                 json.dumps({'requirements':p['requirements'],'scope_count':p['scope_count'],**p.get('extra',{})})))
+        c.execute('''UPDATE discovery_sources SET last_success=?,status=?,failures=0,blocked=0,due=?,
+                  input_rows=?,accepted_rows=?,filtered_rows=?,invalid_rows=?,duplicate_rows=? WHERE id=?''',
+                  (now,'Directory updated; '+str(len(rows))+' bounty listings saved'+('; '+str(invalid)+' invalid records rejected' if invalid else ''),
+                   now+INTERVAL,len(data),len(rows),filtered,invalid,duplicates,source))
+    return True
 
 
 def tick(db):
+    if not RUN_LOCK.acquire(blocking=False):return
+    try:return _tick(db)
+    finally:RUN_LOCK.release()
+
+
+def _tick(db):
     now = int(time.time())
     with db() as c:
-        if not c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]: return
-        source = c.execute('SELECT * FROM discovery_sources WHERE due<=? ORDER BY due,id LIMIT 1',(now,)).fetchone()
+        c.execute('UPDATE discovery_health SET heartbeat=? WHERE id=1',(now,))
+        settings=c.execute('SELECT enabled,generation FROM discovery_settings WHERE id=1').fetchone()
+        if not settings['enabled']:return
+        if c.execute('SELECT next_request FROM discovery_health WHERE id=1').fetchone()[0]>now:return
+        if c.execute('SELECT COALESCE(MAX(last_attempt),0) FROM discovery_sources').fetchone()[0]>now-REQUEST_GAP:return
+        source = c.execute('''SELECT * FROM discovery_sources WHERE due<=? AND blocked=0
+                             ORDER BY due,CASE id WHEN 'hackerone' THEN 0 WHEN 'intigriti' THEN 1 ELSE 2 END,id LIMIT 1''',(now,)).fetchone()
     if not source:
         rewards.refresh(db, urllib.request.build_opener(NoRedirect()))
         return
     with db() as c:
+        c.execute('BEGIN IMMEDIATE')
+        current=c.execute('SELECT enabled,generation FROM discovery_settings WHERE id=1').fetchone()
+        if not current['enabled'] or current['generation']!=settings['generation']:return
         source = dict(source)
         # Claim before network request; survives restarts, prevents request storms.
         c.execute('UPDATE discovery_sources SET last_attempt=?,due=?,status=? WHERE id=?',
                   (now,now+INTERVAL,'Updating directory',source['id']))
+        c.execute('UPDATE discovery_health SET next_request=? WHERE id=1',(now+REQUEST_GAP,))
     try:
-        sync(db,source['id'],fetch_directory(source['id']),now)
-        rewards.refresh(db, urllib.request.build_opener(NoRedirect()))
+        data=fetch_directory(source['id'])
+        if sync(db,source['id'],data,int(time.time()),settings['generation']):
+            rewards.refresh(db, urllib.request.build_opener(NoRedirect()))
     except Exception as exc:
+        finished=int(time.time());blocked=isinstance(exc,urllib.error.HTTPError) and exc.code in (401,403)
+        retry=0
+        if isinstance(exc,urllib.error.HTTPError) and exc.code==429:
+            value=exc.headers.get('Retry-After','') if exc.headers else ''
+            try:retry=int(value) if value.isdigit() else max(0,int(parsedate_to_datetime(value).timestamp())-finished)
+            except (ValueError,TypeError,OverflowError):pass
+            retry=max(retry,0)
         with db() as c:
             failures = source['failures']+1
-            c.execute('UPDATE discovery_sources SET failures=?,due=?,status=? WHERE id=?',
-                      (failures,now+min(86400,INTERVAL*2**min(failures,3)),
-                       'Sync failed ('+type(exc).__name__+'); cached programs need verification',source['id']))
+            delay=max(retry,min(86400,INTERVAL*2**min(failures,3)))
+            if isinstance(exc,urllib.error.HTTPError) and exc.code==429:
+                # Every directory lives on the same raw GitHub host. A host
+                # rate limit delays all feeds, not just the current file.
+                if delay>2**62:
+                    c.execute("UPDATE discovery_sources SET blocked=1,failures=failures+1,status='Directory rate limit needs review; requests stopped'")
+                    return
+                c.execute('UPDATE discovery_health SET next_request=MAX(next_request,?) WHERE id=1',(finished+delay,))
+            c.execute('UPDATE discovery_sources SET failures=?,due=?,blocked=?,status=? WHERE id=?',
+                      (failures,finished+delay,int(blocked),
+                       'Directory access refused; automatic requests stopped' if blocked else 'Directory update failed; cached listings need verification',source['id']))
 
 
 def ai_enabled():
@@ -201,6 +270,12 @@ def snapshot(c):
     now=int(time.time())
     readiness_context=readiness.context(c,now)
     sources=[dict(r) for r in c.execute('SELECT * FROM discovery_sources ORDER BY id')]
+    counts={r['source']:dict(r) for r in c.execute('SELECT source,COUNT(*) AS listed,SUM(available) AS listed_available FROM programs GROUP BY source')}
+    for s in sources:
+        s.update(label=discoveryfeeds.LABELS.get(s['id'],s['id']),source_url=SOURCES[s['id']][0],
+                 listed=counts.get(s['id'],{}).get('listed',0),listed_available=counts.get(s['id'],{}).get('listed_available',0),
+                 interval_minutes=INTERVAL//60,policy_collection=s['id'] not in discoveryfeeds.DIRECTORY_ONLY)
+        s['next_attempt']=None if s['blocked'] else max(s['due'],c.execute('SELECT next_request FROM discovery_health WHERE id=1').fetchone()[0])
     source_map={s['id']:s for s in sources}
     programs=[]
     # Ranking uses cached reference rates; original published amounts are preserved.
@@ -209,6 +284,7 @@ def snapshot(c):
         s=source_map[p['source']]
         p['stale']=not s['last_success'] or s['last_success']<now-86400 or s['failures']>0
         p['source_url']=SOURCES[p['source']][0]
+        p['source_label']=discoveryfeeds.LABELS.get(p['source'],p['source'])
         p['scan_authorized']=False
         p['policy_review']=POLICY_REVIEWS.get(p['url'].rstrip('/'))
         p['local_review']=local_review(p)
@@ -228,6 +304,7 @@ def snapshot(c):
                                      'records_total':len(POLICY_REVIEWS),'authorizing':authorizing,
                                      'non_authorizing':len(reviewed)-authorizing},
             'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
+            'discovery_coverage':'Automatic discovery from HackerOne, Intigriti, Bugcrowd, YesWeHack and disclose.io directories. Independent entries are policy links, not approved testing targets. This is directory monitoring, not a whole-internet crawl.',
             'sources':sources,'programs':programs,'interval_hours':INTERVAL/3600,'interval_minutes':INTERVAL//60,
             'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Local directory sorting only — official policy reviews are separate; no AI API fees',
             'submissions':[dict(r) for r in c.execute('SELECT * FROM submissions ORDER BY at DESC')],
@@ -237,13 +314,13 @@ def snapshot(c):
 def mutate(c,path,data):
     if path=='/api/discovery/pause':
         if not isinstance(data.get('enabled'),bool): raise ValueError('Choose enabled or disabled')
-        c.execute('UPDATE discovery_settings SET enabled=?',(int(data['enabled']),))
+        c.execute('UPDATE discovery_settings SET enabled=?,generation=generation+1',(int(data['enabled']),))
     elif path=='/api/discovery/refresh':
         now=int(time.time())
         if not c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]: raise ValueError('Resume discovery first')
         if c.execute('SELECT MAX(last_attempt) FROM discovery_sources').fetchone()[0]>now-300:
             raise ValueError('Directory refreshed recently. Please wait five minutes.')
-        c.execute('UPDATE discovery_sources SET due=0')
+        c.execute('UPDATE discovery_sources SET due=0 WHERE blocked=0')
     elif path=='/api/program-stage':
         if data.get('stage') not in ('queue','review','dismissed'): raise ValueError('Invalid program stage')
         if not c.execute('SELECT 1 FROM programs WHERE id=?',(data.get('id'),)).fetchone(): raise ValueError('Program not found')
@@ -259,6 +336,24 @@ def mutate(c,path,data):
         c.execute('INSERT INTO submissions(finding,channel,receipt,at,origin) VALUES (?,?,?,?,?)',
                   (f['id'],data['channel'],receipt,int(time.time()),'user_recorded'))
     else: raise ValueError('Unknown workflow action')
+
+
+def receipt(c,revision):
+    """Fixed source IDs and counts only; no policies, targets or private state."""
+    import re
+    now=int(time.time());heartbeat=c.execute('SELECT heartbeat FROM discovery_health WHERE id=1').fetchone()[0]
+    counts={r['source']:r['n'] for r in c.execute('SELECT source,COUNT(*) AS n FROM programs GROUP BY source')}
+    sources=[]
+    for row in c.execute('SELECT * FROM discovery_sources ORDER BY id'):
+        if row['id'] not in SOURCES:continue
+        sources.append({k:row[k] for k in ('id','last_attempt','last_success','due','failures','blocked',
+                                          'input_rows','accepted_rows','filtered_rows','invalid_rows','duplicate_rows')})
+        sources[-1]['listed']=counts.get(row['id'],0)
+    return {'kind':'scopeguard_discovery_health','revision':revision if re.fullmatch('[0-9a-f]{40}',revision or '') else 'unknown',
+            'healthy':bool(heartbeat and 0<=now-heartbeat<90),'paused':not bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
+            'listed':sum(counts.values()),'sources':sources,
+            'next_request':c.execute('SELECT next_request FROM discovery_health WHERE id=1').fetchone()[0],
+            'targets_activated_by_discovery':0}
 
 
 POLICY_REVIEWS = {

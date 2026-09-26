@@ -1,3 +1,47 @@
+## Wider automatic program discovery
+
+The existing directory worker now monitors five public feeds: HackerOne,
+Intigriti, Bugcrowd, YesWeHack, and the disclose.io database for independent
+company programs. Each feed refreshes every 15 minutes, with at least 30 seconds
+between directory requests. A nonblocking lock prevents overlapping fetches.
+No search subscription, extra host, paid model or new credentials are required.
+
+New Bugcrowd and YesWeHack records require a positive reported bounty. Independent
+records require an explicit `yes` or `partial` bounty flag; non-paying disclosure
+policies and known platform links are excluded. Partial bounties retain their
+conditions-unverified label. Unsafe/non-HTTPS policy links are rejected without
+DNS lookups. Identical canonical policy URLs are deduplicated, while separate
+program URLs are not merged just because company names match. Unavailable
+records and removed listings remain visible; existing shortlists are preserved.
+
+Only the fixed directory URLs are fetched. No discovered company, policy URL or
+scope asset is requested by discovery. Directory values and safe-harbor labels
+never grant testing permission. The feeds do not always provide a currency or
+current program status: unknown currency is not assumed to be USD or EUR, and
+listing presence is not labelled as confirmed availability. Rejected, filtered
+and duplicate rows are counted. A fetched copy can contain old publisher records;
+current official rules still need independent verification.
+
+Pause generations discard in-flight responses after a pause/resume. Request
+timers survive restarts; Retry-After and failure backoff delay new requests.
+HTTP 401/403 stops that directory's automatic requests, including manual refresh;
+other feeds continue. Malformed responses preserve the previous saved listings.
+The aggregate host receipt exposes fixed source IDs, sync times and counts only.
+
+The home screen's **Finding new programs** card shows source counts and a
+searchable source filter. New sources receive **official policy review needed**,
+not a false missing-account instruction or completed-policy count. Automatic
+official-document collection remains limited to the connected HackerOne and
+Intigriti APIs. This is wider directory discovery, not a whole-internet crawler
+or automatic approval to test each company.
+
+Dataset schemas checked 26 September 2026:
+- https://github.com/arkadiyt/bounty-targets-data (MIT; Arkadiy Tetelman)
+- https://github.com/arkadiyt/bounty-targets/blob/main/lib/bounty-targets/bugcrowd.rb
+- https://github.com/arkadiyt/bounty-targets/blob/main/lib/bounty-targets/yes_we_hack.rb
+- https://github.com/disclose/diodb (disclose.io community dataset)
+- https://github.com/disclose/diodb/blob/master/program-list-schema.json
+
 ## Automatic program research
 
 Every directory listing receives a persistent research entry. The home screen's
@@ -161,7 +205,7 @@ new testing permission, general exploit discovery or bounty acceptance.
 ## Automatic source investigation
 
 When the existing master research switch is enabled, the server checks its
-35 installed Python source files for changes every minute. No browser needs to
+36 installed Python source files for changes every minute. No browser needs to
 stay open. The pipeline records input paths, runs bounded synthetic path
 experiments, and creates an investigation draft for each static lead. Existing
 authorized source watches and project uploads use the same pipeline. Unchanged

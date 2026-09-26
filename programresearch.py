@@ -6,6 +6,7 @@ import time
 import threading
 
 import researchbrief
+import discoveryfeeds
 
 import programapi
 
@@ -23,7 +24,8 @@ LABELS = {'queued':'Waiting for program rules','collecting':'Reading official ru
           'connection_needed':'Platform connection needed','access_blocked':'Platform refused access',
           'unavailable':'Program is unavailable or dismissed','directory_stale':'Waiting for a current directory',
           'unsupported':'Program address needs review','incomplete':'Official evidence is incomplete',
-          'retry':'Temporary failure; retry scheduled','changed':'Rules changed; fresh review needed'}
+          'retry':'Temporary failure; retry scheduled','changed':'Rules changed; fresh review needed',
+          'policy_review_needed':'Found in a directory; official policy review needed'}
 ERRORS = {
     'schema':'The platform returned a document format ScopeGuard cannot read.',
     'response_format':'The platform response was not a JSON document.',
@@ -300,6 +302,7 @@ def reconcile(c,available,now):
         source=c.execute('SELECT * FROM discovery_sources WHERE id=?',(p['source'],)).fetchone()
         status=('unavailable' if not p['available'] or p['stage']=='dismissed' else
                 'directory_stale' if not source or source['failures'] or source['last_success']<now-REFRESH else
+                'policy_review_needed' if p['source'] in discoveryfeeds.DIRECTORY_ONLY else
                 'unsupported' if not programapi.canonical(p['url']) else
                 'connection_needed' if not available.get(p['source']) else '')
         if status:c.execute('UPDATE program_research SET active=0,status=? WHERE id=?',(status,p['id']))
@@ -479,7 +482,7 @@ def snapshot(c,data_dir,details=False):
     rows=[];counts={};errors={};phases={};collected=attempted=policy_saved=briefs=0
     preparation_counts={key:0 for key in researchbrief.CATEGORIES}
     for row in c.execute('SELECT r.*,p.name FROM program_research r JOIN programs p ON p.id=r.id ORDER BY p.name'):
-        provider=provider_map[row['provider']]
+        provider=provider_map.get(row['provider'],{'connected':False,'blocked':False})
         status=('connection_needed' if not provider['connected'] and row['active'] else
                 provider['status'] if provider['blocked'] and row['active'] else row['status'])
         counts[status]=counts.get(status,0)+1;attempted+=int(row['requests']>0)
@@ -489,6 +492,7 @@ def snapshot(c,data_dir,details=False):
         policy_saved+=int(bool(visible.get('policy_text')))
         collected+=int(fresh and evidence.get('documents_complete') is True)
         item={k:row[k] for k in ('id','name','provider','policy','checked','last_attempt','requests','changes','due','last_error','error_phase','phase')}
+        item['source_label']=discoveryfeeds.LABELS.get(row['provider'],row['provider'])
         if row['last_error']:errors[row['last_error']]=errors.get(row['last_error'],0)+1
         item['error_label']=error_label(row['last_error'])
         item.update(status=status,label=LABELS[status],fresh=fresh,scope_assets=len(visible.get('scope',[])),partial=bool(partial),

@@ -65,7 +65,7 @@ def assess(program, ctx):
     key = policy_key(program['url'])
     parts = urlsplit(program['url']).path.strip('/').split('/')
     slug = '/'.join(parts[1:3]) if len(parts) >= 3 and parts[0] == 'programs' else ''
-    note = POLICIES.get(slug)
+    note = POLICIES.get(slug) if urlsplit(program['url']).hostname in ('app.intigriti.com','www.intigriti.com','intigriti.com') else None
     category, label, explanation = note or ('unknown', 'No testing configured; policy review needed',
         'Confirm the exact eligible asset, permitted test method, account access and expected private-data boundary. Shortlisting does not run a scan.')
     active = [t for t in ctx['targets'] if policy_key(t['policy']) == key and t['enabled'] and t['expires'] > ctx['now']]
