@@ -25,6 +25,18 @@ def policy_key(url):
     return url.rstrip('/')
 
 
+def directory_source_blocker(source, now):
+    if not source:
+        return 'HackerOne directory source is not configured'
+    if source['failures']:
+        return 'Last HackerOne directory refresh failed; waiting for a successful refresh'
+    if not source['last_success']:
+        return 'HackerOne directory has never completed a successful refresh'
+    if source['last_success'] < now-86400:
+        return 'HackerOne directory evidence is older than 24 hours'
+    return ''
+
+
 def directory_gate(c, policy, now):
     p = c.execute('SELECT * FROM programs WHERE rtrim(url,\'/\')=?', (policy_key(policy),)).fetchone()
     if not p:
@@ -32,7 +44,7 @@ def directory_gate(c, policy, now):
     if not p['available'] or p['stage'] == 'dismissed':
         return 'Program unavailable or dismissed'
     s = c.execute('SELECT * FROM discovery_sources WHERE id=?', (p['source'],)).fetchone()
-    if not s or not s['last_success'] or s['last_success'] < now-86400 or s['failures']:
+    if directory_source_blocker(s,now):
         return 'Directory needs a successful refresh; saved permission is not expanded'
     return ''
 
@@ -89,6 +101,8 @@ def snapshot(c):
         rows.append({'name':p['name'],'policy':p['url'],'approved_urls':len(approved),
                      'due_urls':due,'next_due':next_due,'status':status})
     next_item = next_target(c,now)
+    h1_source = c.execute("SELECT * FROM discovery_sources WHERE id='hackerone'").fetchone()
+    h1_blocker = directory_source_blocker(h1_source,now)
     healthy = bool(s['heartbeat'] and 0 <= now-s['heartbeat'] < 60)
     due_count = sum(t['due'] <= now for t in ready)
     queue_state = ('paused' if paused else 'worker_unavailable' if not healthy else
@@ -107,5 +121,13 @@ def snapshot(c):
              directory_blocked_targets=sum(bool(t['enabled']) and t['expires']>now and
                                            bool(directory_gate(c,t['policy'],now)) for t in targets),
              waiting_targets=len(ready)-due_count,
-             next_due=min((t['due'] for t in ready),default=None))
+             next_due=min((t['due'] for t in ready),default=None),
+             directory_source={
+                 'id':'hackerone',
+                 'status':h1_source['status'] if h1_source else 'Not configured',
+                 'last_attempt':h1_source['last_attempt'] if h1_source else 0,
+                 'last_success':h1_source['last_success'] if h1_source else 0,
+                 'failures':h1_source['failures'] if h1_source else 0,
+                 'blocked':bool(h1_blocker),
+                 'blocker':h1_blocker or None})
     return s

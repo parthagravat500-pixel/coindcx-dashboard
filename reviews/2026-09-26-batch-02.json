@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "program": "PayPal",
+      "policy_url": "https://hackerone.com/paypal",
+      "sources": [
+        "https://hackerone.com/paypal",
+        "https://hackerone.com/paypal/policy_scopes"
+      ],
+      "policy_updated": "2026-09-04",
+      "scope_updated": "2026-09-04",
+      "review_status": "reviewed_manual_only",
+      "availability": "Public HackerOne bounty program active; no pause banner observed.",
+      "in_scope_assets": [
+        "py.pl",
+        "paypal.me",
+        "PayPal SDK",
+        "com.yourcompany.PPClient",
+        "com.xoom.app",
+        "com.xoom.android.app",
+        "com.venmo",
+        "com.paypal.merchant.client",
+        "com.paypal.merchant",
+        "com.paypal.android.p2pmobile",
+        "Braintree SDK",
+        "351727428 (iOS Venmo App)",
+        "*.xoom.com",
+        "*.venmo.com",
+        "*.paypalcorp.com",
+        "*.paypal.com",
+        "*.paylution.com",
+        "*.paydiant.com",
+        "*.hyperwallet.com",
+        "*.braintreepayments.com",
+        "*.braintreegateway.com",
+        "*.braintree.tools",
+        "*.braintree-api.com",
+        "sandbox.braintreegateway.com",
+        "paypalobjects.com",
+        "www.swiftfinancial.com",
+        "www.swiftcapital.com",
+        "www.paypal-*.com",
+        "www.loanbuilder.com",
+        "swiftfinancial.com",
+        "swiftcapital.com",
+        "scrutiny.swiftfinancial.com",
+        "prequal.swiftfinancial.com",
+        "pigeon.swiftfinancial.com",
+        "partner.swiftfinancial.com",
+        "my.swiftfinancial.com",
+        "my.loanbuilder.com",
+        "loanbuilder.com",
+        "decision.swiftfinancial.com",
+        "api.swiftfinancial.com",
+        "api.loanbuilder.com"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "com.yourcompany.PPClient is in scope but bounty-ineligible.",
+        "Use *.sand.braintreepayments.com rather than production for Braintree Payments testing and account creation.",
+        "Use *.sandbox.braintree-api.com rather than production for Braintree API testing and account creation.",
+        "*.braintree.tools is a changing development environment with generally lower impact and payouts.",
+        "www.paypal-*.com partner sites may be silently scheduled for deprecation; submissions for deprecated sites are ineligible.",
+        "Braintree sandbox-only reports receive 50% of the standard bounty; partner-site and unsupported-SDK rules vary."
+      ],
+      "automation": "Scanner output and scanner-generated reports, including any automated or active exploit tool, are out of scope. Automated tools or scripts that could overload infrastructure are prohibited. This does not establish permission for ScopeGuard's autonomous checks.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found in the official policy or scope table read. Null means unknown, not unlimited.",
+      "accounts": "Researcher accounts are recommended to use the HackerOne <username>+pp@wearehackerone.com alias. All traffic must include X-PP-BB: HackerOne-<username>. A report should include the testing IP and any test-account email or user ID. Some Braintree assets direct testing to sandbox environments.",
+      "excluded_assets": [
+        "www.gopay.com",
+        "http://www.paypal-support.com",
+        "com.paypal.herehd (iOS)",
+        "com.paypal.here (iOS)",
+        "com.paypal.here (Android)",
+        "braintree.com",
+        "*.paypal.cn",
+        "*.atlassian.net"
+      ],
+      "exclusions": [
+        "Scanner output or scanner-generated reports, including automated or active exploit tools",
+        "Username enumeration on customer-facing systems",
+        "DDoS, spam and production DoS testing",
+        "Man-in-the-middle attacks and physical attacks",
+        "Stolen credentials and social engineering",
+        "Infrastructure observations without demonstrated impact",
+        "Third-party library or vendor findings without demonstrated PayPal impact",
+        "PayPal merchant integrations",
+        "Most sandbox, lab or staging-only findings except Braintree",
+        "Public or non-protected information and invalid exposed credentials"
+      ],
+      "unresolved": [
+        "No permission for the proposed autonomous header checks was established.",
+        "Any future work still needs an exact asset, test identity, required header, IP-recording plan and applicable sandbox decision.",
+        "www.paypal-*.com has a non-public, changing deprecation list and cannot be safely expanded from the wildcard alone."
+      ],
+      "note": "Active public program, but the reviewed rules support identified, controlled research rather than unattended scanner output. No target activated.",
+      "checked_at": "2026-09-26T01:01:27Z",
+      "evidence_method": "Official public HackerOne policy and rendered scope table",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    },
+    {
+      "program": "Discord",
+      "policy_url": "https://discord.com/security",
+      "sources": [
+        "https://discord.com/security"
+      ],
+      "policy_updated": null,
+      "review_status": "reviewed_restricted_private",
+      "availability": "Discord says its Bugcrowd program launched May 20, 2025 and is private to selected researchers invited from its former HackerOne program.",
+      "in_scope_assets": [
+        "Sites and services directly operated by Discord (no complete public domain table provided)",
+        "Blazing 8s",
+        "Bobble League",
+        "Bobble Bash",
+        "Checkers in the Park",
+        "Chess in the Park",
+        "Know What I Meme",
+        "Land-io",
+        "Letter League",
+        "Poker Night",
+        "Putt Party",
+        "Sketch Heads",
+        "Watch Together",
+        "Whiteboard"
+      ],
+      "scope_complete": false,
+      "scope_visibility_note": "The public page describes first-party services and Activities but does not expose the private Bugcrowd target table.",
+      "scope_conditions": [
+        "Only accounts and servers directly owned by the researcher may be tested.",
+        "Testing must not affect other users.",
+        "Only Discord-operated sites and services are eligible; integrated third parties are excluded.",
+        "Activities not explicitly listed on the public page are out of scope."
+      ],
+      "automation": "The official page says not to use scanners or automated tools to find vulnerabilities; reports from scanners and automated tools are out of scope.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical request limit found; automation is prohibited, so null is not permission.",
+      "accounts": "Owned Discord accounts and owned servers are required for applicable tests. Access to the private Bugcrowd program requires an invitation; no account or invitation was requested in this task.",
+      "exclusions": [
+        "Third-party services, providers, promotional campaigns and partners",
+        "Automated scanners and tools",
+        "Brute force, DoS, spam and timing attacks",
+        "Account or email enumeration, ID oracles and invite enumeration",
+        "Clickjacking, content spoofing, CSRF and missing cookie flags",
+        "Rate limiting (temporarily out of scope)",
+        "blog.discord.com, feedback.discord.com, merch.discordapp.com, status.discord.com and support.discord.com",
+        "Self-exploitation, social engineering and phishing",
+        "Any unlisted Discord Activity and third-party providers proxied by discordsays.com"
+      ],
+      "unresolved": [
+        "Private-program invitation is absent.",
+        "The exact private Bugcrowd asset table and any private request limits are unavailable.",
+        "The public page mentions email consideration for invitation, but contacting staff is outside this task."
+      ],
+      "note": "Private program and explicit automation prohibition. No target activated.",
+      "checked_at": "2026-09-26T01:01:27Z",
+      "evidence_method": "Official Discord security page",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    },
+    {
+      "program": "Dropbox",
+      "policy_url": "https://bugcrowd.com/engagements/dropbox",
+      "sources": [
+        "https://bugcrowd.com/engagements/dropbox"
+      ],
+      "policy_updated": "2025-07-31",
+      "review_status": "reviewed_paused",
+      "availability": "Paused since 2025-07-31 12:30:37 UTC. The official page instructs researchers to stop all testing until further notice.",
+      "in_scope_assets": [
+        "23 target rows are visible to the public page, but every asset name/location is masked"
+      ],
+      "public_scope_row_count": 23,
+      "scope_complete": false,
+      "scope_visibility_note": "Unauthenticated target names are redacted. Visible types comprise API, website, Android, iOS and desktop/binary testing.",
+      "scope_conditions": [
+        "Testing must remain paused regardless of historical scope.",
+        "Test accounts are required where user privacy could be affected.",
+        "Limited-scope targeted penetration testing for repeated techniques requires prior inquiry.",
+        "Public disclosure requires explicit permission through the engagement."
+      ],
+      "automation": "Reports from automated tools or scans are out of scope. Automated reports must not be treated as permission even when manually verified; repeated-target techniques require prior limited-scope coordination.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found; the engagement is paused.",
+      "accounts": "Dash.ai for Business test credentials require contacting Dropbox. Other business/professional test accounts use a free trial and must be deactivated before billing. No account was created or requested.",
+      "exclusions": [
+        "Automated-tool and scan reports",
+        "DoS and activity affecting other users",
+        "Third-party AI-model abuse and third-party AI API keys",
+        "FormSwift and Boxcryptor",
+        "Password/account policy observations and login/logout CSRF",
+        "Missing headers or best practices without demonstrated impact",
+        "Known-vulnerable libraries without demonstrated exploitability",
+        "Username or email enumeration",
+        "Storage-limit bypasses, spam, social engineering and physical attacks",
+        "XSS on dropboxusercontent.com",
+        "Demo sites and scripts such as apidemos.hellosign.com"
+      ],
+      "unresolved": [
+        "Program reopening date is unknown.",
+        "Exact asset names are not visible without program access.",
+        "No testing can proceed while the pause remains in force."
+      ],
+      "note": "Official engagement paused; exact public scope is masked; automation reports are excluded. No target activated.",
+      "checked_at": "2026-09-26T01:01:27Z",
+      "evidence_method": "Official public Bugcrowd engagement page",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    }
+  ]
+}

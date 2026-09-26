@@ -63,6 +63,24 @@ class ProgramQueueTests(unittest.TestCase):
         self.assertEqual(q['next_target'],'due')
         self.assertEqual(q['completed'],0)
 
+    def test_directory_source_diagnostic_explains_global_gate(self):
+        self.sync_h1();self.add('one','https://hackerone.com/fixture')
+        with app.db() as c:
+            programqueue.heartbeat(c,self.now)
+            c.execute("UPDATE discovery_sources SET failures=2,status='Synthetic refresh failure'")
+        q=app.snapshot()['program_queue']
+        self.assertEqual(q['queue_state'],'no_eligible_targets')
+        self.assertEqual(q['directory_blocked_targets'],1)
+        self.assertTrue(q['directory_source']['blocked'])
+        self.assertEqual(q['directory_source']['failures'],2)
+        self.assertIn('refresh failed',q['directory_source']['blocker'])
+        self.assertEqual(q['directory_source']['status'],'Synthetic refresh failure')
+
+        self.sync_h1()
+        q=app.snapshot()['program_queue']
+        self.assertFalse(q['directory_source']['blocked'])
+        self.assertIsNone(q['directory_source']['blocker'])
+
     def test_worker_health_and_pause_are_separate_from_ready_work(self):
         self.add('one','https://example.com/policy')
         self.assertEqual(app.snapshot()['program_queue']['queue_state'],'worker_unavailable')

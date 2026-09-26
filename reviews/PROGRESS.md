@@ -1,5 +1,51 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, batch 02
+
+Baseline: scopeguard-app commit 5f3aa5202b916a6ef637ed5f646d4213c4fbd0a6.
+Latest branch and this ledger were read before selecting the batch. Personal
+context confirmed the earlier named reviews and the user's standing instruction
+to keep unsanctioned scanning paused. No previous batch was repeated.
+
+Reviewed current official policies: PayPal, Discord and Dropbox. Detailed
+evidence: `2026-09-26-batch-02.json` (checked 2026-09-26T01:01:27Z).
+PayPal exposes 41 in-scope and 8 out-of-scope asset rows, but its policy rejects
+scanner-generated reports and automated active exploit tools; it also requires
+identified traffic and test-account/IP details. Discord moved to a private
+Bugcrowd program on May 20, 2025 and expressly prohibits scanners/automated
+vulnerability-finding tools. Dropbox has been paused since July 31, 2025 and
+instructs researchers to stop testing; its 23 public target rows are masked.
+No numerical request limit was found for any of these three. Unknown never means
+unlimited. No external test, account, submission, staff contact or target
+activation occurred.
+
+## Queue visibility change
+
+The queue already failed closed on an absent, stale or failed HackerOne directory
+refresh, but exposed only a generic per-target reason. Added a structured
+`directory_source` diagnostic with last attempt/success, current source status,
+failure count and the exact global blocker. The dashboard now says when a failed
+directory refresh blocks otherwise saved URLs, rather than reporting only that no
+eligible checks are due. This does not relax the gate, import policy evidence into
+the live database or enable a target. A synthetic regression covers failure and
+recovery after a successful refresh.
+
+## Validation and limits
+
+The focused queue, workflow, readiness and local-mode test suites; JavaScript
+syntax; and the dashboard DOM smoke test were run after the change. All network
+observations in tests were mocked. The GitHub connector returned no pull-request
+workflow run for the preceding direct branch commit, so there is no remote CI
+result to claim for that commit.
+
+Authenticated live ScopeGuard state remains unavailable, and the current private
+304-entry directory cannot be inspected. These three reviews therefore cannot be
+claimed as three of that live 304. The repository has no supported authenticated
+policy-import endpoint; advisory records remain non-authorizing source data. The
+exact live cause of the user's stalled queue is still unverified, while the source
+now exposes the main possible blocker classes. No confirmed vulnerability or
+earnings were established.
+
 ## 2026-09-26, batch 01
 
 Baseline: scopeguard-app commit e166e73e05be3839fa843c1837f753c49984693c.
