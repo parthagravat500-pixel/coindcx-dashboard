@@ -5,3 +5,6 @@
 !ci/
 !ci/isolated_checks.py
 !ci/Dockerfile
+!checkpoints/
+!checkpoints/catalog.json
+!checkpoints/CHECKPOINTS.md
