@@ -50,7 +50,10 @@ function renderLegacy() {
   });
   $('events').replaceChildren(...state.events.map(e=>el('div',new Date(e.at*1000).toLocaleString()+' · '+e.message)));
 }
-async function refresh(){const r=await fetch('/api/state');if(!r.ok)throw Error('Connection or login failed. Refresh to sign in.');state=await r.json();render();openGitlabSetupFromLink();}
+async function refresh(){
+ try{const r=await fetch('/api/state');if(!r.ok)throw Error('Connection or login failed. Refresh to sign in.');state=await r.json();render();$('summaryUpdated').textContent='Dashboard data updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})+'.';openGitlabSetupFromLink();}
+ catch(error){$('status').textContent='● Connection needs attention';$('summaryUpdated').textContent=state?'Connection lost. The figures below are from the last successful update.':'Unable to load live progress. Refresh and sign in to the dashboard.';throw error;}
+}
 $('pause').onclick=()=>{if(state)change('/api/pause',{paused:!state.paused}).catch(e=>$('message').textContent=e.message);};
 $('targetForm').onsubmit=async e=>{e.preventDefault();const form=e.target;const f=new FormData(form);const b=form.querySelector('button');b.disabled=true;try{await change('/api/targets',{name:f.get('name'),url:f.get('url'),policy:f.get('policy'),rules:f.get('rules'),interval:Number(f.get('hours'))*3600,expires:Math.floor(Date.now()/1000)+Number(f.get('days'))*86400-5,authorized:f.has('authorized'),automation_allowed:f.has('automation_allowed'),cors:f.has('cors')});form.reset();}catch(err){$('message').textContent=err.message;}finally{b.disabled=false;}};
 refresh().catch(e=>$('message').textContent=e.message);
@@ -77,12 +80,15 @@ function workflowRows(stage){const w=state.workflow||{programs:[],submissions:[]
 function modal(title){$('detailContent').replaceChildren(el('h2',title));if(!$('detail').open)$('detail').showModal();return $('detailContent');}
 function facts(root,pairs){const dl=el('dl',undefined,'facts');pairs.forEach(([k,v])=>{dl.append(el('dt',k),el('dd',String(v)));});root.append(dl);}
 function policyScopeLabel(review){return review.scope_complete?review.in_scope_assets.length+' in-scope entries · '+review.excluded_assets.length+' explicit exclusions':'Scope incomplete or restricted; read details';}
+function policyOutcome(review){return ({reviewed_restricted:'Production automation restricted',reviewed_permission_unverified:'Testing permission still unverified',reviewed_manual_only:'Manual validation required',reviewed_restricted_private:'Private program · automation restricted',reviewed_paused:'Paused · no testing',reviewed_manual_validation_required:'Test accounts and manual validation needed'})[review.review_status]||'Read requirements before testing';}
 function policyEvidenceRows(root,records){
- for(const review of records){const card=el('button',undefined,'work-card'),body=el('div');card.type='button';body.append(el('strong',review.program),el('small',policyScopeLabel(review)),el('small','Checked '+review.checked_at));card.append(body,el('span','Read rules','tag'));card.onclick=()=>openPolicyReview(review);root.append(card);}
+ for(const review of records){const card=el('button',undefined,'work-card'),body=el('div');card.type='button';body.append(el('strong',review.program),el('small',policyOutcome(review)),el('small',policyScopeLabel(review)));card.append(body,el('span','Read rules','tag'));card.onclick=()=>openPolicyReview(review);root.append(card);}
 }
 function renderPolicyEvidence(){
  const evidence=state.workflow?.policy_evidence,root=$('policyEvidenceList');root.replaceChildren();
  $('policyEvidenceStatus').textContent=evidence?(evidence.records.length+' saved policy reviews · testing approval is separate'+(evidence.unavailable_entries?' · Some evidence could not be loaded.':'')):'Policy evidence is unavailable from this server version.';
+ const checked=(evidence?.records||[]).map(r=>Date.parse(r.checked_at)).filter(Number.isFinite);
+ $('policyReviewDate').textContent=checked.length?'Latest saved review: '+new Date(Math.max(...checked)).toLocaleString()+'. Open a program for its sources and checked date.':'';
  if(evidence)policyEvidenceRows(root,evidence.records);
 }
 function openPolicyReviews(){
@@ -225,6 +231,27 @@ function openAIHypothesisReview(review,index,part){
  root.append(form);
 }
 $('openPrivateAI').onclick=openPrivateAI;
+function simpleCheckStatus(q){
+ if(!q||q.saved_targets==null)return ['Check status is unavailable','The server has not supplied current queue information.'];
+ if(q.paused)return ['Website checks are paused','Saved progress is kept. Resuming only uses existing, unexpired permissions; it does not approve more websites.'];
+ if(!q.saved_targets)return ['No websites approved for automatic checks','Program reviews are saved, but an exact URL and permission for its test method must be approved before checks can start.'];
+ if(!q.healthy)return ['Website worker needs attention','The check worker has not reported recently. Open details to see its last check-in.'];
+ if(!q.eligible_targets){const reasons=[];if(q.expired_targets)reasons.push(q.expired_targets+' permissions expired');if(q.disabled_targets)reasons.push(q.disabled_targets+' saved URLs disabled');if(q.directory_blocked_targets)reasons.push(q.directory_blocked_targets+' URLs blocked by program-directory status');return ['Saved website checks are blocked',reasons.length?reasons.join(' · ')+'. Review these blockers before any tests can run.':'No saved URL currently meets all permission and scheduling requirements.'];}
+ if(!q.due_targets)return ['Waiting for the next scheduled check','Next eligible check: '+date(q.next_due)+'. Approved intervals are being respected.'];
+ return ['Limited website checks are due',q.due_targets+' approved URLs are due for response-header checks. A completed check does not establish a security bug.'];
+}
+function renderProgressSummary(){
+ const q=state.program_queue,evidence=state.workflow?.policy_evidence;
+ $('reviewedPolicyCount').textContent=evidence?evidence.records.length:'—';
+ $('limitedCheckCount').textContent=q?.completed??'—';
+ $('confirmedBugCount').textContent=q?.confirmed_payable??'—';
+ $('plainSummary').textContent=q?.confirmed_payable===0?'No confirmed bounty bug yet. The saved work and current check status are shown below.':'Open the saved evidence to see what has been established.';
+ const [title,detail]=simpleCheckStatus(q);$('nextTitle').textContent=title;$('nextText').textContent=detail;
+ $('status').textContent='● '+(!q||q.saved_targets==null?'Status unavailable':q.paused?'Checks paused':q.saved_targets===0?'Setup needed':!q.healthy?'Check worker':!q.eligible_targets?'Checks blocked':!q.due_targets?'Waiting for schedule':'Checks due');
+ const programs=state.workflow?.programs||[];
+ $('directorySummary').textContent=programs.length+' programs listed for research. Listings are not approved targets or completed tests.';
+ $('connectAI').textContent='View check details';$('openSetup').textContent='Setup & connections';
+}
 function renderSimpleStatus(){
  renderPolicyEvidence();
  renderResearchStatus();
@@ -250,26 +277,20 @@ function renderSimpleStatus(){
   $('backgroundNext').textContent=state.paused?'Background reviews and website checks are paused.':`Next website check: ${bg.next_website_check?date(bg.next_website_check):gitlabActive()?'GitLab: '+date(state.gitlab.due):capitalActive()?'Demo test: '+date(state.capital_demo.due):'No approved websites available'}. Directory update: ${bg.directory_enabled?date(bg.next_directory_update):'Paused'}. The worker looks for changed data every 10 seconds.`;
  }
 
- const w=state.workflow,active=workflowRows('review').length;
+ const w=state.workflow;
  const running=w.enabled||!state.paused;
  $('masterPause').textContent=running?'Pause everything':'Resume';
- $('status').textContent=w.enabled?(state.paused||!active?'● Finding websites':'● Running'):(!state.paused&&active?'● Checking websites':'● Paused');
- if(bg&&!state.paused)$('status').textContent=state.targets.some(t=>t.state==='Checking')?'● Checking website':!bg.healthy?'● Check worker':bg.pending?'● Reviews queued':'● Waiting · online';
- $('plainSummary').textContent=running?`${w.programs.filter(p=>p.stage!=='dismissed').length} companies found. ${active} websites ${state.paused?'paused':'have scheduled checks'}.`:'Everything is paused. Your saved progress is safe.';
- $('nextTitle').textContent='Local reviews · no API fees';
- $('nextText').textContent='Company and finding reviews use local rules. Experimental AI source reviews have separate status below. Neither proves a bounty-worthy bug. Existing hosting is billed separately.';
- $('connectAI').textContent='Review settings';
- $('openSetup').textContent='Setup status';
+ renderProgressSummary();
 }
 function setup(){
  const root=modal('Your setup');
- root.append(el('p','Free local reviews are active. OpenAI requests are disabled.','muted'));
+ root.append(el('p','These are available tools. The home screen shows whether website checks are running, waiting or blocked.','muted'));
  const list=el('div',undefined,'setup-list');
- [['✓','Find companies','Public directories update every 15 minutes.'],['✓','Review every company','Local rules assess reward uncertainty and missing permissions. No daily review quota.'],['✓','Check approved websites','Checks run on the server at their approved intervals, even when your phone is off.'],['✓','Review findings','Local rules check repeated observations and missing evidence. These are not AI reviews.'],[state.reporting?.connected?'✓':'1','Reporting account',state.reporting?.connected?'HackerOne connected. No confirmed bug is ready to send.':'Connect HackerOne when ready.']].forEach(([icon,title,note])=>{const item=el('article',undefined,'setup-item');item.append(el('span',icon,'setup-icon'));const info=el('div');info.append(el('strong',title),el('small',note));item.append(info);list.append(item);});
+ [['1','Find programs','Public directories supply program listings. A listing does not grant testing permission.'],['2','Review program rules','Saved policy reviews are shown on the home screen. Directory sorting alone is not a policy review.'],['3','Check approved websites','Enabled URLs need current permission and a working queue. Checks follow their saved intervals.'],['4','Validate possible issues','Repeated observations still need independent proof before they can count as a security bug.'],[state.reporting?.connected?'✓':'5','Reporting account',state.reporting?.connected?'HackerOne connected. Reports still require verified evidence.':'Connect HackerOne when a validated report is ready.']].forEach(([icon,title,note])=>{const item=el('article',undefined,'setup-item');item.append(el('span',icon,'setup-icon'));const info=el('div');info.append(el('strong',title),el('small',note));item.append(info);list.append(item);});
  root.append(list,el('p','No AI API charges. Your existing hosting charge remains. Reports still require independently validated evidence.','muted'));
  root.append(button(state.reporting?.connected?'Reporting account settings':'Connect reporting account',reportSetup));
 }
-$('connectAI').onclick=setup;$('openSetup').onclick=setup;
+$('connectAI').onclick=openProgramQueue;$('openSetup').onclick=setup;
 $('detail').addEventListener('close',()=>{$('detail').querySelectorAll('input[type="password"]').forEach(i=>i.value='');});
 $('masterPause').onclick=async()=>{const b=$('masterPause');b.disabled=true;const pause=state.workflow.enabled||!state.paused;try{await change('/api/all-pause',{paused:pause});}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};
 

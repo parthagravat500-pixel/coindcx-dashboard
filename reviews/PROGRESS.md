@@ -1,5 +1,32 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, simple progress dashboard
+
+Baseline: scopeguard-app commit ff1b0062703c28b46fcb8882bb9afe06b58f938f.
+The user asked to show the saved work and simplify the dashboard, following the
+request to deploy the prepared policy panel to the existing ScopeGuard service.
+Read-only Render inspection confirmed that automatic deployment is off and the
+live service still used e166e73e05be3839fa843c1837f753c49984693c, so the overnight
+source commits were not yet visible there.
+
+The home screen now separates saved policy reviews, completed limited header
+checks and confirmed bounty bugs. Unknown counts stay unknown. Plain-language
+queue summaries distinguish paused checks, missing approved URLs, worker trouble,
+blocked permissions, scheduled waiting and due checks. Nine recorded policy
+reviews are visible with individual rules, source URLs, exact recorded assets
+and checked dates. Directory browsing and technical tools are collapsed by
+default; setup language distinguishes available tools from actual work.
+Failed refreshes show a stale-data warning. No testing permission, target,
+authentication, scheduler or deployment configuration was changed.
+
+Validation: 29 focused policy-evidence, queue and HTTP tests; JavaScript syntax;
+and dashboard DOM smoke checks passed. Synthetic dashboard fixtures distinguish
+304 directory listings, nine policy records, one completed check and zero bugs,
+and cover queue blockers and failed refreshes. These fixture numbers are not a
+claim about private live state. Browser preview failed with
+net::ERR_BLOCKED_BY_CLIENT; no access-control workaround was attempted.
+Deployment of this revision and verification remain pending at this commit.
+
 ## 2026-09-26, policy evidence display repair
 
 Baseline: scopeguard-app commit 4fc96386c0eaf6955990e1b5fda9dff69e7753fd.
