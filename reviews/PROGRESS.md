@@ -1,5 +1,39 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, verified method-analysis release at 12:56 UTC
+
+Runtime 15413d1bbc7db6da468e97a9e19c95b3bd7c06ce became live on the existing
+service at 12:51:31 UTC (dep-darrv13bc2fs738abtbg). The exact-commit isolated-test
+GitHub workflow 36243177423 succeeded; the hosted build passed all 322 tests in
+32.624 seconds. All 95 published source blobs matched the intended local files.
+Only scopeguard-app changed; main, hosting settings and spending were unchanged.
+
+The 12:56:29 UTC aggregate source receipt confirmed the current engine had
+actually rerun: project-flow-5/path-model-2/synthetic-sqlite-1,
+owned_engine_current=true, 13 completed source reviews and zero worker failures.
+The owned-source review covered 35 files and 297 declared functions, including
+33 class methods. All 297 entry points were examined within the bounded model;
+23 reached their work limits. Coverage remains incomplete and the review found
+zero supported static candidates or component reproductions. Successful local
+synthetic SQL experiments are test evidence, never external bounty findings.
+
+The 12:51:25 UTC program receipt confirmed all 225 programs available through the
+current supported connection had complete document collections and research
+briefs. Of 304 listings, 70 still needed the Intigriti connection, six were
+unavailable/dismissed and three had unsupported addresses. No collection errors
+remained. Complete documents do not establish testing permission or completed
+vulnerability research. The 12:56:30 UTC test-worker receipt still showed two
+eligible jobs and six blocked jobs: three switched off pending access/permission
+review, one access refusal, one expired permission and one failed control/setup.
+Lead health confirmed zero active leads and zero confirmed bounty bugs.
+
+These are authorized aggregate host receipts, not authenticated private-dashboard
+inspection. No new target activation, external security scan, account creation,
+report submission, paid resource or hosting upgrade occurred. The next material
+limits are missing program access, unresolved testing permission and broader
+runtime/language coverage; complete automated bug research across every listing
+has not been achieved. Unsupported or blocked work must stay visibly incomplete.
+
 ## 2026-09-26, class-method detection and bounded analysis capacity
 
 Verified branch 62f1e068a2288683b017693960b164d2a0d908f4 and all 93 tracked
