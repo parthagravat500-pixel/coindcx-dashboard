@@ -1,5 +1,27 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, official catalog recovery path
+
+Release ecbd221fa3057bbbb8149de7159b4d45b5844148 passed 294 hosted and GitHub
+tests and became live at 11:25 UTC. Its diagnostic confirmed that the individual
+program endpoint response lacked the documented program object. The initial
+record-type error was a symptom of that missing object; no actual differing type
+label was observed. No successful live document collection is claimed here.
+
+Added a supported HackerOne catalog route for this specific HTTP-success/format
+failure. It uses the documented GET /v1/hackers/programs API, matches exact handles
+to existing directory entries, saves only those entries, and follows validated
+catalog pagination. Ready scope/exclusion work can finish between catalog pages.
+Unlisted/private programs returned by the API are not saved or enrolled. A real
+HTTP access refusal never triggers this route. Missing entries are labeled as not
+present in the account's catalog, and can recover on its next daily refresh.
+Unreadable catalogs stop that provider with an explicit format explanation.
+
+Thirty focused tests passed, including catalog recovery, pagination and restart,
+foreign pagination rejection, unavailable-program recovery, ignoring unlisted
+private data, and no fallback after HTTP refusal. Target activation and report
+submission remain separate. Live catalog behavior is verified after deployment.
+
 ## 2026-09-26, program API parser compatibility
 
 Follow-up: 8709bc04dd80eb0e98f3538dd5a2b46ec298a657 passed 293 hosted

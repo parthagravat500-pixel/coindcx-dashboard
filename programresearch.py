@@ -28,6 +28,8 @@ ERRORS = {
     'program_policy_format':'The policy body was not published as text in this response.',
     'program_state_format':'The API used an unsupported program status format.',
     'resource_metadata':'The API used an unsupported record label format.',
+    'catalog_format':'The program catalog did not contain the documented list of programs.',
+    'not_in_catalog':'This program was not present in the catalog available to the connected account.',
     'size':'The official document exceeded the configured storage limit.',
     'transport':'The connection failed. A retry is scheduled.',
     'dns':'The official API address did not pass the public address check.',
@@ -71,6 +73,8 @@ def init(c):
         columns={r[1] for r in c.execute('PRAGMA table_info('+table+')')}
         for name in ('last_error','error_phase'):
             if name not in columns:c.execute('ALTER TABLE '+table+' ADD COLUMN '+name+" TEXT DEFAULT ''")
+    if 'catalog_mode' not in {r[1] for r in c.execute('PRAGMA table_info(program_research_providers)')}:
+        c.execute('ALTER TABLE program_research_providers ADD COLUMN catalog_mode INTEGER DEFAULT 0')
     if 'parser_version' not in {r[1] for r in c.execute('PRAGMA table_info(program_research_health)')}:
         c.execute('ALTER TABLE program_research_health ADD COLUMN parser_version INTEGER DEFAULT 1')
     if c.execute('SELECT parser_version FROM program_research_health WHERE id=1').fetchone()[0]<3:
@@ -167,6 +171,28 @@ def h1_exclusions(doc):
     return result
 
 
+def h1_catalog(doc,page):
+    rows=doc.get('data')
+    if not isinstance(rows,list) or len(rows)>100:raise programapi.APIError('catalog_format')
+    result={}
+    for row in rows:
+        if not isinstance(row,dict) or not isinstance(row.get('attributes'),dict):raise programapi.APIError('catalog_format')
+        handle=row['attributes'].get('handle')
+        if not isinstance(handle,str) or not re.fullmatch(programapi.HANDLE,handle):raise programapi.APIError('catalog_format')
+        key='hackerone:'+handle.lower()
+        if key in result:raise programapi.APIError('catalog_format')
+        result[key]=row
+    links=doc.get('links') or {}
+    if not isinstance(links,dict):raise programapi.APIError('catalog_format')
+    next_link=links.get('next')
+    if next_link:
+        from urllib.parse import parse_qs,urlsplit
+        p=urlsplit(next_link)
+        if p.scheme!='https' or p.netloc!='api.hackerone.com' or p.path!=programapi.PREFIXES['hackerone'] or p.fragment or not programapi.valid_route('hackerone',p.path+'?'+p.query):raise programapi.APIError('catalog_format')
+        if parse_qs(p.query).get('page[number]')!=[str(page+1)] or page>=100:raise programapi.APIError('catalog_format')
+    return result,bool(next_link)
+
+
 def intigriti_index(doc,listed):
     rows=doc.get('records');total=doc.get('maxCount')
     if not isinstance(rows,list) or len(rows)>100 or type(total)is not int or not 0<=total<=10000:raise programapi.APIError('schema')
@@ -241,6 +267,10 @@ def reconcile(c,available,now):
         if fp!=old:
             c.execute("UPDATE program_research_providers SET fingerprint=?,blocked=0,next_request=0,status=?,index_checked=0,offset=0,index_complete=0,program_index='{}',last_error='',error_phase='' WHERE provider=?",(fp,'queued' if value else 'connection_needed',provider))
             c.execute("UPDATE program_research SET due=0,phase='policy',page=1,partial='{}',last_error='',error_phase='',status=CASE WHEN active=1 THEN 'queued' ELSE status END WHERE provider=?",(provider,))
+    # A successful HTTP response with no program object is a format failure,
+    # not an access refusal. Try the other documented read-only API route.
+    if c.execute("SELECT 1 FROM program_research WHERE provider='hackerone' AND last_error='program_envelope' LIMIT 1").fetchone():
+        c.execute("UPDATE program_research_providers SET catalog_mode=1 WHERE provider='hackerone'")
 
 
 def finish(c,job,evidence,now):
@@ -272,14 +302,16 @@ def tick(db,data_dir,lock,now=None):
             chosen=None
             for provider in providers:
                 p=provider['provider']
-                index_job=p=='intigriti' and (not provider['index_complete'] or provider['index_checked']<now-REFRESH)
+                index_needed=(p=='intigriti' or provider['catalog_mode']) and (not provider['index_complete'] or provider['index_checked']<now-REFRESH)
                 job=c.execute("SELECT * FROM program_research WHERE provider=? AND active=1 AND due<=? AND status NOT IN ('access_blocked','unsupported') ORDER BY CASE WHEN phase!='policy' THEN 0 ELSE 1 END,last_attempt,id LIMIT 1",(p,now)).fetchone()
+                index_job=index_needed and (p=='intigriti' or not job or job['phase']=='policy')
                 if not job and index_job:job=c.execute('SELECT * FROM program_research WHERE provider=? AND active=1 ORDER BY last_attempt,id LIMIT 1',(p,)).fetchone()
                 if not job:continue
                 job=dict(job)
                 if index_job:
                     offset=provider['offset'] if not provider['index_complete'] else 0
-                    route=programapi.PREFIXES[p]+'?limit=100&offset='+str(offset)
+                    route=(programapi.PREFIXES[p]+'?limit=100&offset='+str(offset) if p=='intigriti' else
+                           programapi.PREFIXES[p]+'?page%5Bsize%5D=100&page%5Bnumber%5D='+str(offset or 1))
                 elif p=='intigriti':
                     remote_id=json.loads(provider['program_index']).get(programapi.canonical(job['policy']))
                     if not remote_id:
@@ -287,6 +319,8 @@ def tick(db,data_dir,lock,now=None):
                     route=programapi.PREFIXES[p]+'/'+remote_id
                 else:
                     handle=programapi.canonical(job['policy']).split(':',1)[1];route=programapi.PREFIXES[p]+'/'+handle
+                    if job['phase']=='policy' and provider['catalog_mode']:
+                        c.execute("UPDATE program_research SET status='access_blocked',last_error='not_in_catalog',due=? WHERE id=?",(now+REFRESH,job['id']));continue
                     if job['phase']=='scopes':route+='/structured_scopes?page%5Bsize%5D=100&page%5Bnumber%5D='+str(job['page'])
                     elif job['phase']=='exclusions':route+='/scope_exclusions'
                 chosen=(provider,job,index_job,route);break
@@ -299,7 +333,26 @@ def tick(db,data_dir,lock,now=None):
             doc=programapi.request(p,available[p],route)
             with db() as c:
                 if not index_job:c.execute("UPDATE program_research SET last_error='',error_phase='' WHERE id=?",(job['id'],))
-                if index_job:
+                if index_job and p=='hackerone':
+                    catalog,more=h1_catalog(doc,offset or 1)
+                    seen={} if offset in (0,1) else json.loads(provider['program_index'])
+                    for entry in c.execute("SELECT * FROM program_research WHERE provider='hackerone' AND active=1").fetchall():
+                        key=programapi.canonical(entry['policy'])
+                        if key not in catalog:continue
+                        seen[key]=True
+                        if entry['status']=='access_blocked' and entry['last_error']!='not_in_catalog':continue
+                        c.execute('UPDATE program_research SET last_attempt=?,requests=requests+1 WHERE id=?',(now,entry['id']))
+                        try:partial=h1_policy({'data':catalog[key]},entry['policy'])
+                        except programapi.APIError as e:
+                            c.execute("UPDATE program_research SET status='incomplete',last_error=?,error_phase='policy',due=? WHERE id=?",(error_code(e.code),now+REFRESH,entry['id']));continue
+                        bounded_storage(c,entry['id'],json.dumps(partial),partial=True)
+                        c.execute("UPDATE program_research SET partial=?,phase='scopes',page=1,due=?,status='collecting',last_error='',error_phase='' WHERE id=?",(json.dumps(partial),now,entry['id']))
+                    c.execute("UPDATE program_research_providers SET program_index=?,offset=?,index_complete=?,index_checked=?,status='queued' WHERE provider=?",(json.dumps(seen),(offset or 1)+1,int(not more),0 if more else now,p))
+                    if not more:
+                        for entry in c.execute("SELECT id,policy,status,last_error FROM program_research WHERE provider='hackerone' AND active=1").fetchall():
+                            if programapi.canonical(entry['policy']) not in seen and (entry['status']!='access_blocked' or entry['last_error']=='not_in_catalog'):
+                                c.execute("UPDATE program_research SET status='access_blocked',last_error='not_in_catalog',error_phase='index',due=? WHERE id=?",(now+REFRESH,entry['id']))
+                elif index_job:
                     listed={programapi.canonical(r['policy']) for r in c.execute("SELECT policy FROM program_research WHERE provider='intigriti'")}
                     mappings,total,count=intigriti_index(doc,listed)
                     if count==0 and offset<total:raise programapi.APIError('schema')
@@ -353,14 +406,14 @@ def snapshot(c,data_dir,details=False):
     health=c.execute('SELECT * FROM program_research_health WHERE id=1').fetchone()
     providers=[];provider_map={}
     for row in c.execute('SELECT * FROM program_research_providers'):
-        r={k:row[k] for k in ('provider','blocked','next_request','last_request','last_success','status','index_complete','last_error','error_phase')}
+        r={k:row[k] for k in ('provider','blocked','next_request','last_request','last_success','status','index_complete','last_error','error_phase','catalog_mode')}
         r['error_label']=error_label(r['last_error'])
         r.update(connections[r['provider']]);providers.append(r);provider_map[r['provider']]=r
     rows=[];counts={};errors={};collected=attempted=0
     for row in c.execute('SELECT r.*,p.name FROM program_research r JOIN programs p ON p.id=r.id ORDER BY p.name'):
         provider=provider_map[row['provider']]
         status=('connection_needed' if not provider['connected'] and row['active'] else
-                'access_blocked' if provider['blocked'] and row['active'] else row['status'])
+                provider['status'] if provider['blocked'] and row['active'] else row['status'])
         counts[status]=counts.get(status,0)+1;attempted+=int(row['requests']>0)
         evidence=json.loads(row['evidence']);fresh=bool(row['checked'] and row['checked']>=now-REFRESH)
         collected+=int(fresh and evidence.get('documents_complete') is True)
@@ -390,4 +443,5 @@ def receipt(c,data_dir,revision):
     return {'kind':'scopeguard_program_research_health','revision':revision if re.fullmatch('[0-9a-f]{40}',revision or '') else 'unknown',
             **{k:s[k] for k in ('healthy','paused','listed','attempted','documents_collected','counts','errors')},
             'connections':{r['provider']:r['connected'] for r in s['providers']},
+            'catalog_mode':{r['provider']:bool(r['catalog_mode']) for r in s['providers']},
             'provider_blocked':{r['provider']:bool(r['blocked']) for r in s['providers']}}
