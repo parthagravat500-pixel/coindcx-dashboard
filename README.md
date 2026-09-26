@@ -1,3 +1,41 @@
+## Uber account connection
+
+`uberconnect.py` implements an optional, read-only Uber profile OAuth connection.
+It is disabled by default. A Rider login does not configure this integration.
+An approved developer app and its credentials have **not** been established by
+adding this code. Uber requires approval for its profile API:
+https://developer.uber.com/docs/consumer-identity/references/api/v3/me-get.
+
+Only after provider approval, an administrator configures these privately on the
+existing service (never in a policy file, source commit, chat or public logs):
+
+- `UBER_PROFILE_API_APPROVED=true` records obtained provider approval. This flag
+  cannot obtain or substitute for Uber approval; the profile call must also succeed.
+- `UBER_CLIENT_ID` and `UBER_CLIENT_SECRET` belong to that approved application.
+- `UBER_REDIRECT_URI` is the exact HTTPS URL registered with Uber. For this
+  deployment: `https://scopeguard-research.onrender.com/api/uber/callback`.
+
+The authenticated dashboard offers authorization only when configuration is
+complete. Starting/disconnecting requires existing administrator authentication
+and CSRF protection. The account owner then authorizes `profile` on Uber itself.
+The callback requires dashboard authentication, a short-lived single-use state
+and a Secure/HttpOnly/SameSite=Lax host-only binding cookie. It only exchanges at
+Uber's fixed HTTPS token endpoint and verifies `/v3/me`. Redirects, retries,
+broader scopes and unverified profiles fail closed. The profile is discarded.
+
+Access tokens stay in private process memory; there is no token file, database
+column, browser-cookie import, refresh loop or background profile polling.
+Restart/expiry removes usable local access and requires reconnection. A restart
+does not revoke Uber's application grant. Disconnect explicitly revokes the token
+and removes local access even if Uber cannot confirm revocation; the dashboard
+then explains that removal from Uber's connected apps is still needed.
+
+This verifies account access only. It does not add targets, enable checks, change
+program scope, provide a browser session, import private account data, prove a
+security issue or grant permission for vulnerability testing. No live OAuth
+exchange or Uber API call was used to validate this implementation. Tests use
+synthetic responses and local HTTP fixtures: `python -m unittest test_uberconnect`.
+
 ## Private research dashboard
 
 The dashboard distinguishes local rules, isolated regression CI, experimental

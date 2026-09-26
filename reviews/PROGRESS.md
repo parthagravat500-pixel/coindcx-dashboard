@@ -1,5 +1,46 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, Uber profile connector implementation
+
+Baseline: scopeguard-app 575c39d88b5ca86fbe6f5c55c7a474a3b4da3a70.
+The edited existing files matched that remote tree before changes. The user
+requested an actual connection. The previous source contained connection notes,
+but no OAuth connector; this change implements the missing owned-app component.
+
+The connector stays disabled without provider approval recorded in server
+configuration, a registered application ID/secret, and a fixed HTTPS callback.
+Only an authenticated administrator with CSRF protection can begin an explicit
+account-owner authorization. A single-use, expiring state is bound to a Secure,
+HttpOnly, SameSite=Lax host-only cookie. The return remains authenticated.
+Only Uber's fixed token, profile and revocation endpoints are callable; redirects
+and retries are disabled. The requested permission is profile only. A successful
+profile response is necessary for connected status; no broader scope is accepted.
+
+Profile contents are discarded. Tokens stay in process memory, never in source,
+policy records, the database, browser storage or state responses. Expiry and
+configuration changes remove connected status. Disconnect invalidates pending
+work and removes local access even if remote revocation fails; unconfirmed
+revocation is displayed. A restart loses local access but does not revoke Uber's
+application grant. No refresh loop or background account requests were added.
+
+The dashboard now shows operational connection status separately from saved
+policy notes. Missing developer setup offers no credential form or sign-in loop.
+A successful profile connection cannot enable targets, authorize testing, alter
+workers, inflate completion counters or create a bounty finding. The nine policy
+reviews are unchanged in count. Public progress contains no user account data.
+
+Validation: 226 Python tests passed, including 15 new connector tests, plus
+JavaScript syntax and synthetic dashboard DOM checks. Coverage includes missing
+configuration/consent, callback state and browser binding, replay and expiry,
+excess scope, redirects, bounded responses, secret redaction, failed profile
+verification, disconnect races, CSRF and no target activation. All connector
+responses were synthetic; the HTTP integration test used loopback only.
+
+No approved developer app, real OAuth exchange, Uber API call, live connection,
+security test, account creation, contact, report, purchase or additional spending
+was established by this work. Developer approval and private server setup remain
+external blockers. Deployment verification is pending at this commit.
+
 ## 2026-09-26, Uber connection requirements
 
 Baseline: scopeguard-app f75af88f997a2fa64fc9b86892527507b7480840. Latest

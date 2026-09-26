@@ -85,6 +85,7 @@ function policyEvidenceRows(root,records){
  for(const review of records){const card=el('button',undefined,'work-card'),body=el('div');card.type='button';body.append(el('strong',review.program),el('small',policyOutcome(review)),el('small',policyScopeLabel(review)));card.append(body,el('span','Read rules','tag'));card.onclick=()=>openPolicyReview(review);root.append(card);}
 }
 function renderPolicyEvidence(){
+ renderUberConnection();
  const evidence=state.workflow?.policy_evidence,root=$('policyEvidenceList');root.replaceChildren();
  $('policyEvidenceStatus').textContent=evidence?(evidence.records.length+' saved policy reviews · testing approval is separate'+(evidence.unavailable_entries?' · Some evidence could not be loaded.':'')):'Policy evidence is unavailable from this server version.';
  const checked=(evidence?.records||[]).map(r=>Date.parse(r.checked_at)).filter(Number.isFinite);
@@ -93,6 +94,35 @@ function renderPolicyEvidence(){
  renderResearchFocus();
 }
 function researchFocus(){return (state.workflow?.policy_evidence?.records||[]).filter(r=>r.research_plan?.selected).sort((a,b)=>(b.research_plan.updated_at||'').localeCompare(a.research_plan.updated_at||''))[0];}
+function renderUberConnection(){
+ const c=state.uber_connection;
+ $('uberConnectionStatus').textContent=c?c.message:'Uber connection status is unavailable from this server.';
+ $('openUberConnection').textContent=c?.connected?'View connected account status':c?.can_connect?'Connect Uber':'View connection requirements';
+}
+function uberAuthorizationUrl(value){
+ const u=new URL(value);
+ if(u.origin!=='https://auth.uber.com'||u.pathname!=='/oauth/v2/authorize'||u.username||u.password||u.hash||u.searchParams.get('scope')!=='profile'||u.searchParams.get('response_type')!=='code'||!u.searchParams.get('state'))throw Error('Unexpected authorization link. Connection stopped.');
+ return u.href;
+}
+async function startUberConnection(){
+ if(!state.uber_connection?.can_connect)throw Error('An approved Uber app must be configured first.');
+ if(!confirm('Authorize ScopeGuard to verify read-only Uber profile access? This does not enable security tests.'))return;
+ const r=await fetch('/api/uber/start',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':state.csrf},body:JSON.stringify({consent:true})});
+ const result=await r.json();if(!r.ok)throw Error(result.error||'Uber connection could not start.');
+ location.assign(uberAuthorizationUrl(result.authorization_url));
+}
+function openUberConnection(){
+ const root=modal('Uber account connection'),c=state.uber_connection;
+ if(!c){root.append(el('p','Connection status is unavailable. Refresh the dashboard.'));return;}
+ root.append(el('strong',c.connected?'Connected for profile access only':'Not connected'),el('p',c.message));
+ if(c.missing?.length){const list=el('ul');c.missing.forEach(text=>list.append(el('li',text)));root.append(list,el('p','Server setup is required first. A normal Rider login cannot complete these requirements. There is no password or account-reset step here.'));}
+ if(c.connected)facts(root,[['Verified',date(c.verified_at)],['Access expires',date(c.expires_at)],['Security testing','Not enabled by this connection']]);
+ root.append(el('p',c.storage||'Access tokens stay on the server.'),el('p','Your profile details are discarded after verification. This connection does not import browser cookies, create a test target or run a scanner.'),safeLink('Read Uber’s access requirements',c.documentation_url));
+ if(c.revocation_unconfirmed)root.append(el('p','Local access has been removed, but Uber did not confirm revocation. Remove ScopeGuard from your Uber connected apps before reconnecting.'));
+ if(c.can_connect)root.append(button('Authorize on Uber',startUberConnection));
+ if(c.can_disconnect)root.append(button('Disconnect or cancel sign-in',async()=>{await change('/api/uber/disconnect',{});openUberConnection();}));
+}
+$('openUberConnection').onclick=openUberConnection;
 function researchPlanStatus(plan){return ({prepared:'Preparation ready',needs_user:'Waiting for your account step',blocked:'Preparation blocked',complete:'Recorded work completed'})[plan.status]||'Status unverified';}
 function connectionPlanStatus(connection){return ({provider_approval_required:'App connection needs provider approval',not_configured:'App connection is not configured',unverified:'App connection is unverified'})[connection.status]||'App connection is unverified';}
 function renderResearchFocus(){

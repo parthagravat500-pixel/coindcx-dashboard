@@ -27,6 +27,7 @@ import connections
 import reporting
 import research
 import programqueue
+import uberconnect
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -290,6 +291,7 @@ def snapshot():
                 'supervisor': supervisor.summary(),
                 'workflow': workflow.snapshot(c),
                 'connection': connections.status(),
+                'uber_connection': uberconnect.manager.status(),
                 'background': workqueue.snapshot(c),
                 'program_queue': programqueue.snapshot(c),
                 'source_audits': sourceaudit.snapshot(c),
@@ -430,7 +432,7 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
-    def reply(self, status, content, mime='application/json'):
+    def reply(self, status, content, mime='application/json', headers=None):
         raw = content.encode()
         self.send_response(status)
         self.send_header('Content-Type', mime + '; charset=utf-8')
@@ -439,6 +441,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header('X-Content-Type-Options', 'nosniff')
         self.send_header('Referrer-Policy', 'no-referrer')
         self.send_header('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        for name, value in (headers or {}).items():
+            self.send_header(name, value)
         self.end_headers()
         self.wfile.write(raw)
 
@@ -460,6 +464,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, '{"ok":true}')
         if not self.authenticate():
             return
+        callback_path, _, callback_query = self.path.partition('?')
+        if callback_path == uberconnect.CALLBACK_PATH:
+            try:
+                uberconnect.manager.complete(callback_query, self.headers.get('Cookie', ''))
+            except ValueError:
+                return self.reply(400, '<p>Uber connection was not completed.</p><p><a href="/">Return to ScopeGuard</a></p>', 'text/html')
+            return self.reply(303, '', headers={'Location': '/#uberConnectionCard',
+                                               'Set-Cookie': uberconnect.cookie(clear=True)})
         if self.path == '/api/state':
             return self.reply(200, json.dumps(snapshot()))
         assets = {'/': ('index.html', 'text/html'), '/ui.js': ('ui.js', 'text/javascript'), '/style.css': ('style.css', 'text/css')}
@@ -518,6 +530,15 @@ class Handler(BaseHTTPRequestHandler):
             if size < 1 or size > limit:
                 raise ValueError('Invalid request size')
             payload = json.loads(self.rfile.read(size))
+            if self.path in ('/api/uber/start', '/api/uber/disconnect'):
+                if not isinstance(payload, dict) or set(payload) - {'consent'}:
+                    raise ValueError('Uber credentials must never be submitted to this endpoint.')
+                if self.path == '/api/uber/start':
+                    url, binding = uberconnect.manager.begin(payload.get('consent'))
+                    return self.reply(200, json.dumps({'authorization_url': url}),
+                                      headers={'Set-Cookie': uberconnect.cookie(binding)})
+                uberconnect.manager.disconnect()
+                return self.reply(200, '{"ok":true}', headers={'Set-Cookie': uberconnect.cookie(clear=True)})
             if self.path == '/api/research-ai':
                 with LOCK, db() as c:
                     research.configure(c, payload)

@@ -78,23 +78,24 @@
       "targets_activated": 0,
       "research_plan": {
         "selected": true,
-        "status": "needs_user",
-        "updated_at": "2026-09-26T07:10:21Z",
-        "summary": "The program rules and controlled test plan are prepared. A phone login does not connect ScopeGuard. Manual browser research needs a secure session in the research browser; an API connection separately needs Uber approval and an implemented connector.",
+        "status": "blocked",
+        "updated_at": "2026-09-26T07:36:28Z",
+        "summary": "The read-only Uber connection code is implemented. Connection still requires a provider-approved developer app, server configuration and account-owner authorization. No live account connection or Uber security test has been verified.",
         "goal": "Evaluate whether a non-financial private test record is protected from anonymous access and, if suitable, a second separately owned account. This is a hypothesis, not a discovered vulnerability.",
         "completed": [
           "Re-read the official policy and all 24 scope rows: four in scope and 20 excluded/conditional rows.",
           "Identified exclusions relevant to this work: raw scanner reports, missing-header-only observations, account enumeration, brute force, disruption and fraud.",
           "Inspected the ordinary public homepage and the official sign-in form without entering credentials or requesting a verification code.",
           "Validated the existing access-comparison method against local synthetic and loopback fixtures; no Uber endpoint was used in these tests.",
-          "Checked official Uber OAuth and profile API documentation; both published profile API versions explicitly require Uber approval."
+          "Checked official Uber OAuth and profile API documentation; both published profile API versions explicitly require Uber approval.",
+          "Implemented a disabled-by-default, read-only profile OAuth connector. Its state, consent, expiry, revocation and authentication checks are tested only with synthetic responses and local HTTP fixtures."
         ],
         "user_actions": [
-          "For manual browser research, complete the secure sign-in prompt in the shared research browser when offered. A phone browser session is separate; do not copy passwords, verification codes or cookies into chat. No extra Uber account is needed for this first step."
+          "No account reset or repeated Rider login is needed for this setup. Authorize the approved app on Uber only after the dashboard offers Connect Uber."
         ],
         "blockers": [
           "A signed-in session in the research browser has not been verified. A login on another device does not establish that session or a ScopeGuard API connection.",
-          "The documented Uber profile API requires provider approval. No approved application or working ScopeGuard OAuth connector has been established. This API prerequisite is separate from permission for manual browser research.",
+          "Uber approval and deployment configuration for a registered application have not been established. The implemented connector stays unavailable until those prerequisites are supplied. This API prerequisite is separate from manual browser research.",
           "No exact private test resource, endpoint, synthetic marker or intended-access baseline has been observed; a URL will not be guessed or activated.",
           "A two-account comparison additionally needs a second separately owned account without shared access to the chosen synthetic record.",
           "The official ListDomains URL with offset=0 and limit=20 was inaccessible through the web research tool. No returned asset list was obtained or used.",
@@ -114,11 +115,11 @@
         "automatically_runs": false,
         "connection": {
           "status": "provider_approval_required",
-          "summary": "Uber requires approval for its profile API. ScopeGuard has no Uber OAuth connector configured; signing in to Uber on your phone does not connect it.",
-          "checked_at": "2026-09-26T07:10:21Z",
+          "summary": "Read-only profile connection code is implemented but no connection has been verified. An approved Uber developer app must be configured before account-owner authorization can begin.",
+          "checked_at": "2026-09-26T07:36:28Z",
           "requirements": [
             "Provider access: Uber approval for the specific API and an application registered through its supported developer process.",
-            "Implementation: an OAuth connector with private server-side credential storage, state validation, fixed callback and minimal scopes; none is implemented or enabled by these notes.",
+            "Server setup: configure the approved application ID and secret privately and register the exact HTTPS callback. Tokens remain in server memory only; restarts require authorization again.",
             "Account consent: the owner authorizes only the approved app and required scope through Uber. A rider login or HackerOne account alone is not API approval.",
             "Testing permission: independently verify the exact asset and proposed method against current bounty scope before any security test. API access is not blanket testing permission."
           ],
