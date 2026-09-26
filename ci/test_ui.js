@@ -51,6 +51,24 @@ setImmediate(async()=>{
  assert.equal(nodes.get('listCount').textContent,'1 item');
  vm.runInContext('openProgram(state.workflow.programs[0]);openAccess()',context);
  const descendants=n=>[n,...(n.children||[]).filter(x=>x&&typeof x==='object').flatMap(descendants)];
+ const oldAutopilot=state.autopilot;
+ state.autopilot={state:'running',healthy:true,eligible:2,blocked:1,case_count:1,confirmed_bounty_bugs:0,heartbeat:1,next_due:2,
+  coverage:'Bounded owned tests only',jobs:[{label:'Saved test',blocker:'<script>permission expired</script>',ready_at:1}],
+  recent_runs:[{kind:'access',outcome:'reproduced_boundary',started:1,finished:2}],
+  cases:[{job:'access:1',last_seen:2,draft:'<script>Private evidence stays text</script>'}]};
+ vm.runInContext('renderAutopilot();renderProgressSummary();openAutopilot()',context);
+ assert.match(nodes.get('nextTitle').textContent,/workflow is running/);
+ assert.match(nodes.get('autopilotProgress').textContent,/1 saved runtime investigations/);
+ assert.match(nodes.get('autopilotProgress').textContent,/Confirmed bounty bugs: 0/);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Private evidence stays text</script>'));
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='Saved test — <script>permission expired</script>'));
+ assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'),'Reading automatic evidence must not activate targets.');
+ assert(requests.every(r=>r.method==='GET'),'Automatic evidence is read-only.');
+ state.autopilot={...state.autopilot,state:'paused'};vm.runInContext('renderAutopilot();renderProgressSummary()',context);
+ assert.match(nodes.get('nextTitle').textContent,/workflow is paused/);
+ assert.match(nodes.get('autopilotStatus').textContent,/paused/);
+ state.autopilot=undefined;vm.runInContext('renderAutopilot()',context);
+ assert.match(nodes.get('autopilotStatus').textContent,/unavailable/);
  const oldAutomatic=state.automatic_research,oldAudits=state.project_audits;
  state.automatic_research={summary:'Automatically waiting for source changes',projects:[{checked:1,modeled_flows:1,unresolved:2,drafts:3}]};
  vm.runInContext('renderAutomaticResearch()',context);
@@ -127,6 +145,7 @@ setImmediate(async()=>{
  assert.match(nodes.get('nextTitle').textContent,/status is unavailable/);
  assert.match(nodes.get('status').textContent,/Status unavailable/);
  state.program_queue=oldQueue;state.workflow.programs=oldPrograms;state.workflow.policy_evidence=oldEvidence;
+ state.autopilot=oldAutopilot;
  state.gitlab={configured:true,connected:true,enabled:1,expires:Date.now()/1000+3600,project:'fixture-a/private-a',result:{evidence:[]},peer:{configured:false}};
  vm.runInContext('openGitlab()',context);
  const peerForm=descendants(nodes.get('detailContent')).find(n=>n['aria-label']==='Connect second GitLab account');

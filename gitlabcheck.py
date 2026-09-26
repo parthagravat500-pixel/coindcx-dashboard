@@ -165,6 +165,9 @@ def compare(config, allowed=lambda: True, transport=fetch, pace=time.sleep):
         evidence[-1]['step'] = label
         if r['status'] == 429 or r['status'] >= 500:
             raise ServerStop(r['status'], r.get('retry_at', 0))
+        if path == endpoint:
+            evidence[-1].update(json=isinstance(r.get('data'),dict), marker_present=bool(marker(r)),
+                                private=bool(project(r,True)), owner=bool(owner(r)))
         return r
 
     def project(r, private=False):
@@ -180,9 +183,11 @@ def compare(config, allowed=lambda: True, transport=fetch, pace=time.sleep):
 
     def owner(r):
         p = r.get('data') or {}
+        if not isinstance(p,dict): return False
         permissions = p.get('permissions') or {}
-        return any(type((permissions.get(k) or {}).get('access_level')) is int and
-                   (permissions.get(k) or {})['access_level'] >= 40 for k in ('project_access', 'group_access'))
+        if not isinstance(permissions,dict): return False
+        return any(isinstance(permissions.get(k),dict) and type(permissions[k].get('access_level')) is int and
+                   permissions[k]['access_level'] >= 40 for k in ('project_access', 'group_access'))
 
     try:
         r = observe('Verify read-only token', '/api/v4/personal_access_tokens/self', config['token'])
@@ -290,6 +295,7 @@ def primary_tick(db, root, log):
             (due, complete, result['status'], json.dumps(result), enabled, row['revision']))
         if updated.rowcount:
             log(c, 'GitLab project check: ' + result['status'] + '. No report sent.')
+            return result
 
 
 def tick(db, root, log):

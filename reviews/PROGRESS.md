@@ -1,5 +1,56 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, automatic runtime orchestration and private cases
+
+Baseline: scopeguard-app 8006a69f5c4b323cb6726854d98dd5e30b623afa, tree
+681f72b322440ba0aa69d0dca9f7aec9f9538f8c. Every local tracked blob was verified
+against this remote tree before editing; the branch head was rechecked before
+publication. Only this branch and the existing approved Render service are in
+scope. Main trading code, credentials, resource plans and authentication are not
+changed. No live private dashboard session was inspected.
+
+Added autopilot.py: durable selection of already-authorized bounded runtime
+checks, a persisted dispatch lease, fair task rotation, shared policy cooldowns,
+failure backoff, interrupted-run recovery and private evidence follow-up. Header,
+owned JSON, GitLab and owned-app validation workers now share this selector.
+Their existing request limits, scope checks, stop rules and positive controls
+remain in force. Other source/dependency workers retain their existing schedules.
+The runtime loop creates a private draft only when control/comparison evidence
+supports a repeated boundary failure, then continues other eligible work. It
+does not send a report, rate severity, activate targets or approve a bounty.
+
+The dashboard now leads with this automatic workflow, current blockers, actual
+attempts and saved private cases. The previous header-only progress view is
+retained as detail. Evidence is rendered as text; reading it never triggers a
+test or a submission. A minimal operational receipt in private host logs exposes
+aggregate scheduler health without target names, URLs, accounts or findings.
+Added the scheduler to automatic installed-source review (29 Python files).
+
+Centralized the standing Mozilla production-automation block in the target gate,
+including direct bounded runner dispatch. Fixed access-profile result persistence
+so finishing work cannot re-enable a profile disabled during the run. GitLab
+evidence now includes only booleans for marker presence, private visibility and
+ownership, allowing the new classifier to require actual control evidence.
+
+Validation: 251 Python tests passed, including 14 new workflow tests; JavaScript
+syntax and the dashboard DOM smoke test passed. A final focused 45-test run also
+passed after the response-validation adjustment. Integration fixtures use two
+actual loopback HTTP servers and the authenticated/CSRF-protected app API. They
+exercise automatic selection, a repeated synthetic exposure, a correctly denied
+resource, a failed control, own-app validation, saved drafts, restart persistence,
+and continuing to the next job. Additional cases cover expired/revoked scope,
+Mozilla and directory gates, rate limits, failed/duplicate workers, abandoned
+leases, redacted health receipts, GitLab controls and ordinary header observations
+not becoming cases. No external security checks or private real findings were
+used in tests or published in source.
+
+Operational deployment and live health are verified separately after publication.
+This completes the run/evidence/next-task workflow for supported saved profiles.
+It does not solve arbitrary-program permission acquisition, provider account/ID
+challenges, general exploit discovery, independent bounty eligibility or report
+acceptance. Keep these limitations visible; do not call the full arbitrary-site
+bounty system complete based on a green test suite or a healthy worker.
+
 ## 2026-09-26, automatic source investigation
 
 Baseline: scopeguard-app 4ac8c35db43fb1e20fb126c4f906923443bbb09c. Remote

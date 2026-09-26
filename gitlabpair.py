@@ -213,6 +213,7 @@ def tick(db, root, log):
             if result.get('provider_stop'):
                 c.execute("UPDATE gitlab_check SET enabled=0,status='Paused after second-account server stop; review required' WHERE id=1 AND revision=?", (row['parent_revision'],))
             log(c, 'GitLab two-account check: ' + result['status'] + '. No report sent.')
+            return result
 
 
 def snapshot(c):

@@ -25,6 +25,16 @@ def policy_key(url):
     return url.rstrip('/')
 
 
+def automation_blocker(policy, url=''):
+    """Restrictive standing policy; this never grants testing permission."""
+    p = urlsplit(policy)
+    hosts = ((urlsplit(url).hostname or '').lower(), (p.hostname or '').lower())
+    if (any(h in ('mozilla.org','mozilla.com') or h.endswith(('.mozilla.org','.mozilla.com')) for h in hosts)
+            or p.hostname == 'hackerone.com' and p.path.strip('/').split('/')[0] == 'mozilla'):
+        return 'Mozilla automated production testing is blocked'
+    return ''
+
+
 def directory_source_blocker(source, now):
     if not source:
         return 'HackerOne directory source is not configured'
@@ -38,6 +48,7 @@ def directory_source_blocker(source, now):
 
 
 def directory_gate(c, policy, now):
+    if automation_blocker(policy): return automation_blocker(policy)
     p = c.execute('SELECT * FROM programs WHERE rtrim(url,\'/\')=?', (policy_key(policy),)).fetchone()
     if not p:
         return 'Program not present in the current directory' if urlsplit(policy).hostname == 'hackerone.com' else ''
@@ -49,9 +60,13 @@ def directory_gate(c, policy, now):
     return ''
 
 
+def target_gate(c, target, now):
+    return automation_blocker(target['policy'],target['url']) or directory_gate(c,target['policy'],now)
+
+
 def eligible(c, now):
     return [dict(t) for t in c.execute('SELECT * FROM targets WHERE enabled=1 AND expires>? ORDER BY due,id', (now,))
-            if not directory_gate(c,t['policy'],now)]
+            if not target_gate(c,t,now)]
 
 
 def next_target(c, now=None):
@@ -119,7 +134,7 @@ def snapshot(c):
              disabled_targets=sum(not t['enabled'] for t in targets),
              expired_targets=sum(bool(t['enabled']) and t['expires']<=now for t in targets),
              directory_blocked_targets=sum(bool(t['enabled']) and t['expires']>now and
-                                           bool(directory_gate(c,t['policy'],now)) for t in targets),
+                                           bool(target_gate(c,t,now)) for t in targets),
              waiting_targets=len(ready)-due_count,
              next_due=min((t['due'] for t in ready),default=None),
              directory_source={

@@ -29,6 +29,7 @@ import research
 import programqueue
 import uberconnect
 import autoresearch
+import autopilot
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -80,6 +81,7 @@ def init():
         research.init(c)
         programqueue.init(c)
         autoresearch.init(c)
+        autopilot.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -92,15 +94,16 @@ def log(c, message):
 def allowed(target_id):
     with db() as c:
         t = c.execute('SELECT * FROM targets WHERE id=?', (target_id,)).fetchone()
-        return bool(t and t['enabled'] and t['expires'] > time.time() and not c.execute('SELECT paused FROM settings').fetchone()[0])
+        return bool(t and t['enabled'] and t['expires'] > time.time() and not c.execute('SELECT paused FROM settings').fetchone()[0]
+                    and not programqueue.target_gate(c,t,int(time.time())))
 
 
-def tick():
+def tick(target_id=None):
     with db() as c:
         programqueue.heartbeat(c, int(time.time()))
         if c.execute('SELECT paused FROM settings').fetchone()[0]:
             return
-        t = programqueue.next_target(c)
+        t = programqueue.next_target(c) if target_id is None else next((x for x in programqueue.eligible(c,int(time.time())) if x['id']==target_id and x['due']<=time.time()),None)
     if not t:
         return
     attempt = None
@@ -129,7 +132,7 @@ def tick():
                 programqueue.finish(c,attempt,'stopped')
                 c.execute('UPDATE targets SET enabled=0,state=? WHERE id=?', ('Stopped: HTTP ' + str(status) + '; review program rules before enabling', t['id']))
                 log(c, 'Automatic stop for target ' + str(t['id']) + ': HTTP ' + str(status))
-                return
+                return {'outcome':'stopped'}
             leads = findings(observation, cors)
             for f in leads:
                 key = hashlib.sha256((str(t['id']) + ':' + f['rule']).encode()).hexdigest()[:24]
@@ -142,6 +145,7 @@ def tick():
             complete = 200 <= status < 300 and (not t['cors'] or cors is not None)
             programqueue.finish(c,attempt,('observations' if leads else 'no_observation') if complete else 'inconclusive',len(leads))
             log(c, 'Check completed for target ' + str(t['id']))
+            return {'outcome':('observations' if leads else 'no_observation') if complete else 'inconclusive'}
     except Exception as e:
         with db() as c:
             programqueue.finish(c,attempt,'error')
@@ -149,6 +153,7 @@ def tick():
             c.execute('UPDATE targets SET failures=?,due=?,enabled=CASE WHEN ?>=3 THEN 0 ELSE enabled END,state=? WHERE id=?',
                       (count, int(time.time()) + min(86400, t['interval'] * 2 ** count), count, 'Check failed (' + type(e).__name__ + '). Review URL, network and TLS; stopped after 3 failures.', t['id']))
             log(c, 'Target ' + str(t['id']) + ' failed: ' + type(e).__name__)
+        return {'outcome':'error'}
 
 
 def worker():
@@ -158,6 +163,29 @@ def worker():
         except Exception:
             # Preserve scheduler availability without exposing exception contents.
             pass
+        WAKE.wait(10)
+
+
+def autonomous_worker(port):
+    runners = {
+        'headers': lambda target: tick(target),
+        'access': lambda target: accesscheck.tick(db,DATA,log,target),
+        'gitlab': lambda target: gitlabcheck.primary_tick(db,DATA,log),
+        'gitlab_pair': lambda target: gitlabcheck.gitlabpair.tick(db,DATA,log),
+        'owned_validation': lambda target: validation.tick(db,log,port,TOKEN),
+    }
+    next_receipt = 0
+    while True:
+        try:
+            autopilot.tick(db,LOCK,log,runners)
+            if time.time() >= next_receipt:
+                with db() as c:
+                    receipt = autopilot.diagnostic(c,os.environ.get('RENDER_GIT_COMMIT',''))
+                print(json.dumps(receipt),flush=True)
+                next_receipt = time.time()+300
+        except Exception:
+            # Only a fixed error label reaches host logs, never exception text.
+            print('{"kind":"scopeguard_autopilot_health","state":"worker_error"}',flush=True)
         WAKE.wait(10)
 
 
@@ -295,6 +323,7 @@ def snapshot():
                 'source_audits': sourceaudit.snapshot(c),
                 'project_audits': projectaudit.snapshot(c),
                 'automatic_research': autoresearch.snapshot(c),
+                'autopilot': autopilot.snapshot(c),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
@@ -554,17 +583,14 @@ if __name__ == '__main__':
     connections.load(DATA)
     init()
     threading.Thread(target=research_worker, daemon=True).start()
-    threading.Thread(target=gitlab_worker, daemon=True).start()
     threading.Thread(target=capital_worker, daemon=True).start()
-    threading.Thread(target=access_worker, daemon=True).start()
     threading.Thread(target=dependency_worker, daemon=True).start()
     threading.Thread(target=queue_worker, daemon=True).start()
     threading.Thread(target=source_watch_worker, daemon=True).start()
-    threading.Thread(target=worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()
     threading.Thread(target=discovery_worker, daemon=True).start()
     threading.Thread(target=reporting_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
-    threading.Thread(target=validation_worker, args=(server.server_address[1],), daemon=True).start()
+    threading.Thread(target=autonomous_worker, args=(server.server_address[1],), daemon=True).start()
     print('ScopeGuard dashboard ready. New installations start paused.', flush=True)
     server.serve_forever()

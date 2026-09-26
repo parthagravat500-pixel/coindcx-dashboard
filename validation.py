@@ -94,6 +94,7 @@ def tick(db,log,port,token):
         c.execute('DELETE FROM validation_runs WHERE id NOT IN (SELECT id FROM validation_runs ORDER BY id DESC LIMIT 20)')
         c.execute('UPDATE validation_schedule SET due=?,status=?,completed=completed+? WHERE id=1',(now+(INTERVAL if complete else 600),result['status'],int(complete)))
         log(c,'Owned-app validation: '+result['status']+'. '+str(len(result['checks']))+' checks recorded; no bounty report sent.')
+    return result
 
 
 def queue(c):

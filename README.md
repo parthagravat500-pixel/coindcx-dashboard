@@ -1,7 +1,51 @@
+## Automatic runtime workflow
+
+The existing research switch now starts one durable selector for saved header
+checks, private-JSON comparisons, owned GitLab comparisons and ScopeGuard's own
+login/request-protection regression. It selects the next eligible task, runs its
+bounded method, records the outcome and continues to another task without a
+browser session or a per-run click. Existing source and dependency workers remain
+separate. The dashboard's main status shows this workflow and its private evidence.
+
+`autopilot.py` uses a persistent dispatch lease and oldest-run ordering so a
+failed task does not occupy every turn. It records due times before dispatch,
+spaces tasks sharing a policy by at least 60 seconds, honors each method's longer
+interval and request budget, and backs off inconclusive/failed work. Interrupted
+leases are recorded as unknown and delayed, never counted as successful tests.
+The central worker replaces the independent header, access, GitLab and owned-app
+validation loops. No new process, resource, paid model or service is provisioned.
+
+Only already-saved, enabled and unexpired permissions are eligible. Runners check
+permission again before individual requests. The master pause survives restarts.
+Mozilla production automation is explicitly blocked in the shared target gate.
+No listing, source-review result, OAuth connection or saved policy note approves a
+target or renews permission. A revoked profile cannot be re-enabled by a finishing
+result. In-flight requests may finish, but revoked/changed work cannot create a
+new confirmed result in this workflow.
+
+Repeated boundary failures require positive controls and repeated comparisons
+before an investigation draft is created. Evidence contains only generated step
+labels, status codes, hashes, sizes and synthetic-marker/permission booleans;
+response bodies, test markers, tokens and exception text are excluded. Drafts and
+up to 200 attempts persist privately behind existing dashboard authentication;
+up to 100 cases are retained, with the latest 30 displayed. Header observations,
+errors and interrupted checks do not become runtime cases. These drafts do not
+enter the report-sending queue. Impact, intended sharing, program eligibility and
+duplicate status remain unverified.
+
+A five-minute receipt in private host logs exposes only the deployed revision,
+worker state, aggregate task counts and last outcome. It contains no target URL,
+account, credential or finding. This permits operational health verification
+without introducing an unauthenticated diagnostics endpoint.
+
+This completes automatic orchestration for the supported, preauthorized methods.
+It does not automate arbitrary program enrollment, account/identity challenges,
+new testing permission, general exploit discovery or bounty acceptance.
+
 ## Automatic source investigation
 
 When the existing master research switch is enabled, the server checks its
-28 installed Python source files for changes every minute. No browser needs to
+29 installed Python source files for changes every minute. No browser needs to
 stay open. The pipeline records input paths, runs bounded synthetic path
 experiments, and creates an investigation draft for each static lead. Existing
 authorized source watches and project uploads use the same pipeline. Unchanged

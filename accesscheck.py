@@ -58,7 +58,7 @@ def configure(c,root,data):
             raise ValueError('Use distinct synthetic markers, absent from both URLs.')
         config.update(peer_target=peer['id'],peer_url=peer['url'],peer_authorization=peer_auth,peer_marker=peer_marker,policy=target['policy'])
         expires=min(expires,peer['expires'])
-    if programqueue.directory_gate(c,target['policy'],int(time.time())):
+    if programqueue.target_gate(c,target,int(time.time())):
         raise ValueError('Refresh and review the program directory before configuring a test.')
     revision=secrets.token_hex(16)
     config['revision']=revision
@@ -133,14 +133,15 @@ def compare(config,allowed=lambda:True,transport=None):
     return result
 
 
-def tick(db,root,log):
+def tick(db,root,log,target_id=None):
     now=int(time.time())
     with db() as c:
         if c.execute('SELECT paused FROM settings').fetchone()[0]:return
         row=c.execute('''SELECT a.*,t.url,t.policy FROM access_checks a JOIN targets t ON t.id=a.target
           LEFT JOIN program_rotation p ON p.policy=rtrim(t.policy,'/')
           WHERE a.enabled=1 AND a.expires>? AND t.enabled=1 AND t.expires>? AND a.due<=?
-          ORDER BY coalesce(p.last_started,0),a.due,a.target LIMIT 1''',(now,now,now)).fetchone()
+          AND (? IS NULL OR a.target=?)
+          ORDER BY coalesce(p.last_started,0),a.due,a.target LIMIT 1''',(now,now,now,target_id,target_id)).fetchone()
         if not row:return
         row=dict(row);c.execute("UPDATE access_checks SET due=?,status='Checking private-data access' WHERE target=?",(now+INTERVAL,row['target']))
         c.execute('INSERT INTO program_rotation VALUES(?,?) ON CONFLICT(policy) DO UPDATE SET last_started=excluded.last_started',(row['policy'].rstrip('/'),now))
@@ -149,7 +150,7 @@ def tick(db,root,log):
             current=c.execute('''SELECT a.revision,a.enabled,a.expires,t.enabled AS active,t.expires AS scope_expires,t.url,t.policy
               FROM access_checks a JOIN targets t ON t.id=a.target WHERE a.target=?''',(row['target'],)).fetchone()
             valid=bool(current and current['revision']==row['revision'] and current['url']==row['url'] and current['policy']==row['policy'] and current['enabled'] and current['active'] and min(current['expires'],current['scope_expires'])>time.time() and not c.execute('SELECT paused FROM settings').fetchone()[0])
-            if not valid or programqueue.directory_gate(c,current['policy'],int(time.time())):return False
+            if not valid or programqueue.target_gate(c,current,int(time.time())):return False
             if config.get('mode')=='two_account':
                 peer=c.execute('SELECT * FROM targets WHERE id=?',(config['peer_target'],)).fetchone()
                 return bool(peer and peer['enabled'] and peer['expires']>time.time() and peer['url']==config['peer_url'] and peer['policy']==config['policy'] and current['policy']==config['policy'])
@@ -165,9 +166,11 @@ def tick(db,root,log):
         result={'status':'Check stopped ('+type(exc).__name__+'); no conclusion established','reproduced':False,'submission_ready':False,'evidence':[]}
         stop=True;delay=3600
     with db() as c:
-        changed=c.execute('UPDATE access_checks SET checked=?,due=?,enabled=?,status=?,result=? WHERE target=? AND revision=?',
+        changed=c.execute('UPDATE access_checks SET checked=?,due=?,enabled=?,status=?,result=? WHERE target=? AND revision=? AND enabled=1',
            (now,now+delay,int(not stop),result['status'],json.dumps(result),row['target'],row['revision']))
-        if changed.rowcount:log(c,'Private-data access check for target '+str(row['target'])+': '+result['status']+'. No report sent.')
+        if changed.rowcount:
+            log(c,'Private-data access check for target '+str(row['target'])+': '+result['status']+'. No report sent.')
+            return result
 
 
 def remove(c,root,target):

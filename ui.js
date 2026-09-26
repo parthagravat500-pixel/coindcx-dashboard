@@ -87,6 +87,7 @@ function policyEvidenceRows(root,records){
 function renderPolicyEvidence(){
  renderUberConnection();
  renderAutomaticResearch();
+ renderAutopilot();
  const evidence=state.workflow?.policy_evidence,root=$('policyEvidenceList');root.replaceChildren();
  $('policyEvidenceStatus').textContent=evidence?(evidence.records.length+' saved policy reviews · testing approval is separate'+(evidence.unavailable_entries?' · Some evidence could not be loaded.':'')):'Policy evidence is unavailable from this server version.';
  const checked=(evidence?.records||[]).map(r=>Date.parse(r.checked_at)).filter(Number.isFinite);
@@ -102,6 +103,26 @@ function renderAutomaticResearch(){
  $('automaticResearchEvidence').textContent=projects.length?projects.length+' source projects · '+total('modeled_flows')+' input flows observed in the model · '+total('unresolved')+' unresolved leads · '+total('drafts')+' investigation drafts. Latest review: '+date(Math.max(...projects.map(p=>p.checked)))+'. Runtime vulnerabilities remain unverified.':'No completed automatic source evidence yet. Listed programs do not count as completed research.';
 }
 $('openAutomaticResearch').onclick=()=>openProjectAudits();
+function renderAutopilot(){
+ const a=state.autopilot;
+ const labels={paused:'Automatic tests are paused.',unavailable:'Automatic test worker has not checked in recently.',running:'Running an approved task.',ready:'Selecting the next approved task.',waiting:'Waiting for the next permitted check time.'};
+ $('autopilotStatus').textContent=a?(labels[a.state]||'State unavailable'):'Automatic workflow is unavailable from this server version.';
+ $('autopilotProgress').textContent=a?a.eligible+' eligible tasks · '+a.blocked+' blocked tasks · '+(a.case_count??a.cases.length)+' saved runtime investigations. Confirmed bounty bugs: '+a.confirmed_bounty_bugs+'.':'Waiting for authenticated progress data.';
+}
+function openAutopilot(){
+ const root=modal('Automatic workflow and evidence'),a=state.autopilot;
+ if(!a){root.append(el('p','Workflow state is unavailable.'));return;}
+ root.append(el('p',a.coverage),el('p','These results cover saved test profiles only. Reproduced behavior still needs impact, eligibility and duplicate review before reporting.'));
+ facts(root,[['Worker',a.state],['Last check-in',date(a.heartbeat)],['Next eligible check',date(a.next_due)],['Reports submitted by this workflow','None']]);
+ root.append(el('h3','Saved tasks'));
+ for(const job of a.jobs||[])root.append(el('p',job.label+' — '+(job.blocker||'Next permitted time: '+date(job.ready_at))));
+ root.append(el('h3','Recent attempts'));
+ for(const run of a.recent_runs||[])root.append(el('p',run.kind.replaceAll('_',' ')+' — '+run.outcome.replaceAll('_',' ')+' · '+date(run.finished||run.started)));
+ root.append(el('h3','Latest runtime investigations'));
+ if(!a.cases.length)root.append(el('p','No repeated boundary failure has been recorded by this workflow. This does not certify that the targets are secure.'));
+ for(const item of a.cases){const box=el('details');box.append(el('summary',item.job+' · '+date(item.last_seen)),el('pre',item.draft));root.append(box);}
+}
+$('openAutopilot').onclick=openAutopilot;
 function researchFocus(){return (state.workflow?.policy_evidence?.records||[]).filter(r=>r.research_plan?.selected).sort((a,b)=>(b.research_plan.updated_at||'').localeCompare(a.research_plan.updated_at||''))[0];}
 function renderUberConnection(){
  const c=state.uber_connection;
@@ -301,7 +322,7 @@ function simpleCheckStatus(q){
  if(q.paused)return ['Website checks are paused','Saved progress is kept. Resuming only uses existing, unexpired permissions; it does not approve more websites.'];
  if(!q.saved_targets)return ['No websites approved for automatic checks','Program reviews are saved, but an exact URL and permission for its test method must be approved before checks can start.'];
  if(!q.healthy)return ['Website worker needs attention','The check worker has not reported recently. Open details to see its last check-in.'];
- if(!q.eligible_targets){const reasons=[];if(q.expired_targets)reasons.push(q.expired_targets+' permissions expired');if(q.disabled_targets)reasons.push(q.disabled_targets+' saved URLs disabled');if(q.directory_blocked_targets)reasons.push(q.directory_blocked_targets+' URLs blocked by program-directory status');return ['Saved website checks are blocked',reasons.length?reasons.join(' · ')+'. Review these blockers before any tests can run.':'No saved URL currently meets all permission and scheduling requirements.'];}
+ if(!q.eligible_targets){const reasons=[];if(q.expired_targets)reasons.push(q.expired_targets+' permissions expired');if(q.disabled_targets)reasons.push(q.disabled_targets+' saved URLs disabled');if(q.directory_blocked_targets)reasons.push(q.directory_blocked_targets+' URLs blocked by policy or program-directory status');return ['Saved website checks are blocked',reasons.length?reasons.join(' · ')+'. Review these blockers before any tests can run.':'No saved URL currently meets all permission and scheduling requirements.'];}
  if(!q.due_targets)return ['Waiting for the next scheduled check','Next eligible check: '+date(q.next_due)+'. Approved intervals are being respected.'];
  return ['Limited website checks are due',q.due_targets+' approved URLs are due for response-header checks. A completed check does not establish a security bug.'];
 }
@@ -313,6 +334,13 @@ function renderProgressSummary(){
  $('plainSummary').textContent=q?.confirmed_payable===0?'No confirmed bounty bug yet. The saved work and current check status are shown below.':'Open the saved evidence to see what has been established.';
  const [title,detail]=simpleCheckStatus(q);$('nextTitle').textContent=title;$('nextText').textContent=detail;
  $('status').textContent='● '+(!q||q.saved_targets==null?'Status unavailable':q.paused?'Checks paused':q.saved_targets===0?'Setup needed':!q.healthy?'Check worker':!q.eligible_targets?'Checks blocked':!q.due_targets?'Waiting for schedule':'Checks due');
+ const a=state.autopilot;
+ if(a){
+  const titles={paused:'Automatic workflow is paused',unavailable:'Automatic worker needs attention',running:'Automatic workflow is running',ready:'Automatic workflow is selecting work',waiting:'Automatic workflow is waiting for its next check'};
+  $('nextTitle').textContent=titles[a.state]||'Automatic workflow state unavailable';
+  $('nextText').textContent=a.eligible+' eligible tasks · '+a.blocked+' blocked tasks. '+(a.state==='paused'?'Saved progress is kept.':a.state==='unavailable'?'The worker has not reported recently.':'Next permitted check: '+date(a.next_due)+'.')+' Open automatic workflow details for its supported checks and saved evidence.';
+  $('status').textContent='● '+({paused:'Paused',unavailable:'Worker needs attention',running:'Working automatically',ready:'Selecting work',waiting:'Waiting for schedule'}[a.state]||'State unavailable');
+ }
  const programs=state.workflow?.programs||[];
  $('directorySummary').textContent=programs.length+' programs listed for research. Listings are not approved targets or completed tests.';
  $('connectAI').textContent='View check details';$('openSetup').textContent='Setup & connections';
@@ -355,7 +383,7 @@ function setup(){
  root.append(list,el('p','No AI API charges. Your existing hosting charge remains. Reports still require independently validated evidence.','muted'));
  root.append(button(state.reporting?.connected?'Reporting account settings':'Connect reporting account',reportSetup));
 }
-$('connectAI').onclick=openProgramQueue;$('openSetup').onclick=setup;
+$('connectAI').onclick=()=>state.autopilot?openAutopilot():openProgramQueue();$('openSetup').onclick=setup;
 $('detail').addEventListener('close',()=>{$('detail').querySelectorAll('input[type="password"]').forEach(i=>i.value='');});
 $('masterPause').onclick=async()=>{const b=$('masterPause');b.disabled=true;const pause=state.workflow.enabled||!state.paused;try{await change('/api/all-pause',{paused:pause});}catch(e){$('message').textContent=e.message;}finally{b.disabled=false;}};
 
