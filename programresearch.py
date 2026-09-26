@@ -23,6 +23,11 @@ ERRORS = {
     'program_shape':'The program response did not contain the expected program fields.',
     'program_type':'The platform returned an unexpected program record type.',
     'program_identity':'The returned program did not match the requested program.',
+    'program_envelope':'The API response did not contain a program object.',
+    'program_attributes':'The API response did not contain program attributes.',
+    'program_policy_format':'The policy body was not published as text in this response.',
+    'program_state_format':'The API used an unsupported program status format.',
+    'resource_metadata':'The API used an unsupported record label format.',
     'size':'The official document exceeded the configured storage limit.',
     'transport':'The connection failed. A retry is scheduled.',
     'dns':'The official API address did not pass the public address check.',
@@ -58,7 +63,7 @@ def init(c):
         next_request INTEGER DEFAULT 0,last_request INTEGER DEFAULT 0,last_success INTEGER DEFAULT 0,
         status TEXT DEFAULT 'connection_needed',index_checked INTEGER DEFAULT 0,
         offset INTEGER DEFAULT 0,index_complete INTEGER DEFAULT 0,program_index TEXT DEFAULT '{}');
-      CREATE TABLE IF NOT EXISTS program_research_health (id INTEGER PRIMARY KEY,heartbeat INTEGER,next_request INTEGER,parser_version INTEGER DEFAULT 2);
+      CREATE TABLE IF NOT EXISTS program_research_health (id INTEGER PRIMARY KEY,heartbeat INTEGER,next_request INTEGER,parser_version INTEGER DEFAULT 3);
       INSERT OR IGNORE INTO program_research_health(id,heartbeat,next_request) VALUES(1,0,0);
     ''')
     # Existing databases keep their progress; only fixed error codes are added.
@@ -68,16 +73,17 @@ def init(c):
             if name not in columns:c.execute('ALTER TABLE '+table+' ADD COLUMN '+name+" TEXT DEFAULT ''")
     if 'parser_version' not in {r[1] for r in c.execute('PRAGMA table_info(program_research_health)')}:
         c.execute('ALTER TABLE program_research_health ADD COLUMN parser_version INTEGER DEFAULT 1')
-    if c.execute('SELECT parser_version FROM program_research_health WHERE id=1').fetchone()[0]<2:
+    if c.execute('SELECT parser_version FROM program_research_health WHERE id=1').fetchone()[0]<3:
         # Retry parser failures once after this correction, retaining provider
         # access blocks, rate-limit timers and the global request budget.
-        c.execute("UPDATE program_research SET status='queued',due=0,phase='policy',page=1,partial='{}' WHERE status='incomplete' AND checked=0 AND last_error IN ('','program_type')")
-        c.execute('UPDATE program_research_health SET parser_version=2 WHERE id=1')
+        c.execute("UPDATE program_research SET status='queued',due=0,phase='policy',page=1,partial='{}' WHERE status='incomplete' AND checked=0 AND last_error IN ('','program_type','schema')")
+        c.execute('UPDATE program_research_health SET parser_version=3 WHERE id=1')
     for p in programapi.HOSTS:c.execute('INSERT OR IGNORE INTO program_research_providers(provider) VALUES(?)',(p,))
 
 
 def safe_text(value,limit=20000):
-    if not isinstance(value,str) or len(value)>limit:raise programapi.APIError('schema')
+    if not isinstance(value,str):raise programapi.APIError('schema')
+    if len(value)>limit:raise programapi.APIError('size')
     return value
 
 
@@ -85,7 +91,8 @@ def resource_type(value):
     # Type names are descriptive API metadata, not program authorization. The
     # observed API uses labels different from its examples. Validate the actual
     # identity and required attributes instead, preserving the source label.
-    if not isinstance(value,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,79}',value):raise programapi.APIError('schema')
+    if value is None:return 'unspecified'
+    if not isinstance(value,str) or not re.fullmatch(r'[A-Za-z][A-Za-z0-9_-]{0,79}',value):raise programapi.APIError('resource_metadata')
     return value
 
 
@@ -106,12 +113,16 @@ def empty_evidence(policy):
 
 
 def h1_policy(doc,policy):
-    data=doc.get('data',{});attrs=data.get('attributes',{}) if isinstance(data,dict) else {}
-    if not isinstance(data,dict) or not isinstance(attrs,dict):raise programapi.APIError('program_shape')
+    data=doc.get('data')
+    if not isinstance(data,dict):raise programapi.APIError('program_envelope')
+    attrs=data.get('attributes')
+    if not isinstance(attrs,dict):raise programapi.APIError('program_attributes')
     handle=programapi.canonical(policy).removeprefix('hackerone:')
     kind=resource_type(data.get('type'))
     if str(attrs.get('handle','')).lower()!=handle:raise programapi.APIError('program_identity')
     if 'policy' not in attrs or not isinstance(attrs.get('submission_state'),str):raise programapi.APIError('program_shape')
+    if attrs['policy'] is not None and not isinstance(attrs['policy'],str):raise programapi.APIError('program_policy_format')
+    if attrs.get('state') is not None and not isinstance(attrs['state'],str):raise programapi.APIError('program_state_format')
     out=empty_evidence(policy);out['policy_text']=safe_text(attrs.get('policy') or '',120000)
     out['platform_record_type']=kind
     out['program_status']=safe_text(attrs.get('submission_state') or 'unknown',80)

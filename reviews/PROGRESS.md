@@ -2,6 +2,15 @@
 
 ## 2026-09-26, program API parser compatibility
 
+Follow-up: 8709bc04dd80eb0e98f3538dd5a2b46ec298a657 passed 293 hosted
+tests and became live at 11:21 UTC. Its first request still encountered a generic
+schema failure. Added fixed field-specific diagnostics for missing program data,
+attributes, non-text policies and unexpected status fields. Missing descriptive
+type metadata is now recorded as unspecified; exact identity and required policy
+fields remain mandatory. Oversized text is identified as a size limit instead of
+a format mismatch. Twenty-six focused tests passed. This does not claim that a
+live policy collection has succeeded; subsequent receipts determine that.
+
 The diagnostic release a05e92c97ea6845509f0bfe873939d99b92177d4 passed
 291 hosted tests and became live at 11:16 UTC. Its fixed diagnostic confirmed
 that the nominal program record type did not match the documentation example.
