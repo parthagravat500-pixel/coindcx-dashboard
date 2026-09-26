@@ -86,6 +86,7 @@ function policyEvidenceRows(root,records){
 }
 function renderPolicyEvidence(){
  renderUberConnection();
+ renderAutomaticResearch();
  const evidence=state.workflow?.policy_evidence,root=$('policyEvidenceList');root.replaceChildren();
  $('policyEvidenceStatus').textContent=evidence?(evidence.records.length+' saved policy reviews · testing approval is separate'+(evidence.unavailable_entries?' · Some evidence could not be loaded.':'')):'Policy evidence is unavailable from this server version.';
  const checked=(evidence?.records||[]).map(r=>Date.parse(r.checked_at)).filter(Number.isFinite);
@@ -93,6 +94,14 @@ function renderPolicyEvidence(){
  if(evidence)policyEvidenceRows(root,evidence.records);
  renderResearchFocus();
 }
+function renderAutomaticResearch(){
+ const r=state.automatic_research;
+ $('automaticResearchStatus').textContent=r?r.summary:'Automatic research status is unavailable from this server version.';
+ const projects=r?.projects||[];
+ const total=key=>projects.reduce((n,p)=>n+(Number.isInteger(p[key])?p[key]:0),0);
+ $('automaticResearchEvidence').textContent=projects.length?projects.length+' source projects · '+total('modeled_flows')+' input flows observed in the model · '+total('unresolved')+' unresolved leads · '+total('drafts')+' investigation drafts. Latest review: '+date(Math.max(...projects.map(p=>p.checked)))+'. Runtime vulnerabilities remain unverified.':'No completed automatic source evidence yet. Listed programs do not count as completed research.';
+}
+$('openAutomaticResearch').onclick=()=>openProjectAudits();
 function researchFocus(){return (state.workflow?.policy_evidence?.records||[]).filter(r=>r.research_plan?.selected).sort((a,b)=>(b.research_plan.updated_at||'').localeCompare(a.research_plan.updated_at||''))[0];}
 function renderUberConnection(){
  const c=state.uber_connection;
@@ -530,7 +539,7 @@ $('openGitlab').onclick=openGitlab;
 
 function openProjectAudits(){
  const root=modal('Project research');
- root.append(el('p','Investigate new code paths first, compare revisions, and keep evidence for each lead. Python code is parsed, never executed. Reviews are local and have no AI API fees.','muted'));
+ root.append(el('p','Source reviews automatically compare revisions, try bounded code-path experiments and save investigation drafts. Inspected code is never executed. Runtime behavior and bounty eligibility remain unverified.','muted'));
  const audits=state.project_audits||[];
  if(!audits.length)root.append(el('p','No project analysis has completed yet.'));
  for(const a of audits){const box=el('details');box.open=true;const r=a.result,c=r.changes;
@@ -543,10 +552,14 @@ function openProjectAudits(){
  }else box.append(el('p','Baseline recorded. Upload the next revision with the same project name and folder paths to compare changes.','muted'));
  if(r.syntax_skipped.length)box.append(el('p','Could not parse: '+r.syntax_skipped.join(', ')));
  if(r.bounded_or_truncated)box.append(el('p','Coverage is incomplete: a depth, work or output limit was reached.'));
+ if(r.automatic_validation){const v=r.automatic_validation;box.append(el('p',v.experiments+' synthetic experiments attempted · '+v.modeled_flows+' modeled input flows · '+v.unresolved+' unresolved leads · '+v.drafts+' automatic investigation drafts'),el('p',v.limitation,'muted'));}
  if(!r.findings.length)box.append(el('p','No input-to-operation paths found by the covered checks. This does not establish that the project is secure.'));
  for(const f of r.findings){const detail=el('details');detail.append(el('summary',(f.set_aside?'Set aside':f.change_status||'Lead')+' · '+f.title+' — '+f.file+':'+f.line));
  if(f.changed_trace_files?.length)detail.append(el('p','Priority reason: path includes changed or added files: '+f.changed_trace_files.join(', ')));
  const steps=el('ol');f.trace.forEach(t=>steps.append(el('li',t.file+':'+t.line+' — '+t.role)));detail.append(steps);
+ if(f.automatic_validation){const v=f.automatic_validation;detail.append(el('h3','Automatic path experiment'),el('p',v.status.replaceAll('_',' ')+': '+v.reason),el('p',v.experiments+' generated-input experiments attempted. This is an incomplete model, not a live exploit.'));
+ for(const evidence of v.evidence||[]){detail.append(el('p','Probe family: '+evidence.probe_family));const route=el('ol');for(const step of evidence.route||[])route.append(el('li',step.file+':'+step.line+' — '+step.role));detail.append(route);}}
+ if(f.investigation_draft){const draft=el('details');draft.append(el('summary','Automatically prepared investigation draft'),el('pre',f.investigation_draft));detail.append(draft);}
  if(f.research){detail.append(el('strong',f.research.question));const checklist=el('ol');f.research.evidence_required.forEach(t=>checklist.append(el('li',t)));detail.append(checklist);
  if(f.related_leads)detail.append(el('p',f.related_leads+' related leads use the same operation. '+f.research.variant_hint));}
  detail.append(el('p','Evidence status: static hypothesis. No runtime impact demonstrated.','muted'));

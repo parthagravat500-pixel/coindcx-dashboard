@@ -1,4 +1,39 @@
-## Uber account connection
+## Automatic source investigation
+
+When the existing master research switch is enabled, the server checks its
+28 installed Python source files for changes every minute. No browser needs to
+stay open. The pipeline records input paths, runs bounded synthetic path
+experiments, and creates an investigation draft for each static lead. Existing
+authorized source watches and project uploads use the same pipeline. Unchanged
+source reuses its evidence; changes and engine upgrades trigger a fresh review.
+Pause persists across restarts and is never automatically cleared. No directory
+entry, policy note or OAuth connection activates a website target.
+
+`pathcheck.py` interprets a deliberately small AST subset with generated inputs.
+It models top-level direct function calls, assignments, simple string building,
+conditionals and selected primitive conversions/predicates. Sensitive operations
+are intercepted, never invoked. Unknown calls, classes, loops and other unsupported
+features stop an experiment. Limits: 20 leads, three entry points, three input
+pairs, six call levels, 2,000 steps per experiment and bounded primitive values.
+Source code is not imported, compiled into executable code, or executed.
+
+Results distinguish **input influence observed in the model**, **not reproduced
+with sampled inputs**, **unsupported**, and **budget exhausted**. None proves
+runtime exploitability, safety, authorization or bounty eligibility. For example,
+a numeric SQL input can change a query argument while remaining safe from SQL
+injection. Failed experiments cannot dismiss a lead. Drafts contain source
+locations and evidence digests, never evaluated values or source literals. They
+remain inside the authenticated evidence view and are never submitted.
+
+`autoresearch.py` persists worker heartbeat, completed changed-source reviews,
+pause/error state and retry backoff. A failed stage rolls back the new source
+evidence, preserving the previous complete result. The dashboard shows this
+work separately from live website checks and confirmed bounty bugs. The optional
+Uber profile connector is collapsed because it is not a prerequisite for source
+research. This is automatic source investigation within explicit coverage limits,
+not a complete autonomous bounty researcher for arbitrary websites or accounts.
+
+## Uber account connection (optional)
 
 `uberconnect.py` implements an optional, read-only Uber profile OAuth connection.
 It is disabled by default. A Rider login does not configure this integration.

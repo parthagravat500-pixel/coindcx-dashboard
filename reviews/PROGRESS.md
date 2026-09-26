@@ -1,5 +1,49 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, automatic source investigation
+
+Baseline: scopeguard-app 4ac8c35db43fb1e20fb126c4f906923443bbb09c. Remote
+head/tree were read and every local tracked blob matched before editing. The
+user reaffirmed that ScopeGuard should perform the work automatically, without
+repeated account setup. No existing permission, credential or pause state was
+expanded by this change.
+
+Added an automatic investigation stage to existing owned-source reviews,
+authorized source watches and uploads. Static input paths now receive bounded
+AST-model experiments with paired synthetic inputs and a private investigation
+draft tied to the source evidence digest. Sensitive operations are intercepted;
+no inspected code, SQL, shell command or deserializer runs. Unsupported paths,
+unreproduced sampled paths and budget limits remain unresolved. Even a modeled
+input flow does not establish unsafe handling, runtime reachability, authorization
+failure, real impact or bounty eligibility. No automatic report submission or
+new target activation was added.
+
+The installed-source worker now covers 28 Python files, including the previously
+omitted newer permission, identity, OAuth and research modules. It checks changes
+once per minute inside the existing worker, deduplicates unchanged evidence,
+honors the master pause, persists progress across restarts and rolls back a failed
+stage before retrying with backoff. Authenticated dashboard state exposes worker
+health, last review, experiments, unresolved leads and investigation drafts.
+Automatic source research is the primary card; Uber profile integration and
+program preparation are collapsed optional details.
+
+Validation: all 237 Python tests passed, including 11 new automatic-research tests,
+plus JavaScript syntax and dashboard DOM checks. Synthetic fixtures cover
+cross-file flows, guards, safe SQL parameter binding, unsupported operations,
+analysis budgets, no source-value persistence, pause, deduplication, restart,
+rollback, retry and no target/submission creation. A local run on the actual 28
+installed source files completed in approximately 0.4 seconds with zero static
+input-flow leads and zero activated targets; this is not a clean bill of health
+or a statement about the private live queue. An unchanged second pass did not
+increase completed reviews.
+
+No extra resources, paid service, Uber login, external security test, account,
+submission or confirmed bounty bug was created. The full autonomous research
+system for arbitrary bounty programs remains incomplete: live permission and
+account barriers, unsupported languages/paths and independent runtime validation
+are not solved by this source-model pipeline. Publication and deployment are
+verified separately after this commit; no private live-state inspection is claimed.
+
 ## 2026-09-26, Uber profile connector implementation
 
 Baseline: scopeguard-app 575c39d88b5ca86fbe6f5c55c7a474a3b4da3a70.

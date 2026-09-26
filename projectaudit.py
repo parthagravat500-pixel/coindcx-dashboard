@@ -8,8 +8,9 @@ from pathlib import PurePosixPath
 import stat
 import time
 import zipfile
+import pathcheck
 
-VERSION = 'project-flow-2'
+VERSION = 'project-flow-3/' + pathcheck.VERSION
 MAX_TOTAL = 2000000
 MAX_FILE = 128000
 MAX_FILES = 80
@@ -127,7 +128,11 @@ def analyze(files):
                 if sink and flow:
                     trace = merge(flow, [location(path,node,'Sensitive operation')])
                     fingerprint = hashlib.sha256(json.dumps([path,key,sink,ast.dump(node,include_attributes=False),[(t['file'],t['role']) for t in trace]],sort_keys=True).encode()).hexdigest()[:20]
-                    findings[fingerprint] = {'id':fingerprint,'title':sink,'file':path,'line':node.lineno,'trace':trace,
+                    entries = findings.get(fingerprint, {}).get('entrypoints', [])
+                    entry = stack[0] if stack else key
+                    if entry not in entries and len(entries) < 3: entries.append(entry)
+                    findings[fingerprint] = {'id':fingerprint,'title':sink,'file':path,'line':node.lineno,'column':node.col_offset,'trace':trace,
+                        'entrypoints':entries,
                         'priority':'Review first','confirmed':False,'submission_ready':False,'research':research_plan(sink),
                         'next_step':'Verify that this path is reachable, check validation and authorization, then reproduce with synthetic data in an isolated copy.'}
                 candidate = modules[path] + '.' + call if call not in functions else call
@@ -186,6 +191,17 @@ def record(c,name,files,skipped=0):
     old = c.execute('SELECT digest,result,checked FROM project_audits WHERE name=?',(name,)).fetchone()
     if old and old[0] == digest: return False
     result = analyze(files);result['non_python_or_excluded_files'] = skipped
+    experiments = pathcheck.validate(files, result['findings'])
+    for finding in result['findings']:
+        finding['automatic_validation'] = experiments[finding['id']]
+        finding['investigation_draft'] = pathcheck.draft(finding, digest)
+    result['automatic_validation'] = {
+        'engine': pathcheck.VERSION, 'leads_processed': min(len(experiments), pathcheck.MAX_LEADS),
+        'experiments': sum(v['experiments'] for v in experiments.values()),
+        'modeled_flows': sum(v['status']=='modeled_flow' for v in experiments.values()),
+        'unresolved': sum(v['status']!='modeled_flow' for v in experiments.values()),
+        'drafts': len(experiments), 'runtime_verified': False,
+        'limitation': pathcheck.LIMITATION}
     manifest = {path:hashlib.sha256(source.encode()).hexdigest() for path,source in files.items()}
     previous = json.loads(old[1]) if old else {}
     compatible = previous.get('engine') == VERSION and 'manifest' in previous

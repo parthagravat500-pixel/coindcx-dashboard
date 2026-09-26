@@ -28,6 +28,7 @@ import reporting
 import research
 import programqueue
 import uberconnect
+import autoresearch
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -78,6 +79,7 @@ def init():
         workqueue.init(c)
         research.init(c)
         programqueue.init(c)
+        autoresearch.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -239,11 +241,7 @@ def queue_worker():
             with LOCK:
                 workqueue.tick(db, log)
                 with db() as c:
-                    if not c.execute('SELECT paused FROM settings').fetchone()[0]:
-                        project_changed=projectaudit.record(c,'ScopeGuard',{name:(ROOT/name).read_text() for name in sourceaudit.FILES if (ROOT/name).is_file()})
-                        if project_changed:log(c,'Project flow review completed for ScopeGuard. Evidence paths are hypotheses, not confirmed bounty findings.')
-                        count=sourceaudit.installed(c,ROOT)
-                        if count:log(c,'Source audit completed for '+str(count)+' changed ScopeGuard Python files; pattern matches require review.')
+                    autoresearch.tick(c, ROOT, log)
         except Exception:
             with db() as c:
                 c.execute("UPDATE background_status SET status='Review failed; retrying on next cycle' WHERE id=1")
@@ -296,6 +294,7 @@ def snapshot():
                 'program_queue': programqueue.snapshot(c),
                 'source_audits': sourceaudit.snapshot(c),
                 'project_audits': projectaudit.snapshot(c),
+                'automatic_research': autoresearch.snapshot(c),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
