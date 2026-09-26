@@ -1,4 +1,5 @@
 import json
+import sqlite3
 import unittest
 from unittest.mock import patch
 
@@ -75,6 +76,35 @@ class QueryCheckTests(unittest.TestCase):
         self.assertTrue(result['component_verified'])
         raw=json.dumps(result)
         for forbidden in ('private_secret_canary','scopeguard_owner',"OR 1=1",source):self.assertNotIn(forbidden,raw)
+
+    def test_build_without_extension_api_keeps_component_and_sandbox_working(self):
+        class WithoutExtensions(sqlite3.Connection):
+            def __getattribute__(self,name):
+                if name=='enable_load_extension':raise AttributeError(name)
+                return super().__getattribute__(name)
+        connect=sqlite3.connect
+        with patch('querycheck.sqlite3.connect',side_effect=lambda *a,**kw:connect(*a,factory=WithoutExtensions,**kw)):
+            self.assertTrue(self.review({'web.py':QUOTED})[0]['component_verified'])
+            fixture=querycheck.Fixture('SELECT * FROM records WHERE owner=17')
+            try:
+                self.assertFalse(hasattr(fixture.c,'enable_load_extension'))
+                for query in ("SELECT load_extension('forbidden')",'SELECT randomblob(1000000000)',
+                              "ATTACH DATABASE '/tmp/forbidden.db' AS leaked",'DELETE FROM records'):
+                    with self.assertRaises(querycheck.Unsupported):fixture.read(query)
+                self.assertEqual(len(fixture.read('SELECT * FROM records')),2)
+            finally:fixture.close()
+
+    def test_extension_disable_failure_stays_unsupported_and_closes_fixture(self):
+        class DisableFailure(sqlite3.Connection):
+            def enable_load_extension(self,enabled):
+                raise sqlite3.OperationalError('Unable to disable extensions')
+        connection=sqlite3.connect(':memory:',factory=DisableFailure)
+        files={'web.py':QUOTED};findings=projectaudit.analyze(files)['findings']
+        with patch('querycheck.sqlite3.connect',return_value=connection),patch('querycheck.FAMILIES',querycheck.FAMILIES[:1]):
+            result=querycheck.validate(files,findings)[findings[0]['id']]
+        self.assertEqual(result['status'],'unsupported')
+        self.assertFalse(result['component_verified'])
+        with self.assertRaises(sqlite3.ProgrammingError):connection.execute('SELECT 1')
 
     def test_budget_is_explicit_and_never_promotes_untested_leads(self):
         files={'web.py':'\n'.join(NUMERIC.replace('route()',f'route{i}()') for i in range(15))}

@@ -43,7 +43,10 @@ class Fixture:
             raise
 
     def initialize(self,selected,column):
-        self.c.enable_load_extension(False)
+        # Python may be built without this optional API. Fresh connections never
+        # enable extensions; the authorizer below also denies every SQL function.
+        disable_extensions = getattr(self.c,'enable_load_extension',None)
+        if disable_extensions is not None: disable_extensions(False)
         self.c.setlimit(sqlite3.SQLITE_LIMIT_LENGTH,65536)
         self.c.setlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH,4096)
         self.c.setlimit(sqlite3.SQLITE_LIMIT_COLUMN,12)

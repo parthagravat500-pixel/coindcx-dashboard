@@ -1,5 +1,19 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, hosting compatibility correction
+
+The first deployment of a8c4a7038d639722bd67adea7095d722c52dfd40 was blocked
+by its build tests: the host's Python SQLite module does not expose the optional
+enable_load_extension method. Local and GitHub tests had passed, but the hosted
+test run failed before release. The existing service version was preserved.
+
+The component fixture now disables extension loading explicitly when that API
+exists. Fresh SQLite connections keep their default disabled extension state;
+the authorizer still rejects every SQL function, external database attachment
+and write. An available API that fails to disable extensions still prevents the
+fixture from running. Two regression tests cover the missing API, retained
+sandbox restrictions, and failure cleanup. Deployment is verified separately.
+
 ## 2026-09-26, automatic lead follow-up and evidence inbox
 
 Baseline: scopeguard-app da01ffbc852a3264907389729921b47598d46cb5. Verified all
