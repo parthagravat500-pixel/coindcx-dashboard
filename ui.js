@@ -475,23 +475,26 @@ function renderProgramResearch(){
  const r=state.program_research;
  $('openProgramResearch').disabled=!r;$('openProgramConnections').disabled=!r;
  $('homeProgramResearchBadge').textContent=!r?'Unavailable':r.paused?'Paused':!r.healthy?'Needs attention':r.providers.some(p=>p.connected&&!p.blocked)?'Automatic':'Connection needed';
- $('homeProgramResearchSummary').textContent=!r?'Current program research is unavailable.':r.listed+' listed programs · '+r.documents_collected+' with current official documents · '+(r.policy_documents_saved||0)+' with policy text saved · '+r.attempted+' with a document request attempted.';
+ $('homeProgramResearchSummary').textContent=!r?'Current program research is unavailable.':r.listed+' listed programs · '+r.documents_collected+' with current official documents · '+(r.policy_documents_saved||0)+' with policy text saved · '+(r.briefs_prepared||0)+' research briefs prepared.';
  const missing=(r?.providers||[]).filter(p=>!p.connected).map(p=>p.provider==='hackerone'?'HackerOne':'Intigriti');
  $('homeProgramResearchNext').textContent=!r?'Waiting for a fresh dashboard update.':r.paused?'Program research is paused.':missing.length?'Connect '+missing.join(' and ')+' once for automatic rule collection. Connected platforms can continue.':r.providers.some(p=>p.blocked)?'A platform refused access or returned an unsupported response. Other connected platforms can continue.':'The worker reads official rules, saves scope and exclusions, and moves to the next program. Documents refresh daily.';
 }
 function openProgramResearch(){
  const r=state.program_research,root=modal('Research across all listed programs');
  if(!r){root.append(el('p','Current research status is unavailable.'));return;}
- root.append(el('p',r.coverage),el('p','Official documents collected: '+r.documents_collected+' of '+r.listed+'. No new testing permissions have been granted.'),button('Research connections',openProgramConnections));
+ root.append(el('p',r.coverage),el('p','Official documents collected: '+r.documents_collected+' of '+r.listed+'. Research briefs prepared: '+(r.briefs_prepared||0)+'.'),button('Research connections',openProgramConnections));
  const label=el('label','Find a program'),search=el('input');search.type='search';search.placeholder='Program name';label.append(search);
+ const filterLabel=el('label','Show'),filter=el('select');for(const [value,title] of [['all','All programs'],['prepared','Research briefs prepared'],['connection','Needs a connection'],['collecting','Still collecting rules']]){const option=el('option',title);option.value=value;filter.append(option);}filter.value='all';filterLabel.append(filter);
  const list=el('div'),more=button('Show more',()=>{limit+=40;draw();});let limit=40;
- const draw=()=>{const rows=r.rows.filter(x=>x.name.toLowerCase().includes(search.value.toLowerCase()));list.replaceChildren();for(const row of rows.slice(0,limit)){
+ const draw=()=>{const rows=r.rows.filter(x=>x.name.toLowerCase().includes(search.value.toLowerCase())&&(filter.value==='all'||filter.value==='prepared'&&x.preparation?.prepared||filter.value==='connection'&&x.status==='connection_needed'||filter.value==='collecting'&&['queued','collecting','retry'].includes(x.status)));list.replaceChildren();for(const row of rows.slice(0,limit)){
    const card=el('article',undefined,'item');card.append(el('strong',row.name),el('p',row.label),el('small',row.requests+' document requests · Last completed collection: '+date(row.checked)),el('small',row.scope_assets+' scope rows saved · '+row.changes+' changes detected'));
    if(row.error_label)card.append(el('p',row.error_label));
    if(row.status==='collecting')card.append(el('small',row.phase==='exclusions'?'Finishing published exclusions':row.phase==='scopes'?'Reading in-scope assets':'Reading program policy'));
    if(row.checked&&!row.fresh)card.append(el('p','Saved documents are out of date.','muted'));
-   card.append(button('Read collected evidence',()=>openProgramEvidence(row)),safeLink('Official program page ↗',row.policy));list.append(card);
-  }more.hidden=rows.length<=limit;};search.oninput=()=>{limit=40;draw();};root.append(label,list,more);draw();
+   if(row.preparation?.prepared)card.append(el('p','Research brief prepared · '+row.preparation.candidate_count+' scope rows match supported methods. Testing is not enabled.'));
+   if(row.preparation?.next_step)card.append(el('small',row.preparation.next_step));
+   card.append(button('Read research brief and evidence',()=>openProgramEvidence(row)),safeLink('Official program page ↗',row.policy));list.append(card);
+  }if(!rows.length)list.append(el('p','No programs match this view.'));more.hidden=rows.length<=limit;};search.oninput=filter.onchange=()=>{limit=40;draw();};root.append(label,filterLabel,list,more);draw();
 }
 async function openProgramEvidence(row){
  const root=modal(row.name+' · official documents'),heading=root.children[0];root.append(el('p','Loading saved evidence…'));
@@ -502,6 +505,15 @@ async function openProgramEvidence(row){
  root.append(el('p',data.partial?'Collection is incomplete. The saved policy text and available scope are shown below.':'Collected: '+date(data.checked)+'.'),el('p','Testing permission is unverified. No target was activated.'),el('p','Program status reported by platform: '+(e.program_status||'Not collected')));
  if(data.partial)root.append(el('p',data.policy_checked_at?'Policy text read: '+date(data.policy_checked_at):'The policy read time was not retained in this older partial record.'));
  if(!data.checked&&!data.partial){root.append(el('p',row.label+'. No completed official document collection is saved.'));return;}
+ const brief=data.research_brief;
+ if(brief){const box=el('section',undefined,'item');box.append(el('h3',brief.prepared?'Your research brief':'What happens next'),el('p',brief.next_step));
+  if(brief.prepared){facts(box,[['Exact web addresses',brief.counts.web],['Source repositories',brief.counts.source],['Need an exact address',brief.counts.choose_url],['Need another test method',brief.counts.specialist],['Submission excluded',brief.counts.excluded],['Eligibility unresolved',brief.counts.unknown+brief.counts.conflict]]);
+   const candidates=el('details');candidates.append(el('summary','Possible methods and exact saved assets ('+brief.candidate_count+')'));
+   for(const candidate of brief.candidates||[])candidates.append(homeRow(candidate.asset,candidate.method+'. Needed: '+candidate.requires+'. Bounty eligibility reported by platform: '+String(candidate.bounty_eligible)+'.'));
+   if(brief.omitted_candidates)candidates.append(el('p',brief.omitted_candidates+' additional matching rows are in the full scope below.'));
+   if(!(brief.candidates||[]).length)candidates.append(el('p','No exact asset currently matches a supported method.'));box.append(candidates);
+   for(const condition of brief.conditions||[])box.append(el('p',condition.title+': '+(condition.passages?condition.passages+' candidate passages below; meaning still needs review.':'No passage extracted; requirements remain unverified.')));
+  }box.append(el('p',brief.limitation,'muted'));root.append(box);}
  facts(root,[['Scope complete',e.scope_complete?'Yes':'No'],['Document collection complete',e.documents_complete?'Yes':'No'],['Automation permission',e.automation_permission||'Unverified']]);
  for(const note of e.unresolved||[])root.append(el('p',note,'muted'));
  for(const [kind,lines] of Object.entries(e.rule_passages||{})){const box=el('details');box.append(el('summary',kind+' · candidate rule passages'));for(const line of lines)box.append(el('p',line));if(!lines.length)box.append(el('p','No passage identified; this does not imply permission.'));root.append(box);}

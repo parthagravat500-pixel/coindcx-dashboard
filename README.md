@@ -7,7 +7,10 @@ collections, changes and access blockers separately from security tests.
 With authorized platform API connections, ScopeGuard reads official HackerOne
 policies, paginated structured scope and reward exclusions, plus Intigriti
 program rules, domains and structured requirements. It uses only documented GET
-endpoints, at most one worker request per 15 seconds globally. Progress, backoff
+endpoints, with one metadata request at a time and at least five seconds between
+requests globally. HackerOne reads are capped at 12/minute; Intigriti retains a
+15-second minimum. The HackerOne scope endpoint's published limit is 50/minute.
+These limits apply only to policy APIs, never to asset testing. Progress, backoff
 and partial pagination survive restarts. Completed documents refresh daily;
 forbidden programs do not hold up other programs. Platform authentication errors
 stop that provider until the connection changes. Missing tokens cause zero API
@@ -27,6 +30,23 @@ Attachments are not fetched, and their presence prevents a complete-document
 claim. Mozilla production automation remains restricted. No source repository,
 target, account, permission renewal, exploit or report is created by this worker.
 Supported methods and missing prerequisites are shown with each collection.
+
+Completed current collections automatically produce an offline research brief.
+The brief counts exact HTTPS addresses, supported repository shapes, patterns
+needing an exact address, unsupported asset types, exclusions and unknown
+eligibility. It preserves the exact saved asset and proposes only a capability
+match, never a runnable test or vulnerability lead. No host or wildcard is
+expanded, no login requirement is inferred, and unknown Intigriti eligibility
+stays unresolved. At most 80 matching rows are shown with an honest omitted count;
+the full saved scope remains available. Changed, stale, blocked and incomplete
+evidence retains its corresponding warnings. Filtering by prepared briefs helps
+find useful research preparation without presenting it as testing approval.
+
+Slow official API reads no longer hold the dashboard's shared work lock. A
+dedicated nonblocking worker lock prevents overlapping metadata requests, and
+the worker rechecks pause, current credentials, directory health and program
+availability before accepting responses. Rate-limit waits start after the
+response arrives, so network time does not shorten Retry-After.
 
 Evidence is bounded to 512 KB per document snapshot and 64 MB in total (including
 partial working copies), with at most 2,000

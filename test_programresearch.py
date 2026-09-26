@@ -49,7 +49,7 @@ class ProgramResearchTests(unittest.TestCase):
     def tick(self,response=None,error=None):
         with patch('programapi.request',return_value=response,side_effect=error) as call:
             research.tick(app.db,app.DATA,app.LOCK,self.clock)
-        self.clock+=research.INTERVAL
+        self.clock+=research.PROVIDER_INTERVALS[call.call_args.args[0]] if call.called else research.INTERVAL
         return call
     def snapshot(self):
         with app.db() as c:return research.snapshot(c,app.DATA,True)
@@ -159,8 +159,68 @@ class ProgramResearchTests(unittest.TestCase):
             row=state['program_research']['rows'][0];self.assertEqual(row['status'],'collected')
             status,detail=call('GET','/api/program-research?id='+row['id']);self.assertEqual(status,200)
             self.assertTrue(detail['evidence']['documents_complete']);self.assertFalse(detail['evidence']['grants_permission'])
+            self.assertTrue(detail['research_brief']['prepared']);self.assertEqual(state['program_research']['briefs_prepared'],1)
+            self.assertEqual(detail['research_brief']['candidates'][0]['asset'],'https://owned.example.test')
+            self.assertFalse(detail['research_brief']['testing_enabled'])
             self.assertNotIn('synthetic-token',json.dumps(state));self.assertEqual(state['targets'],[])
         finally:server.shutdown();server.server_close();app.TOKEN=old_token
+
+    def test_slow_request_releases_shared_lock_but_never_overlaps_metadata_requests(self):
+        import threading
+        self.seed();self.connect();started=threading.Event();release=threading.Event();lock=threading.RLock()
+        def response(*args):started.set();release.wait(3);return h1_doc()
+        with patch('programapi.request',side_effect=response) as request:
+            worker=threading.Thread(target=research.tick,args=(app.db,app.DATA,lock,self.now));worker.start()
+            try:
+                self.assertTrue(started.wait(2));self.assertTrue(lock.acquire(timeout=1));lock.release()
+                research.tick(app.db,app.DATA,lock,self.now+60)
+                self.assertEqual(request.call_count,1)
+            finally:release.set();worker.join(4)
+        self.assertFalse(worker.is_alive());self.assertEqual(self.snapshot()['policy_documents_saved'],1)
+
+    def test_pause_disconnect_and_dismiss_during_read_discard_late_response(self):
+        self.seed();self.connect()
+        def pause(*args):
+            with app.db() as c:c.execute('UPDATE settings SET paused=1')
+            return h1_doc()
+        with patch('programapi.request',side_effect=pause):research.tick(app.db,app.DATA,app.LOCK,self.clock)
+        self.assertEqual(self.snapshot()['policy_documents_saved'],0)
+        with app.db() as c:c.execute('UPDATE settings SET paused=0')
+        self.clock+=research.INTERVAL
+        def disconnect(*args):programapi.save(app.DATA,'hackerone',{'enabled':False});return h1_doc()
+        with patch('programapi.request',side_effect=disconnect):research.tick(app.db,app.DATA,app.LOCK,self.clock)
+        self.assertEqual(self.snapshot()['policy_documents_saved'],0)
+        self.connect();self.clock+=research.INTERVAL
+        def dismiss(*args):
+            with app.db() as c:c.execute("UPDATE programs SET stage='dismissed'")
+            return h1_doc()
+        with patch('programapi.request',side_effect=dismiss):research.tick(app.db,app.DATA,app.LOCK,self.clock)
+        self.assertEqual(self.snapshot()['policy_documents_saved'],0)
+
+    def test_metadata_pace_is_bounded_per_provider_and_survives_restart(self):
+        self.seed();self.connect();self.tick(h1_doc());self.clock=self.now+4
+        app.init();self.tick().assert_not_called();self.clock=self.now+5
+        self.tick(scopes()).assert_called_once()
+        self.int_seed();self.clock=self.now+10;self.tick({'records':[int_doc()],'maxCount':1})
+        with app.db() as c:
+            provider=c.execute("SELECT next_request FROM program_research_providers WHERE provider='intigriti'").fetchone()
+        self.assertEqual(provider[0],self.now+25)
+        self.assertEqual(self.snapshot()['collection_intervals'],{'hackerone':5,'intigriti':15})
+
+    def test_retry_after_wait_starts_when_slow_failure_is_received(self):
+        self.seed();self.connect()
+        with patch('programapi.request',side_effect=programapi.APIError(429,600)),patch('programresearch.time.time',return_value=self.now+60):
+            research.tick(app.db,app.DATA,app.LOCK,self.now)
+        with app.db() as c:
+            self.assertEqual(c.execute("SELECT next_request FROM program_research_providers WHERE provider='hackerone'").fetchone()[0],self.now+660)
+
+    def test_provider_access_block_suppresses_current_research_brief(self):
+        self.seed();self.connect();self.complete()
+        with app.db() as c:
+            identity=c.execute('SELECT id FROM program_research').fetchone()[0]
+            c.execute("UPDATE program_research_providers SET blocked=1,status='access_blocked' WHERE provider='hackerone'")
+            self.assertFalse(research.detail(c,identity)['research_brief']['prepared'])
+        self.assertEqual(self.snapshot()['briefs_prepared'],0)
 
     def test_pause_stale_and_dismissed_rows_never_request_documents(self):
         self.seed();self.connect()

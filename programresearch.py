@@ -3,10 +3,17 @@ import hashlib
 import json
 import re
 import time
+import threading
+
+import researchbrief
 
 import programapi
 
-INTERVAL = 15
+# Official HackerOne metadata reads: at most 12/minute, below its documented
+# 50/minute structured-scope limit (checked 2026-09-26). Asset testing is separate.
+INTERVAL = 5
+PROVIDER_INTERVALS = {'hackerone': 5, 'intigriti': 15}
+RUN_LOCK = threading.Lock()
 REFRESH = 86400
 MAX_SCOPES = 2000
 MAX_EVIDENCE = 512000
@@ -329,6 +336,23 @@ def bounded_storage(c,identity,raw,partial=False):
 
 
 def tick(db,data_dir,lock,now=None):
+    # One metadata request at a time, without holding the dashboard's shared lock
+    # while a remote API is slow. The persisted budget survives process restarts.
+    if not RUN_LOCK.acquire(blocking=False):return
+    try:return _tick(db,data_dir,lock,now)
+    finally:RUN_LOCK.release()
+
+
+def response_allowed(c,data_dir,provider,job,credentials):
+    if programapi.fingerprint(programapi.credentials(data_dir,provider))!=programapi.fingerprint(credentials):return False
+    if c.execute('SELECT paused FROM settings').fetchone()[0] or not c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]:return False
+    p=c.execute('SELECT * FROM programs WHERE id=?',(job['id'],)).fetchone()
+    source=c.execute('SELECT * FROM discovery_sources WHERE id=?',(provider,)).fetchone()
+    return bool(p and p['available'] and p['stage']!='dismissed' and p['source']==provider and p['url']==job['policy']
+                and source and not source['failures'] and source['last_success']>=int(time.time())-REFRESH)
+
+
+def _tick(db,data_dir,lock,now=None):
     now=int(time.time()) if now is None else now
     with lock:
         available={p:programapi.credentials(data_dir,p) for p in programapi.HOSTS}
@@ -365,80 +389,83 @@ def tick(db,data_dir,lock,now=None):
             if not chosen:return
             provider,job,index_job,route=chosen;p=provider['provider']
             c.execute('UPDATE program_research_health SET next_request=? WHERE id=1',(now+INTERVAL,))
-            c.execute("UPDATE program_research_providers SET next_request=?,last_request=?,status='collecting' WHERE provider=?",(now+INTERVAL,now,p))
+            c.execute("UPDATE program_research_providers SET next_request=?,last_request=?,status='collecting' WHERE provider=?",(now+PROVIDER_INTERVALS[p],now,p))
             if not index_job:c.execute("UPDATE program_research SET last_attempt=?,requests=requests+1,due=?,status='collecting' WHERE id=?",(now,now+INTERVAL,job['id']))
-        try:
-            doc=programapi.request(p,available[p],route)
-            with db() as c:
-                if not index_job:c.execute("UPDATE program_research SET last_error='',error_phase='' WHERE id=?",(job['id'],))
-                if index_job and p=='hackerone':
-                    catalog,more=h1_catalog(doc,offset or 1)
-                    seen={} if offset in (0,1) else json.loads(provider['program_index'])
-                    for entry in c.execute("SELECT * FROM program_research WHERE provider='hackerone' AND active=1").fetchall():
-                        key=programapi.canonical(entry['policy'])
-                        if key not in catalog:continue
-                        seen[key]='https://'+programapi.HOSTS[p]+route
-                        if entry['status']=='access_blocked' and entry['last_error']!='not_in_catalog':continue
-                        c.execute('UPDATE program_research SET last_attempt=?,requests=requests+1 WHERE id=?',(now,entry['id']))
-                        try:partial=h1_policy({'data':catalog[key]},entry['policy'])
-                        except programapi.APIError as e:
-                            c.execute("UPDATE program_research SET status='incomplete',last_error=?,error_phase='policy',due=? WHERE id=?",(error_code(e.code),now+REFRESH,entry['id']));continue
-                        partial['sources']=[seen[key]];partial['policy_checked_at']=now
-                        bounded_storage(c,entry['id'],json.dumps(partial),partial=True)
-                        c.execute("UPDATE program_research SET partial=?,phase='scopes',page=1,due=?,status='collecting',last_error='',error_phase='' WHERE id=?",(json.dumps(partial),now,entry['id']))
-                    c.execute("UPDATE program_research_providers SET program_index=?,offset=?,index_complete=?,index_checked=?,status='queued' WHERE provider=?",(json.dumps(seen),(offset or 1)+1,int(not more),0 if more else now,p))
-                    if not more:
-                        for entry in c.execute("SELECT id,policy,status,last_error FROM program_research WHERE provider='hackerone' AND active=1").fetchall():
-                            if programapi.canonical(entry['policy']) not in seen and (entry['status']!='access_blocked' or entry['last_error']=='not_in_catalog'):
-                                c.execute("UPDATE program_research SET status='access_blocked',last_error='not_in_catalog',error_phase='index',due=? WHERE id=?",(now+REFRESH,entry['id']))
-                elif index_job:
-                    listed={programapi.canonical(r['policy']) for r in c.execute("SELECT policy FROM program_research WHERE provider='intigriti'")}
-                    mappings,total,count=intigriti_index(doc,listed)
-                    if count==0 and offset<total:raise programapi.APIError('schema')
-                    old={} if offset==0 else json.loads(provider['program_index']);old.update(mappings)
-                    done=offset+count>=total
-                    c.execute("UPDATE program_research_providers SET program_index=?,offset=?,index_complete=?,index_checked=?,status='queued' WHERE provider=?",(json.dumps(old),offset+count,int(done),now if done else 0,p))
-                    if done:
-                        for entry in c.execute("SELECT id,policy FROM program_research WHERE provider='intigriti' AND status='access_blocked' AND requests=0").fetchall():
-                            if programapi.canonical(entry['policy']) in old:c.execute("UPDATE program_research SET status='queued',due=0 WHERE id=?",(entry['id'],))
-                elif p=='intigriti':
-                    result=intigriti_policy(doc,job['policy']);result['sources']=['https://'+programapi.HOSTS[p]+route];result['policy_checked_at']=now;finish(c,job,result,now)
-                elif job['phase']=='policy':
-                    partial=h1_policy(doc,job['policy'])
-                    partial['policy_checked_at']=now
+    try:
+        doc=programapi.request(p,available[p],route)
+        with lock,db() as c:
+            if not response_allowed(c,data_dir,p,job,available[p]):return
+            if not index_job:c.execute("UPDATE program_research SET last_error='',error_phase='' WHERE id=?",(job['id'],))
+            if index_job and p=='hackerone':
+                catalog,more=h1_catalog(doc,offset or 1)
+                seen={} if offset in (0,1) else json.loads(provider['program_index'])
+                for entry in c.execute("SELECT * FROM program_research WHERE provider='hackerone' AND active=1").fetchall():
+                    key=programapi.canonical(entry['policy'])
+                    if key not in catalog:continue
+                    seen[key]='https://'+programapi.HOSTS[p]+route
+                    if entry['status']=='access_blocked' and entry['last_error']!='not_in_catalog':continue
+                    c.execute('UPDATE program_research SET last_attempt=?,requests=requests+1 WHERE id=?',(now,entry['id']))
+                    try:partial=h1_policy({'data':catalog[key]},entry['policy'])
+                    except programapi.APIError as e:
+                        c.execute("UPDATE program_research SET status='incomplete',last_error=?,error_phase='policy',due=? WHERE id=?",(error_code(e.code),now+REFRESH,entry['id']));continue
+                    partial['sources']=[seen[key]];partial['policy_checked_at']=now
+                    bounded_storage(c,entry['id'],json.dumps(partial),partial=True)
+                    c.execute("UPDATE program_research SET partial=?,phase='scopes',page=1,due=?,status='collecting',last_error='',error_phase='' WHERE id=?",(json.dumps(partial),now,entry['id']))
+                c.execute("UPDATE program_research_providers SET program_index=?,offset=?,index_complete=?,index_checked=?,status='queued' WHERE provider=?",(json.dumps(seen),(offset or 1)+1,int(not more),0 if more else now,p))
+                if not more:
+                    for entry in c.execute("SELECT id,policy,status,last_error FROM program_research WHERE provider='hackerone' AND active=1").fetchall():
+                        if programapi.canonical(entry['policy']) not in seen and (entry['status']!='access_blocked' or entry['last_error']=='not_in_catalog'):
+                            c.execute("UPDATE program_research SET status='access_blocked',last_error='not_in_catalog',error_phase='index',due=? WHERE id=?",(now+REFRESH,entry['id']))
+            elif index_job:
+                listed={programapi.canonical(r['policy']) for r in c.execute("SELECT policy FROM program_research WHERE provider='intigriti'")}
+                mappings,total,count=intigriti_index(doc,listed)
+                if count==0 and offset<total:raise programapi.APIError('schema')
+                old={} if offset==0 else json.loads(provider['program_index']);old.update(mappings)
+                done=offset+count>=total
+                c.execute("UPDATE program_research_providers SET program_index=?,offset=?,index_complete=?,index_checked=?,status='queued' WHERE provider=?",(json.dumps(old),offset+count,int(done),now if done else 0,p))
+                if done:
+                    for entry in c.execute("SELECT id,policy FROM program_research WHERE provider='intigriti' AND status='access_blocked' AND requests=0").fetchall():
+                        if programapi.canonical(entry['policy']) in old:c.execute("UPDATE program_research SET status='queued',due=0 WHERE id=?",(entry['id'],))
+            elif p=='intigriti':
+                result=intigriti_policy(doc,job['policy']);result['sources']=['https://'+programapi.HOSTS[p]+route];result['policy_checked_at']=now;finish(c,job,result,now)
+            elif job['phase']=='policy':
+                partial=h1_policy(doc,job['policy'])
+                partial['policy_checked_at']=now
+                bounded_storage(c,job['id'],json.dumps(partial),partial=True)
+                c.execute("UPDATE program_research SET partial=?,phase='scopes',page=1 WHERE id=?",(json.dumps(partial),job['id']))
+            else:
+                partial=json.loads(job['partial'])
+                if job['phase']=='scopes':
+                    rows,more=h1_scope(doc,handle,job['page']);partial['scope'].extend(rows)
+                    if len(partial['scope'])>MAX_SCOPES:raise programapi.APIError('size')
+                    partial['scope_complete']=not more
+                    if more and job['page']>=20:raise programapi.APIError('size')
+                    partial['sources'].append('https://'+programapi.HOSTS[p]+route)
                     bounded_storage(c,job['id'],json.dumps(partial),partial=True)
-                    c.execute("UPDATE program_research SET partial=?,phase='scopes',page=1 WHERE id=?",(json.dumps(partial),job['id']))
+                    c.execute('UPDATE program_research SET partial=?,phase=?,page=? WHERE id=?',(json.dumps(partial),'scopes' if more else 'exclusions',job['page']+1 if more else 1,job['id']))
                 else:
-                    partial=json.loads(job['partial'])
-                    if job['phase']=='scopes':
-                        rows,more=h1_scope(doc,handle,job['page']);partial['scope'].extend(rows)
-                        if len(partial['scope'])>MAX_SCOPES:raise programapi.APIError('size')
-                        partial['scope_complete']=not more
-                        if more and job['page']>=20:raise programapi.APIError('size')
-                        partial['sources'].append('https://'+programapi.HOSTS[p]+route)
-                        bounded_storage(c,job['id'],json.dumps(partial),partial=True)
-                        c.execute('UPDATE program_research SET partial=?,phase=?,page=? WHERE id=?',(json.dumps(partial),'scopes' if more else 'exclusions',job['page']+1 if more else 1,job['id']))
-                    else:
-                        partial['exclusions']=h1_exclusions(doc);partial['sources'].append('https://'+programapi.HOSTS[p]+route)
-                        partial['documents_complete']=bool(partial['policy_text']) and partial['scope_complete'];finish(c,job,partial,now)
-                c.execute("UPDATE program_research_providers SET last_success=?,last_error='',error_phase='' WHERE provider=?",(now,p))
-        except Exception as error:
-            code=error.code if isinstance(error,programapi.APIError) else 'schema' if isinstance(error,(ValueError,TypeError,KeyError,AttributeError)) else 'transport'
-            with db() as c:
-                fixed=error_code(code);phase='index' if index_job else job['phase']
-                c.execute('UPDATE program_research_providers SET last_error=?,error_phase=? WHERE provider=?',(fixed,phase,p))
-                if not index_job:c.execute('UPDATE program_research SET last_error=?,error_phase=? WHERE id=?',(fixed,phase,job['id']))
-                if code==401 or index_job and code in (403,404):
-                    c.execute("UPDATE program_research_providers SET blocked=1,status='access_blocked' WHERE provider=?",(p,))
-                elif code in (403,404):
-                    c.execute("UPDATE program_research SET status='access_blocked',due=? WHERE id=?",(now+REFRESH,job['id']))
-                elif code in ERRORS and code!='transport' or isinstance(code,int) and 300<=code<500 and code!=429:
-                    if index_job:c.execute("UPDATE program_research_providers SET blocked=1,status='incomplete' WHERE provider=?",(p,))
-                    else:c.execute("UPDATE program_research SET status='incomplete',phase='policy',page=1,due=? WHERE id=?",(now+REFRESH,job['id']))
-                else:
-                    delay=max(300*2**min(job['failures'],6),getattr(error,'retry',0))
-                    c.execute("UPDATE program_research_providers SET next_request=?,status='retry' WHERE provider=?",(now+delay,p))
-                    if not index_job:c.execute("UPDATE program_research SET status='retry',failures=failures+1,due=? WHERE id=?",(now+delay,job['id']))
+                    partial['exclusions']=h1_exclusions(doc);partial['sources'].append('https://'+programapi.HOSTS[p]+route)
+                    partial['documents_complete']=bool(partial['policy_text']) and partial['scope_complete'];finish(c,job,partial,now)
+            c.execute("UPDATE program_research_providers SET last_success=?,last_error='',error_phase='' WHERE provider=?",(now,p))
+    except Exception as error:
+        code=error.code if isinstance(error,programapi.APIError) else 'schema' if isinstance(error,(ValueError,TypeError,KeyError,AttributeError)) else 'transport'
+        with lock,db() as c:
+            if not response_allowed(c,data_dir,p,job,available[p]):return
+            fixed=error_code(code);phase='index' if index_job else job['phase']
+            c.execute('UPDATE program_research_providers SET last_error=?,error_phase=? WHERE provider=?',(fixed,phase,p))
+            if not index_job:c.execute('UPDATE program_research SET last_error=?,error_phase=? WHERE id=?',(fixed,phase,job['id']))
+            if code==401 or index_job and code in (403,404):
+                c.execute("UPDATE program_research_providers SET blocked=1,status='access_blocked' WHERE provider=?",(p,))
+            elif code in (403,404):
+                c.execute("UPDATE program_research SET status='access_blocked',due=? WHERE id=?",(now+REFRESH,job['id']))
+            elif code in ERRORS and code!='transport' or isinstance(code,int) and 300<=code<500 and code!=429:
+                if index_job:c.execute("UPDATE program_research_providers SET blocked=1,status='incomplete' WHERE provider=?",(p,))
+                else:c.execute("UPDATE program_research SET status='incomplete',phase='policy',page=1,due=? WHERE id=?",(now+REFRESH,job['id']))
+            else:
+                delay=max(300*2**min(job['failures'],6),getattr(error,'retry',0))
+                retry_at=max(now,int(time.time()))+delay
+                c.execute("UPDATE program_research_providers SET next_request=?,status='retry' WHERE provider=?",(retry_at,p))
+                if not index_job:c.execute("UPDATE program_research SET status='retry',failures=failures+1,due=? WHERE id=?",(retry_at,job['id']))
 
 
 def snapshot(c,data_dir,details=False):
@@ -449,7 +476,8 @@ def snapshot(c,data_dir,details=False):
         r={k:row[k] for k in ('provider','blocked','next_request','last_request','last_success','status','index_complete','last_error','error_phase','catalog_mode')}
         r['error_label']=error_label(r['last_error'])
         r.update(connections[r['provider']]);providers.append(r);provider_map[r['provider']]=r
-    rows=[];counts={};errors={};phases={};collected=attempted=policy_saved=0
+    rows=[];counts={};errors={};phases={};collected=attempted=policy_saved=briefs=0
+    preparation_counts={key:0 for key in researchbrief.CATEGORIES}
     for row in c.execute('SELECT r.*,p.name FROM program_research r JOIN programs p ON p.id=r.id ORDER BY p.name'):
         provider=provider_map[row['provider']]
         status=('connection_needed' if not provider['connected'] and row['active'] else
@@ -465,29 +493,40 @@ def snapshot(c,data_dir,details=False):
         item['error_label']=error_label(row['last_error'])
         item.update(status=status,label=LABELS[status],fresh=fresh,scope_assets=len(visible.get('scope',[])),partial=bool(partial),
                     documents_complete=bool(evidence.get('documents_complete')),grants_permission=False)
+        brief=researchbrief.build(visible,fresh=fresh and not partial,status=status)
+        item['preparation']={k:brief[k] for k in ('prepared','counts','candidate_count','next_step')}
+        if brief['prepared']:
+            briefs+=1
+            for key,count in brief['counts'].items():preparation_counts[key]+=count
         if details:item['evidence']=evidence
         rows.append(item)
     paused=bool(c.execute('SELECT paused FROM settings').fetchone()[0]) or not bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0])
     return {'heartbeat':health['heartbeat'],'healthy':bool(health['heartbeat'] and 0<=now-health['heartbeat']<90),
             'paused':paused,'listed':len(rows),'attempted':attempted,'documents_collected':collected,
             'policy_documents_saved':policy_saved,
+            'briefs_prepared':briefs,'preparation_counts':preparation_counts,
+            'collection_intervals':dict(PROVIDER_INTERVALS),
             'counts':counts,'errors':errors,'phases':phases,'providers':providers,'rows':rows,'next_request':health['next_request'],
             'test_permissions_granted':0,'new_targets_activated':0,
-            'coverage':'Collects official policy documents and scope through authorized platform APIs. It does not test assets, interpret every condition, create accounts or authorize new scans.'}
+            'coverage':'Collects official rules and prepares a research brief with exact saved assets, possible supported methods and unresolved conditions. A brief is not testing permission or a bug finding.'}
 
 
 def detail(c,identity):
-    row=c.execute('SELECT evidence,partial,checked,status FROM program_research WHERE id=?',(identity,)).fetchone()
+    row=c.execute('SELECT evidence,partial,checked,status,provider,active FROM program_research WHERE id=?',(identity,)).fetchone()
     if not row:raise ValueError('Program research record not found')
     partial=json.loads(row['partial']);evidence=finalize(partial) if partial else json.loads(row['evidence'])
-    return {'evidence':evidence,'checked':0 if partial else row['checked'],'status':row['status'],
-            'partial':bool(partial),'policy_checked_at':evidence.get('policy_checked_at',0)}
+    fresh=bool(not partial and row['checked'] and row['checked']>=int(time.time())-REFRESH)
+    provider=c.execute('SELECT blocked,status FROM program_research_providers WHERE provider=?',(row['provider'],)).fetchone()
+    status=provider['status'] if provider and provider['blocked'] and row['active'] else row['status']
+    return {'evidence':evidence,'checked':0 if partial else row['checked'],'status':status,
+            'partial':bool(partial),'policy_checked_at':evidence.get('policy_checked_at',0),
+            'research_brief':researchbrief.build(evidence,fresh=fresh,status=status,assets=True)}
 
 
 def receipt(c,data_dir,revision):
     s=snapshot(c,data_dir)
     return {'kind':'scopeguard_program_research_health','revision':revision if re.fullmatch('[0-9a-f]{40}',revision or '') else 'unknown',
-            **{k:s[k] for k in ('healthy','paused','listed','attempted','documents_collected','policy_documents_saved','counts','errors','phases')},
+            **{k:s[k] for k in ('healthy','paused','listed','attempted','documents_collected','policy_documents_saved','briefs_prepared','preparation_counts','collection_intervals','counts','errors','phases')},
             'connections':{r['provider']:r['connected'] for r in s['providers']},
             'catalog_mode':{r['provider']:bool(r['catalog_mode']) for r in s['providers']},
             'provider_blocked':{r['provider']:bool(r['blocked']) for r in s['providers']}}

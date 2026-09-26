@@ -1,5 +1,43 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, capacity and automatic research preparation
+
+Verified branch 2a3024cc3bea5f2b001d9dcfecd2c7eacaecd7aa and all 91 tracked
+blobs before changes. The existing live worker had reached 59 complete document
+collections and 91 saved policy texts at 12:04:56 UTC; at 12:09:56 it had 68
+complete collections. Testing remained limited to two eligible existing jobs,
+with six blocked jobs and zero confirmed bounty bugs. Seventy directory programs
+still needed the missing Intigriti connection. These are aggregate host receipts,
+not a private dashboard inspection or evidence that all 304 were reviewed.
+
+The official HackerOne documentation was rechecked on 26 September: read limit
+600/minute, structured-scope limit 50/minute. The metadata worker now uses a
+five-second global minimum and a five-second HackerOne minimum (12/minute at
+most), keeping Intigriti at 15 seconds. Existing Retry-After, backoff, provider
+access stops and durable request timers remain. Rate-limit waits now start when
+the response arrives. A separate nonblocking worker lock prevents overlap while
+releasing the shared app lock during the network wait. Pause, credential changes,
+program dismissal and stale directories cause late responses to be discarded.
+The existing host had substantial CPU and memory headroom; no resource, plan,
+deployment settings or extra spending was needed.
+
+Current completed collections now produce research briefs automatically from
+saved evidence. Exact HTTPS assets and supported repository shapes are separated
+from patterns, unsupported methods, excluded rows and unknown eligibility.
+Suggested methods are capability matches only: they never grant permissions,
+create targets, infer no-login access, execute tests or become bug leads. Scope
+instructions and exclusions remain authoritative; the brief is not a complete
+policy interpretation. The dashboard exposes these briefs and a simple filter,
+while raw policies and exact scope stay available behind authentication.
+
+Validation: all 312 Python tests passed, plus dashboard DOM smoke and JavaScript
+syntax checks. New tests cover exact-asset preservation, unknown/conflicting
+eligibility, stale/partial/blocked rules, bounded output, untrusted text, a real
+authenticated loopback evidence request, concurrent slow reads, pause/disconnect
+during reads, pacing after restart, and Retry-After after network delay. No private
+policy payloads or credentials were inspected or committed. Live deployment and
+the new aggregate research-brief receipt are verified separately after publishing.
+
 ## 2026-09-26, verified live result at 11:44 UTC
 
 Runtime commit 32272c563c5d13dca0b091e9846ad83d07304e9a is live on the

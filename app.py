@@ -226,7 +226,7 @@ def program_research_worker():
         except Exception:
             # No external error text or credentials enter events or host logs.
             with db() as c:log(c,'Program research could not advance; saved evidence retained.')
-        WAKE.wait(15)
+        WAKE.wait(programresearch.INTERVAL)
 
 
 def supervisor_worker():
