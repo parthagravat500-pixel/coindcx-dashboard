@@ -1,5 +1,32 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, verified capacity release at 12:15 UTC
+
+Runtime 63d7734982b626982d7f809de68af2e5eeab23ee became live on the existing
+service at 12:15:17 UTC (dep-darre1gjo6nc73951mtg). GitHub workflow 36241269598
+succeeded; the hosted build passed all 312 tests in 35.160 seconds. This change
+was confined to scopeguard-app; the trading branch and hosting settings remain
+untouched.
+
+The new runtime's 12:15:12 UTC aggregate receipt confirmed healthy, unpaused
+program research with 304 listings, 91 saved policy texts, 76 current complete
+collections and 76 automatically prepared research briefs. It confirmed the new
+five-second HackerOne / 15-second Intigriti metadata pacing. Briefs matched 26
+exact web scope rows and 30 repository rows to possible supported methods; these
+are not tested assets, approved targets or bug findings. Other rows required
+exact-address selection or unsupported methods, or were excluded/conflicting.
+
+Seventy programs still required the absent Intigriti connection; 121 were queued,
+16 collecting, 12 incomplete, six unavailable/dismissed and three had unsupported
+addresses. Earlier parser errors still attached to pending rows are history,
+not proof that the corrected collector failed again. The live test worker had
+two eligible existing jobs and six blocked jobs. Lead health reported zero active
+leads and zero confirmed bounty bugs. No target activation, external security
+scan, private dashboard inspection, account creation, report submission, new
+resource or extra spending occurred. Full automated bug research across every
+listed program remains unfinished; missing access and program-specific testing
+requirements must not be replaced with assumed permission.
+
 ## 2026-09-26, capacity and automatic research preparation
 
 Verified branch 2a3024cc3bea5f2b001d9dcfecd2c7eacaecd7aa and all 91 tracked
