@@ -76,12 +76,44 @@ function workflowRows(stage){const w=state.workflow||{programs:[],submissions:[]
 }
 function modal(title){$('detailContent').replaceChildren(el('h2',title));if(!$('detail').open)$('detail').showModal();return $('detailContent');}
 function facts(root,pairs){const dl=el('dl',undefined,'facts');pairs.forEach(([k,v])=>{dl.append(el('dt',k),el('dd',String(v)));});root.append(dl);}
+function policyScopeLabel(review){return review.scope_complete?review.in_scope_assets.length+' in-scope entries · '+review.excluded_assets.length+' explicit exclusions':'Scope incomplete or restricted; read details';}
+function policyEvidenceRows(root,records){
+ for(const review of records){const card=el('button',undefined,'work-card'),body=el('div');card.type='button';body.append(el('strong',review.program),el('small',policyScopeLabel(review)),el('small','Checked '+review.checked_at));card.append(body,el('span','Read rules','tag'));card.onclick=()=>openPolicyReview(review);root.append(card);}
+}
+function renderPolicyEvidence(){
+ const evidence=state.workflow?.policy_evidence,root=$('policyEvidenceList');root.replaceChildren();
+ $('policyEvidenceStatus').textContent=evidence?(evidence.records.length+' saved policy reviews · testing approval is separate'+(evidence.unavailable_entries?' · Some evidence could not be loaded.':'')):'Policy evidence is unavailable from this server version.';
+ if(evidence)policyEvidenceRows(root,evidence.records);
+}
+function openPolicyReviews(){
+ const root=modal('Program policy reviews'),evidence=state.workflow?.policy_evidence;
+ root.append(el('p','Saved evidence is shown even when a program is missing or renamed in the directory. Permission must be checked for each exact target before testing.'));
+ if(!evidence||!evidence.records.length)root.append(el('p','No saved policy evidence is available from this server.'));
+ if(evidence?.unavailable_entries)root.append(el('p','Some evidence could not be loaded; it is not counted as reviewed.'));
+ if(evidence)policyEvidenceRows(root,evidence.records);
+}
+function openPolicyReview(review){
+ const root=modal(review.program+' · policy evidence');
+ facts(root,[['Checked at',review.checked_at],['Availability',review.availability||'Not recorded'],['Scope',review.scope_complete?'Complete table recorded at the checked date':'Incomplete or restricted; do not infer permission'],['Automation',review.automation||'Unverified'],['Requests per second',review.explicit_requests_per_second==null?'Not stated / unknown':review.explicit_requests_per_second],['Account requirements',review.accounts||'Unverified'],['Testing activation','None from this evidence']]);
+ if(review.note)root.append(el('p',review.note));
+ if(review.request_limit_note)root.append(el('p',review.request_limit_note,'muted'));
+ if(review.scope_visibility_note)root.append(el('p',review.scope_visibility_note,'muted'));
+ for(const [key,label] of [['in_scope_assets','Recorded in-scope assets'],['scope_conditions','Scope conditions'],['excluded_assets','Excluded assets'],['exclusions','Excluded tests and reports'],['unresolved','Unresolved questions']]){
+  const rows=review[key]||[];if(!rows.length)continue;root.append(el('h3',label));const list=el('ul');rows.forEach(value=>list.append(el('li',value)));root.append(list);
+ }
+ root.append(el('h3','Official sources'));(review.sources||[]).forEach(url=>root.append(safeLink(url,url),el('br')));
+ if(review.live_directory_membership)root.append(el('p','Directory membership at review: '+review.live_directory_membership,'muted'));
+ root.append(button('All policy reviews',openPolicyReviews));
+}
+$('openPolicyReviews').onclick=openPolicyReviews;
 function openProgram(p){const root=modal(p.name);root.append(el('span',money(p),'reward'),el('p','Listed by '+p.source+' · reward and availability need confirmation in the official policy.','muted'));
  facts(root,[['Directory status',!p.available?'Unavailable or removed':p.stale?'Cached / needs refresh':'Listed as open'],['Last directory observation',date(p.last_seen)],['Requirements',p.details.requirements.join('; ')||'Read the current program terms'],['Listed scope entries',p.details.scope_count],['Current testing',p.readiness?.label||'No testing configured'],['Scope','Limited to separately saved permissions; this listing grants none.']]);
  root.append(safeLink('Open official program policy ↗',p.url),el('br'),safeLink('View discovery source ↗',p.source_url));
  if(p.readiness){root.append(el('h3','Readiness'),el('p',p.readiness.explanation));if(p.readiness.reviewed_on)root.append(el('small','Policy notes checked '+p.readiness.reviewed_on));p.readiness.sources.forEach(u=>root.append(safeLink('Read reviewed policy ↗',u)));}
  root.append(el('h3','What happens next'),el('p','Verify eligible web assets, exclusions, permitted automation and reporting route. A high maximum reward may apply to work this scanner cannot perform.'));
  if(p.policy_review){root.append(el('h3','Permission review'),el('p',p.policy_review.note),el('small','Reviewed '+p.policy_review.reviewed_on+'; check current terms before testing.'));p.policy_review.sources.forEach(u=>root.append(safeLink('Official source ↗',u),el('br')));}
+ const evidence=(state.workflow?.policy_evidence?.records||[]).find(r=>[r.policy_url,...r.sources].some(url=>[p.url,...(p.policy_review?.sources||[])].some(source=>source.replace(/\/$/,'')===url.replace(/\/$/,''))));
+ if(evidence)root.append(button('View full policy evidence',()=>openPolicyReview(evidence)));
  if(p.local_review)root.append(el('h3','Automatic review · local rules'),el('p',p.local_review.note));
  if(p.ai_note)root.append(el('h3','Earlier AI advisory'),el('p',p.ai_note));
  const actions=el('div',undefined,'controls');actions.append(button(p.stage==='review'?'Remove from shortlist':'Shortlist this company',async()=>{await change('/api/program-stage',{id:p.id,stage:p.stage==='review'?'queue':'review'});$('detail').close();}));
@@ -194,6 +226,7 @@ function openAIHypothesisReview(review,index,part){
 }
 $('openPrivateAI').onclick=openPrivateAI;
 function renderSimpleStatus(){
+ renderPolicyEvidence();
  renderResearchStatus();
  const queue=state.program_queue;
  if(queue){const ready=state.workflow?.readiness_summary;$('programQueueStatus').textContent=(queue.paused?'Paused':!queue.healthy?'Worker status unavailable':queue.directory_blocked_targets&&queue.directory_source?.blocked?'Directory refresh blocks saved header checks':queue.queue_state==='waiting_schedule'?'Waiting for next scheduled header check':queue.due_targets?'Header checks due':'No eligible header checks due')+' · '+(ready?.active||0)+' programs with active configured checks · '+queue.completed+' header checks completed';$('programQueueCoverage').textContent='Header queue: '+queue.coverage+' '+queue.permission_needed+' listed H1 programs have no active header target. Private-data tests are shown separately.';}

@@ -2,6 +2,7 @@
 import connections
 import rewards
 import readiness
+import policyevidence
 import hashlib
 import json
 import math
@@ -217,6 +218,7 @@ def snapshot(c):
     reviewed=[p for p in programs if p['policy_review']]
     authorizing=sum(bool(p['policy_review'].get('grants_permission')) for p in reviewed)
     return {'reward_exchange':exchange,'methods':readiness.METHODS,
+            'policy_evidence':policyevidence.snapshot(),
             'readiness_summary':{'active':sum(p['readiness']['active'] for p in programs),
                                  'configured':sum(p['readiness']['configured'] for p in programs),
                                  'needs_setup':sum(p['readiness']['category']=='setup' for p in programs),

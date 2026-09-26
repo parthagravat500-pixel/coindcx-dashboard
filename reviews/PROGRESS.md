@@ -1,5 +1,38 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, policy evidence display repair
+
+Baseline: scopeguard-app commit 4fc96386c0eaf6955990e1b5fda9dff69e7753fd.
+The user asked why the reviewed program data was absent from the dashboard.
+Source inspection confirmed that the detailed batch JSON files were never read
+by the app. Only hardcoded short notes appeared inside exact-matching directory
+cards. The repository deployment specification also disables automatic deploys;
+the running Render revision was not verified.
+
+Added a read-only policy-evidence loader to the existing authenticated snapshot
+and a visible Program policy reviews panel. All nine saved detailed records are
+available independently of directory membership or program renaming. Each view
+shows exact recorded assets, exclusions, source links, checked timestamp,
+automation rules, account requirements and unresolved questions. Incomplete or
+masked scope stays visibly incomplete. Viewing records cannot grant permission,
+create a target or change the queue. Missing or malformed evidence is reported
+without crashing the dashboard; unknown request limits remain unknown. Policy
+text is rendered only as text, never HTML or executable instructions.
+
+Validation: 36 focused policy, workflow, queue, readiness and local-mode tests;
+the existing HTTP authentication/CSRF and target checks; Python compilation;
+JavaScript syntax; and dashboard DOM smoke tests passed.
+Fixtures verify unlisted-record visibility, rejected authorization flags, malformed
+record handling and text-only rendering without network checks. The packaged
+source files load nine records with no unavailable entries. Existing authentication
+and target activation code were not changed.
+
+Render access stopped at the connector's workspace-selection requirement.
+The connector lists My Workspace but explicitly requires user confirmation before
+it can be used. No workspace was selected, and no deployment or live-dashboard
+inspection occurred. No new policy research, external testing, spending or bounty
+finding is claimed for this display repair.
+
 ## 2026-09-26, batch 03
 
 Baseline: scopeguard-app commit ced1043b45fe30cceab4a1d19ab951d1f5e3fe94.

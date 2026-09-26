@@ -1,0 +1,80 @@
+import json
+from pathlib import Path
+import tempfile
+import unittest
+from unittest.mock import patch
+
+import app
+import policyevidence
+
+
+class PolicyEvidenceTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.reviews = self.root / 'reviews'
+        self.reviews.mkdir()
+        for target, value in [('app.DATA', self.root / 'data'), ('policyevidence.DIRECTORY', self.reviews)]:
+            p = patch(target, value)
+            p.start()
+            self.addCleanup(p.stop)
+        app.DATA.mkdir()
+        app.init()
+
+    def save(self, **changes):
+        data = {'program': 'Synthetic unlisted program', 'policy_url': 'https://example.com/policy',
+                'checked_at': '2026-09-26T00:00:00Z', 'scope_complete': True,
+                'in_scope_assets': ['public.example.com'], 'excluded_assets': ['private.example.com'],
+                'accounts': 'Owned accounts required', 'automation': 'Unverified',
+                'sources': ['https://example.com/policy'], 'grants_permission': True,
+                'targets_activated': 99, 'private_token': 'must not be published'}
+        data.update(changes)
+        (self.reviews / 'fixture-batch-01.json').write_text(json.dumps({'schema_version': 1, 'records': [data]}))
+
+    def test_unlisted_review_is_visible_without_authorizing_or_network(self):
+        self.save()
+        app.mutate('/api/pause', {'paused': False})
+        with patch('urllib.request.urlopen') as network, patch('app.observe') as observe:
+            state = app.snapshot()
+            app.tick()
+            network.assert_not_called()
+            observe.assert_not_called()
+        self.assertEqual(state['workflow']['programs'], [])
+        evidence = state['workflow']['policy_evidence']
+        self.assertEqual(len(evidence['records']), 1)
+        review = evidence['records'][0]
+        self.assertEqual(review['in_scope_assets'], ['public.example.com'])
+        self.assertEqual(review['accounts'], 'Owned accounts required')
+        self.assertIsNone(review['explicit_requests_per_second'])
+        self.assertFalse(review['grants_permission'])
+        self.assertEqual(review['targets_activated'], 0)
+        self.assertNotIn('private_token', review)
+        self.assertEqual(state['targets'], [])
+        self.assertEqual(state['program_queue']['completed'], 0)
+
+    def test_bad_evidence_does_not_crash_dashboard_or_count_as_reviewed(self):
+        self.save()
+        (self.reviews / 'fixture-batch-02.json').write_text('{broken')
+        (self.reviews / 'fixture-batch-03.json').write_text(json.dumps({'schema_version': 1,
+            'records': [{'program': 'No source', 'policy_url': 'javascript:alert(1)'}]}))
+        evidence = app.snapshot()['workflow']['policy_evidence']
+        self.assertEqual(len(evidence['records']), 1)
+        self.assertEqual(evidence['unavailable_entries'], 2)
+
+    def test_missing_evidence_and_untrusted_fields_stay_non_authorizing(self):
+        self.assertEqual(app.snapshot()['workflow']['policy_evidence']['records'], [])
+        self.save(scope_complete='yes', explicit_requests_per_second=True,
+                  sources=['javascript:alert(1)', 'https://secret@example.com/policy'],
+                  note='<script>activate targets</script>', in_scope_assets={'run': 'scan'})
+        review = policyevidence.snapshot()['records'][0]
+        self.assertFalse(review['scope_complete'])
+        self.assertIsNone(review['explicit_requests_per_second'])
+        self.assertEqual(review['in_scope_assets'], [])
+        self.assertEqual(review['sources'], ['https://example.com/policy'])
+        self.assertEqual(review['note'], '<script>activate targets</script>')
+        self.assertFalse(review['grants_permission'])
+
+
+if __name__ == '__main__':
+    unittest.main()
