@@ -1,5 +1,42 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, class-method detection and bounded analysis capacity
+
+Verified branch 62f1e068a2288683b017693960b164d2a0d908f4 and all 93 tracked
+blobs before changes. The live collector advanced from 175 complete collections
+at 12:35:19 UTC to 224 at 12:45:27 UTC. Its only remaining collecting record was
+reading scope; 70 needed Intigriti access, six were unavailable/dismissed and
+three had unsupported addresses. No parser errors remained in that last receipt.
+The test side still had two eligible jobs, six blocked jobs and zero bounty bugs.
+
+A controlled class-based SQL fixture demonstrated a coverage gap: the previous
+project analyzer reported zero functions and zero findings because it indexed
+only top-level functions. A shared declared-method index now follows direct
+receiver calls and includes class methods in static review. A bounded inert path
+model supports simple instance/static methods without constructing project
+objects. Inheritance, decorators, initialization, dynamic dispatch, state changes
+and missing runtime arguments remain unresolved. No inspected module or class is
+executed. Supported method paths feed the existing real SQLite synthetic
+component experiment and its repeated, owner and parameter-binding controls.
+
+Every entry point now receives a share of the static work budget. The budget is
+bounded at 240,000 expression visits; six call levels, AST/file limits and output
+bounds remain. A local check of owned source reduced work-limited entries from
+73 to 23 when increasing the budget from 60,000 to 240,000; measured analysis was
+0.235 and 0.416 seconds respectively. This does not remove unsupported runtime
+features or establish security. Coverage counts include partial examination and
+are explicit about limits. Engine changes invalidate older analysis caches.
+
+Forty-seven focused tests passed, including class-method SQL reproduction,
+safe parameter binding and numeric controls, cross-file aliases/keywords,
+static methods, recursion, receiver reassignment, unsupported class features,
+no project execution/network activity, redaction and late-entry budget fairness.
+All 322 Python tests passed before the budget-only increase; focused tests and
+the hosted full-test gate validate the final setting. Dashboard DOM and syntax
+checks passed. New aggregate source-health diagnostics contain counts and fixed
+engine metadata, never private source, paths, findings or credentials. The owned
+source check produced zero supported leads. Deployment is verified separately.
+
 ## 2026-09-26, verified capacity release at 12:15 UTC
 
 Runtime 63d7734982b626982d7f809de68af2e5eeab23ee became live on the existing

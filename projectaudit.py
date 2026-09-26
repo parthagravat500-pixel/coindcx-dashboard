@@ -10,13 +10,15 @@ import time
 import zipfile
 import pathcheck
 import querycheck
+import methodgraph
 
-VERSION = 'project-flow-4/' + pathcheck.VERSION + '/' + querycheck.VERSION
+VERSION = 'project-flow-5/' + pathcheck.VERSION + '/' + querycheck.VERSION
 MAX_TOTAL = 2000000
 MAX_FILE = 128000
 MAX_FILES = 80
-LIMITATION = ('Static review of Python only: follows direct calls to project functions, arguments and returns, '
-               'up to six call levels. Branches are conservatively combined. Dynamic dispatch, class methods, '
+MAX_VISITS = 240000
+LIMITATION = ('Static review of Python only: follows direct calls to project functions and declared class methods, arguments and returns, '
+               'up to six call levels. Branches are conservatively combined. Inheritance, dynamic dispatch, instance state, '
                'framework routing, sanitizers and runtime exploitability are not resolved. '
                'These are hypotheses, not confirmed bugs or bounty-eligible reports.')
 SKIP = {'.git', '.venv', 'venv', 'node_modules', '__pycache__'}
@@ -61,7 +63,7 @@ def archive(encoded, prefix=''):
 
 
 def analyze(files):
-    modules = {}; functions = {}; aliases = {}; skipped = []; total_nodes = 0
+    modules = {}; functions = {}; aliases = {}; methods = {}; skipped = []; total_nodes = 0
     if not files or len(files) > MAX_FILES or sum(len(v.encode()) for v in files.values()) > MAX_TOTAL:
         raise ValueError('Project exceeds analysis limits.')
     def fullname(node):
@@ -89,7 +91,11 @@ def analyze(files):
                 for a in node.names: aliases[path][a.asname or a.name] = base + '.' + a.name
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 functions[module + '.' + node.name] = (path, node)
-    findings = {}; budget = [0]; stopped = [False]
+        for key,(fn,info) in methodgraph.methods(tree,module).items():
+            functions[key]=(path,fn);methods[key]=info
+    findings = {}; budget = [0]; stopped = [False]; visited=set(); entries=0
+    root_limit=[MAX_VISITS]; limited_entries=0
+    class WorkLimit(Exception):pass
     def location(path, node, role): return {'file': path, 'line': node.lineno, 'role': role}
     def merge(*paths):
         out = []
@@ -101,6 +107,7 @@ def analyze(files):
         name = fullname(node); head, _, tail = name.partition('.')
         return aliases[path].get(head, head) + ('.' + tail if tail else '')
     def evaluate(key, args, stack):
+        visited.add(key)
         if key in stack or len(stack) >= 6:
             stopped[0] = True; return []
         path, fn = functions[key]
@@ -109,9 +116,8 @@ def analyze(files):
         returns = []
         def expr(node):
             if node is None: return []
+            if budget[0]>=root_limit[0]:raise WorkLimit()
             budget[0] += 1
-            if budget[0] > 60000:
-                stopped[0] = True; return []
             if isinstance(node, ast.Name): return env.get(node.id, [])
             if isinstance(node, ast.Call):
                 call = resolved(path, node.func)
@@ -136,13 +142,15 @@ def analyze(files):
                         'entrypoints':entries,
                         'priority':'Review first','confirmed':False,'submission_ready':False,'research':research_plan(sink),
                         'next_step':'Verify that this path is reachable, check validation and authorization, then reproduce with synthetic data in an isolated copy.'}
-                candidate = modules[path] + '.' + call if call not in functions else call
+                receiver_candidate=methodgraph.receiver_call(key,node.func,methods)
+                candidate = receiver_candidate or (modules[path] + '.' + call if call not in functions else call)
                 if candidate not in functions:
                     sibling = modules[path].rsplit('.',1)[0] + '.' + call if '.' in modules[path] else call
                     if sibling in functions: candidate = sibling
                 if candidate in functions:
                     _, target = functions[candidate]
                     params = target.args.posonlyargs + target.args.args
+                    if receiver_candidate and methods[candidate]['kind']!='static':params=params[1:]
                     bound = {p.arg: merge(v,[location(path,node,'Call to project function')]) if v else [] for p,v in zip(params,values)}
                     bound.update({k:merge(v,[location(path,node,'Call to project function')]) if v else [] for k,v in keywords.items()})
                     return evaluate(candidate,bound,stack+(key,))
@@ -153,7 +161,7 @@ def analyze(files):
             return merge(*(expr(c) for c in ast.iter_child_nodes(node)))
         def block(body):
             for node in body:
-                if budget[0] > 60000: stopped[0] = True; return
+                if budget[0]>=root_limit[0]:raise WorkLimit()
                 if isinstance(node,(ast.FunctionDef,ast.AsyncFunctionDef,ast.ClassDef)): continue
                 if isinstance(node,(ast.Assign,ast.AnnAssign)):
                     flow = expr(node.value)
@@ -173,11 +181,20 @@ def analyze(files):
                 else: expr(node)
         block(fn.body)
         return merge(returns)
-    for key in functions:
-        if budget[0] > 60000: break
-        evaluate(key,{},())
+    for index,key in enumerate(functions):
+        if budget[0]>=MAX_VISITS:stopped[0]=True;break
+        # Give every declared entry a share before spending the remaining work
+        # on a large early function. No alphabetical tail silently loses coverage.
+        remaining=len(functions)-index
+        root_limit[0]=budget[0]+max(1,(MAX_VISITS-budget[0])//remaining)
+        entries+=1
+        try:evaluate(key,{},())
+        except WorkLimit:stopped[0]=True;limited_entries+=1
     items = sorted(findings.values(),key=lambda f:(-len({t['file'] for t in f['trace']}),f['file'],f['line']))
-    return {'engine':VERSION,'files_analyzed':len(modules),'functions_analyzed':len(functions),'syntax_skipped':skipped,
+    return {'engine':VERSION,'files_analyzed':len(modules),'functions_analyzed':len(visited),
+            'methods_analyzed':len(visited.intersection(methods)), 'functions_declared':len(functions),
+            'entrypoints_analyzed':entries,'work_limited_entries':limited_entries,'analysis_visits':budget[0],
+            'syntax_skipped':skipped,
             'bounded_or_truncated':stopped[0] or len(items)>100,'findings':items[:100],'total_findings':len(items),
             'confirmed_bugs':0,'submission_ready':False,'limitation':LIMITATION}
 

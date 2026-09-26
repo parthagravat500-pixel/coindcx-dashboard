@@ -102,7 +102,7 @@ function renderAutomaticResearch(){
  $('automaticResearchStatus').textContent=r?r.summary:'Automatic research status is unavailable from this server version.';
  const projects=r?.projects||[];
  const total=key=>projects.reduce((n,p)=>n+(Number.isInteger(p[key])?p[key]:0),0);
- $('automaticResearchEvidence').textContent=projects.length?projects.length+' source projects · '+total('modeled_flows')+' input flows observed in the model · '+total('unresolved')+' unresolved leads · '+total('drafts')+' investigation drafts. Latest review: '+date(Math.max(...projects.map(p=>p.checked)))+'. Runtime vulnerabilities remain unverified.':'No completed automatic source evidence yet. Listed programs do not count as completed research.';
+ $('automaticResearchEvidence').textContent=projects.length?projects.length+' source projects · '+total('methods')+' class methods included · '+total('modeled_flows')+' input flows observed in the model · '+total('unresolved')+' unresolved leads · '+total('drafts')+' investigation drafts. Latest review: '+date(Math.max(...projects.map(p=>p.checked)))+'. Runtime vulnerabilities remain unverified.':'No completed automatic source evidence yet. Listed programs do not count as completed research.';
 }
 $('openAutomaticResearch').onclick=()=>openProjectAudits();
 function renderAutopilot(){
@@ -762,7 +762,7 @@ function openProjectAudits(){
  const audits=state.project_audits||[];
  if(!audits.length)root.append(el('p','No project analysis has completed yet.'));
  for(const a of audits){const box=el('details');box.open=true;const r=a.result,c=r.changes;
- box.append(el('summary',a.name+' · '+(r.active_leads??r.total_findings)+' active leads · 0 confirmed bugs'),el('small','Reviewed '+date(a.checked)),el('p',r.files_analyzed+' Python files · '+r.functions_analyzed+' top-level functions'));
+ box.append(el('summary',a.name+' · '+(r.active_leads??r.total_findings)+' active leads · 0 confirmed bugs'),el('small','Reviewed '+date(a.checked)),el('p',r.files_analyzed+' Python files · '+r.functions_analyzed+' functions including '+(r.methods_analyzed||0)+' class methods'));
  if(r.source_revision)box.append(safeLink('Source commit '+r.source_revision.commit.slice(0,12)+' ↗',r.source_revision.url));
  if(c?.has_baseline){box.append(el('p',c.new_leads+' new leads · '+c.changed_files.length+' changed files · '+c.added_files.length+' added · '+c.removed_files.length+' removed'));
  const changes=el('details');changes.append(el('summary','Changes since '+date(c.previous_checked)));

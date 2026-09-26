@@ -1,6 +1,7 @@
 """Automatic owned-source pipeline; no network, credentials or target activation."""
 import json
 import time
+import re
 
 import projectaudit
 import sourceaudit
@@ -71,7 +72,30 @@ def snapshot(c):
         v = result.get('automatic_validation')
         if v:
             row['projects'].append({'name': audit['name'], 'checked': audit['checked'],
-                                    'files': result['files_analyzed'], **v})
+                                    'files': result['files_analyzed'],
+                                    'methods':result.get('methods_analyzed',0), **v})
     row['confirmed_bugs'] = 0
     row['external_tests'] = 0
     return row
+
+
+def receipt(c,revision):
+    """Aggregate operational evidence only; no project names, paths or findings."""
+    status=snapshot(c)
+    owned=c.execute("SELECT checked,result FROM project_audits WHERE name='ScopeGuard'").fetchone()
+    result=json.loads(owned['result']) if owned else {}
+    return {'kind':'scopeguard_source_research_health',
+            'revision':revision if re.fullmatch('[0-9a-f]{40}',revision or '') else 'unknown',
+            'healthy':status['healthy'],'state':status['state'],'completed':status['completed'],
+            'failure_count':status['failure_count'],'engine':projectaudit.VERSION,
+            'owned_engine_current':result.get('engine')==projectaudit.VERSION,
+            'owned_checked':owned['checked'] if owned else 0,
+            'owned_files':result.get('files_analyzed',0),'owned_functions':result.get('functions_analyzed',0),
+            'owned_methods':result.get('methods_analyzed',0),
+            'owned_entrypoints':result.get('entrypoints_analyzed',0),
+            'owned_declared_functions':result.get('functions_declared',0),
+            'owned_work_limited_entries':result.get('work_limited_entries',0),
+            'owned_coverage_limited':bool(result.get('bounded_or_truncated',False)),
+            'owned_static_candidates':result.get('total_findings',0),
+            'owned_component_reproductions':result.get('component_validation',{}).get('reproduced',0),
+            'confirmed_bounty_bugs':0}

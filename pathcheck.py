@@ -5,13 +5,15 @@ exploit verifier. Unknown operations stop an experiment. Only generated probe
 labels and source locations are retained; source values are never persisted.
 """
 import ast
+import methodgraph
 
-VERSION = 'path-model-1'
+VERSION = 'path-model-2'
 MAX_LEADS = 20
 PAIRS = (('text', 'scopeguard_alpha', 'scopeguard_beta'),
          ('integer', '17', '29'), ('negative_integer', '-17', '-29'))
 LIMITATION = ('Experiments use an incomplete AST model with synthetic inputs. '
               'No project code, database query, shell command or deserializer is executed. '
+              'Simple class receivers are modeled without construction; inheritance, decorators, initialization and instance state require context. '
               'Framework routing, authorization, deployment reachability and real impact remain unverified. '
               'A missed path does not prove safety.')
 
@@ -28,6 +30,11 @@ class Returned(Exception):
 class Reached(Exception):
     def __init__(self, value):
         self.value = value
+
+
+class Receiver:
+    """An inert marker owned by this model, never an inspected project object."""
+    def __init__(self,owner):self.owner=owner
 
 
 def fullname(node):
@@ -53,6 +60,7 @@ class Model:
         self.functions = {}
         self.modules = {}
         self.aliases = {}
+        self.methods = {}
         for path, source in sorted(files.items()):
             try:
                 tree = ast.parse(source)
@@ -76,6 +84,8 @@ class Model:
                         aliases[item.asname or item.name] = base + '.' + item.name
                 elif isinstance(node, ast.FunctionDef):
                     self.functions[module + '.' + node.name] = (path, node)
+            for key,(fn,info) in methodgraph.methods(tree,module).items():
+                self.functions[key]=(path,fn);self.methods[key]=info
 
     def resolve(self, path, node):
         head, _, tail = fullname(node).partition('.')
@@ -87,7 +97,9 @@ class Model:
         self.finding = finding
         self.route = []
         try:
-            self.call(entry, [], {}, ())
+            info=self.methods.get(entry)
+            args=[Receiver(info['owner'])] if info and info['kind']=='instance' else []
+            self.call(entry, args, {}, ())
             return {'outcome': 'not_reached'}
         except Reached as reached:
             return {'outcome': 'reached', 'value': reached.value, 'route': self.route[-30:]}
@@ -107,6 +119,10 @@ class Model:
         if key in stack or len(stack) >= 6:
             raise Unsupported('call_limit')
         path, fn = self.functions[key]
+        method=self.methods.get(key)
+        if method and not method['model_safe']:raise Unsupported('class_runtime_context')
+        if method and method['kind']=='instance' and (not args or not isinstance(args[0],Receiver) or args[0].owner!=method['owner']):
+            raise Unsupported('unknown_receiver')
         if fn.args.vararg or fn.args.kwarg:
             raise Unsupported('variadic_function')
         names = [p.arg for p in fn.args.posonlyargs + fn.args.args]
@@ -203,6 +219,13 @@ class Model:
                 if any(k.arg is None for k in node.keywords):
                     raise Unsupported('expanded_arguments')
                 kwargs = {k.arg: expr(k.value) for k in node.keywords}
+                receiver_candidate=methodgraph.receiver_call(key,node.func,self.methods)
+                if receiver_candidate:
+                    receiver=env.get(method['receiver'])
+                    if not isinstance(receiver,Receiver) or receiver.owner!=method['owner']:raise Unsupported('unknown_receiver')
+                    if self.methods[receiver_candidate]['kind']=='instance':args=[receiver]+args
+                    return self.call(receiver_candidate,args,kwargs,stack)
+                if any(isinstance(v,Receiver) for v in args+list(kwargs.values())):raise Unsupported('opaque_receiver')
                 if call in ('str', 'int', 'len') and len(args) == 1 and not kwargs and call not in env and call not in self.functions and self.modules[path]+'.'+call not in self.functions:
                     return bounded({'str': str, 'int': int, 'len': len}[call](args[0]))
                 if isinstance(node.func, ast.Attribute) and node.func.attr in ('isdigit', 'isalnum', 'isalpha') and not args and not kwargs:

@@ -148,10 +148,11 @@ setImmediate(async()=>{
  state.autopilot=undefined;vm.runInContext('renderAutopilot()',context);
  assert.match(nodes.get('autopilotStatus').textContent,/unavailable/);
  const oldAutomatic=state.automatic_research,oldAudits=state.project_audits;
- state.automatic_research={summary:'Automatically waiting for source changes',projects:[{checked:1,modeled_flows:1,unresolved:2,drafts:3}]};
+ state.automatic_research={summary:'Automatically waiting for source changes',projects:[{checked:1,methods:2,modeled_flows:1,unresolved:2,drafts:3}]};
  vm.runInContext('renderAutomaticResearch()',context);
  assert.match(nodes.get('automaticResearchEvidence').textContent,/1 input flows observed in the model/);
  assert.match(nodes.get('automaticResearchEvidence').textContent,/2 unresolved leads/);
+ assert.match(nodes.get('automaticResearchEvidence').textContent,/2 class methods included/);
  assert.match(nodes.get('automaticResearchEvidence').textContent,/Runtime vulnerabilities remain unverified/);
  state.project_audits=[{name:'Owned fixture',checked:1,digest:'a',result:{files_analyzed:1,functions_analyzed:1,syntax_skipped:[],total_findings:1,limitation:'Fixture',automatic_validation:{experiments:2,modeled_flows:1,unresolved:0,drafts:1,limitation:'Incomplete model'},findings:[{id:'a',title:'Fixture flow',file:'web.py',line:2,trace:[],automatic_validation:{status:'modeled_flow',reason:'Generated input changes an argument',experiments:2,evidence:[]},investigation_draft:'<script>Untrusted draft stays text</script>'}]}}];
  nodes.get('openAutomaticResearch').onclick();

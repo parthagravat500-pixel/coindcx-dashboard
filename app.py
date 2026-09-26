@@ -294,6 +294,7 @@ def queue_worker():
                     leadwork.sync(c)
                     if time.time() >= next_lead_receipt:
                         print(json.dumps(leadwork.receipt(c,os.environ.get('RENDER_GIT_COMMIT',''))),flush=True)
+                        print(json.dumps(autoresearch.receipt(c,os.environ.get('RENDER_GIT_COMMIT',''))),flush=True)
                         next_lead_receipt = time.time()+300
         except Exception:
             with db() as c:

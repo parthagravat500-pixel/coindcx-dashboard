@@ -161,7 +161,7 @@ new testing permission, general exploit discovery or bounty acceptance.
 ## Automatic source investigation
 
 When the existing master research switch is enabled, the server checks its
-31 installed Python source files for changes every minute. No browser needs to
+35 installed Python source files for changes every minute. No browser needs to
 stay open. The pipeline records input paths, runs bounded synthetic path
 experiments, and creates an investigation draft for each static lead. Existing
 authorized source watches and project uploads use the same pipeline. Unchanged
@@ -170,12 +170,25 @@ Pause persists across restarts and is never automatically cleared. No directory
 entry, policy note or OAuth connection activates a website target.
 
 `pathcheck.py` interprets a deliberately small AST subset with generated inputs.
-It models top-level direct function calls, assignments, simple string building,
-conditionals and selected primitive conversions/predicates. Sensitive operations
-are intercepted, never invoked. Unknown calls, classes, loops and other unsupported
+It models direct function calls, simple declared instance/static methods,
+assignments, simple string building, conditionals and selected primitive
+conversions/predicates. Inert receiver markers follow direct self-method calls;
+no project class is constructed. Sensitive operations are intercepted, never
+invoked. Unknown calls, inheritance, initialization, decorators, instance state,
+loops and other unsupported
 features stop an experiment. Limits: 20 leads, three entry points, three input
 pairs, six call levels, 2,000 steps per experiment and bounded primitive values.
 Source code is not imported, compiled into executable code, or executed.
+
+Static review distributes its bounded 240,000 expression visits across declared
+entry points so a large early function cannot exhaust every later function's
+share. Results report declared/visited functions, class methods and work-limited
+entries; these counts include partially reviewed functions, not full coverage.
+The existing local SQLite component check now receives supported class-method
+paths too. Repeated extra synthetic rows plus positive and parameter-binding
+controls are still required. Such a result remains component evidence, never a
+confirmed application exploit or bounty. Fixed aggregate host diagnostics expose
+engine/version, coverage counts and worker failures without source or findings.
 
 Results distinguish **input influence observed in the model**, **not reproduced
 with sampled inputs**, **unsupported**, and **budget exhausted**. None proves
@@ -509,7 +522,7 @@ card is hidden unless already configured; Capital.com is unavailable in India.
 
 The Project research card analyzes up to 80 UTF-8 Python files in an owner-authorized ZIP (2 MB compressed and expanded, 128 KB per Python file). Archives are read in memory, never extracted; unsafe paths, symlinks and encrypted entries are rejected. Source text is not retained or executed. Results contain file/line paths and a content fingerprint, and can be downloaded as JSON.
 
-The bounded analyzer follows direct calls between top-level project functions, arguments and returns (six call levels, 60,000 expression visits). It looks for external input reaching SQL text, shell commands, dynamic code or object deserialization. Findings remain static hypotheses: framework reachability, sanitizers, object methods and runtime impact need separate review. It does not analyze Ruby/JavaScript, run arbitrary tests, claim critical severity, or submit reports. ScopeGuard's own 17 Python modules are reviewed automatically after code changes; uploaded archives are re-reviewed when uploaded again. Existing permission, pause and submission controls remain in force.
+The bounded analyzer follows direct calls between project functions and declared class methods, arguments and returns (six call levels, 240,000 expression visits). It looks for external input reaching SQL text, shell commands, dynamic code or object deserialization. Findings remain static hypotheses: framework reachability, sanitizers, inheritance, instance state and runtime impact need separate review. It does not analyze Ruby/JavaScript, run arbitrary tests, claim critical severity, or submit reports. ScopeGuard's own 35 Python modules are reviewed automatically after code changes; uploaded archives are re-reviewed when uploaded again. Existing permission, pause and submission controls remain in force.
 
 ### Change-aware project research
 
