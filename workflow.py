@@ -214,11 +214,17 @@ def snapshot(c):
         p['readiness']=readiness.assess(p,readiness_context)
         programs.append(p)
     exchange = rewards.rank(c, programs)
+    reviewed=[p for p in programs if p['policy_review']]
+    authorizing=sum(bool(p['policy_review'].get('grants_permission')) for p in reviewed)
     return {'reward_exchange':exchange,'methods':readiness.METHODS,
             'readiness_summary':{'active':sum(p['readiness']['active'] for p in programs),
                                  'configured':sum(p['readiness']['configured'] for p in programs),
                                  'needs_setup':sum(p['readiness']['category']=='setup' for p in programs),
                                  'specialist':sum(p['readiness']['category']=='specialist' for p in programs)},
+            'policy_review_summary':{'listed_programs':len(programs),'matched_listings':len(reviewed),
+                                     'unreviewed_listings':len(programs)-len(reviewed),
+                                     'records_total':len(POLICY_REVIEWS),'authorizing':authorizing,
+                                     'non_authorizing':len(reviewed)-authorizing},
             'enabled':bool(c.execute('SELECT enabled FROM discovery_settings').fetchone()[0]),
             'sources':sources,'programs':programs,'interval_hours':INTERVAL/3600,'interval_minutes':INTERVAL//60,
             'ai_status':'Connected — advisory only, at most 1 review/day' if ai_enabled() else 'Local directory sorting only — official policy reviews are separate; no AI API fees',
@@ -254,6 +260,9 @@ def mutate(c,path,data):
 
 
 POLICY_REVIEWS = {
+ "https://hackerone.com/uber": {"reviewed_on":"2026-09-26","checked_at":"2026-09-26T02:00:47Z","note":"The active public program exposes 4 in-scope and 20 excluded scope rows. Owned test accounts and identified HackerOne aliases are expected. Automated scan or enumeration output without additional analysis, validation, reasoning and demonstrated impact is excluded. No numerical request limit or permission for unattended ScopeGuard checks was found; no target was activated.","sources":["https://hackerone.com/uber","https://hackerone.com/uber/policy_scopes"],"review_status":"reviewed_manual_validation_required","grants_permission":False},
+ "https://hackerone.com/superhuman": {"reviewed_on":"2026-09-26","checked_at":"2026-09-26T02:00:47Z","note":"The active public program exposes 30 in-scope rows across Superhuman, Grammarly and Coda. Owned test accounts with the required HackerOne-style identity are needed. Automated scanner output without manual validation is excluded. No numerical request limit or permission for unattended ScopeGuard checks was found; no target was activated.","sources":["https://hackerone.com/superhuman","https://hackerone.com/superhuman/policy_scopes"],"review_status":"reviewed_manual_validation_required","grants_permission":False},
+ "https://hackerone.com/coinbase": {"reviewed_on":"2026-09-26","checked_at":"2026-09-26T02:00:47Z","note":"The active Web2 program exposes 16 in-scope and 3 excluded scope rows. Low and Medium findings are out of scope; only High, Critical and the special Extreme wallet-impact class are bounty-eligible. No explicit test-account instructions, numerical request limit or automation permission was found. No target was activated.","sources":["https://hackerone.com/coinbase","https://hackerone.com/coinbase/policy_scopes"],"review_status":"reviewed_permission_unverified","grants_permission":False},
  "https://hackerone.com/paypal": {"reviewed_on":"2026-09-26","checked_at":"2026-09-26T01:01:27Z","note":"Public program is active, but scanner output and scanner-generated reports, including automated active exploit tools, are out of scope. Research traffic must use the X-PP-BB HackerOne identifier header; test accounts and the testing IP must be disclosed in a report. No numerical request limit was found. No automatic target was activated.","sources":["https://hackerone.com/paypal","https://hackerone.com/paypal/policy_scopes"],"review_status":"reviewed_manual_only","grants_permission":False},
  "https://hackerone.com/discord": {"reviewed_on":"2026-09-26","checked_at":"2026-09-26T01:01:27Z","note":"Discord moved to a private Bugcrowd program on May 20, 2025. Its official public rules prohibit scanners and automated vulnerability-finding tools and require testing only owned accounts and servers. No target was activated.","sources":["https://discord.com/security"],"review_status":"reviewed_restricted_private","grants_permission":False},
  "https://hackerone.com/dropbox": {"reviewed_on":"2026-09-26","checked_at":"2026-09-26T01:01:27Z","note":"Dropbox's Bugcrowd engagement has been paused since July 31, 2025 and instructs researchers to stop all testing. Public target names are masked; automated-tool and scan reports are out of scope. No target was activated.","sources":["https://bugcrowd.com/engagements/dropbox"],"review_status":"reviewed_paused","grants_permission":False},

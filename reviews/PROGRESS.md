@@ -1,5 +1,41 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, batch 03
+
+Baseline: scopeguard-app commit ced1043b45fe30cceab4a1d19ab951d1f5e3fe94.
+The latest branch, previous evidence files and this ledger were read before
+selecting a new batch. No previously recorded program was repeated.
+
+Reviewed current official policies: Uber, Superhuman (formerly Grammarly) and
+Coinbase. Detailed evidence: `2026-09-26-batch-03.json` (checked
+2026-09-26T02:00:47Z). Uber exposes 4 in-scope and 20 excluded asset rows and
+requires owned test accounts; unvalidated automated scan/enumeration output is
+ineligible. Superhuman exposes 30 in-scope rows across its own, Grammarly and
+Coda products, with product-specific owned-account requirements; automated
+output needs manual validation. Coinbase exposes 16 in-scope and 3 excluded
+rows, but Low and Medium findings are out of scope and no explicit automation
+permission or public test-account procedure was found. None of these reviews
+grants ScopeGuard permission to activate a target. No numerical request limit
+was found; unknown never means unlimited. No external test, account, submission,
+staff contact or target activation occurred.
+
+## Review-count visibility change
+
+Added a `policy_review_summary` that separately reports current directory
+listings, listings matched to official policy evidence, still-unreviewed
+listings, total source evidence records, and how many matched reviews grant queue
+permission. The dashboard now shows the matched/listed count beside discovery
+status and in queue details. A synthetic regression proves that a matched
+non-authorizing review increases the evidence count while creating no target and
+making no network request. This prevents the listed-program counter from looking
+like a reviewed, queued or completed-work counter.
+
+Authenticated live ScopeGuard state and its private 304-entry list remain
+unavailable, so these reviews cannot be claimed as three entries from that exact
+list. The repository still has no supported authenticated policy-import endpoint;
+the new records are non-authorizing source data only. No deployment, external
+scan, confirmed vulnerability or earnings occurred.
+
 ## 2026-09-26, batch 02
 
 Baseline: scopeguard-app commit 5f3aa5202b916a6ef637ed5f646d4213c4fbd0a6.

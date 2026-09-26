@@ -1,0 +1,217 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "program": "Uber",
+      "policy_url": "https://hackerone.com/uber",
+      "sources": [
+        "https://hackerone.com/uber",
+        "https://hackerone.com/uber/policy_scopes"
+      ],
+      "policy_updated": "2026-04-30",
+      "scope_updated": "2026-09-22",
+      "review_status": "reviewed_manual_validation_required",
+      "availability": "Public HackerOne bounty program active; no pause banner observed.",
+      "in_scope_assets": [
+        "uber.com",
+        "Recon Data (official ListDomains and ListIPs endpoints)",
+        "*ubereats.com",
+        "*.uberinternal.com"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "The ubereats wildcard excludes every separately listed out-of-scope host.",
+        "Recon data is informational and does not make every returned asset bounty-eligible.",
+        "Reports must contain analysis, validation, reasoning and demonstrable security impact rather than scanner output.",
+        "Researchers may test only accounts they own and must minimize any access to other users' data."
+      ],
+      "automation": "Automated scan and enumeration reports without additional analysis, validation, reasoning and demonstrated impact are excluded. The policy does not establish permission for ScopeGuard's unattended production checks.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found in the official policy or scope table read. Null means unknown, not unlimited.",
+      "accounts": "Owned test accounts are required. The program expects a HackerOne testing identity using the @wearehackerone.com alias; no preconfigured account was provided or created.",
+      "excluded_assets": [
+        "uber.onelogin.com",
+        "uber.com.cn and China/Didi assets",
+        "scaledsolutions*.uber.com",
+        "people.uber.com",
+        "newsroom.uber.com",
+        "merchants.ubereats.com (same-organization role escalation; cross-tenant issues remain eligible)",
+        "love.uber.com",
+        "https://brand.uber.com",
+        "https://assets.uber.com",
+        "Fraud Reports",
+        "et.uber.com",
+        "eng.uber.com",
+        "drive.uber.com",
+        "central-beta.uber.com",
+        "bizblog.uber.com",
+        "adsacademy.uber.com",
+        "*scaledsolutions.uber.com",
+        "*.ubertransit.io",
+        "*.uberscoot.us",
+        "*.ubercarshare.com"
+      ],
+      "exclusions": [
+        "Brute force, denial of service, social engineering and destructive testing",
+        "Automated output without manual validation and impact",
+        "Missing headers, TLS configuration, open ports, banners and versions without a security exploit",
+        "Rate-limit observations without demonstrated security impact",
+        "Accessing or changing other users' data beyond the minimum proof"
+      ],
+      "unresolved": [
+        "No permission for the proposed autonomous header checks was established.",
+        "No numerical request limit was published in the pages reviewed.",
+        "A future manual test would still need an exact eligible asset, owned account and reportable impact hypothesis."
+      ],
+      "note": "Active public program, but the reviewed rules require controlled, identified and manually validated research. No target activated.",
+      "checked_at": "2026-09-26T02:00:47Z",
+      "evidence_method": "Official public HackerOne policy and rendered scope table",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    },
+    {
+      "program": "Superhuman (formerly Grammarly)",
+      "policy_url": "https://hackerone.com/superhuman",
+      "sources": [
+        "https://hackerone.com/superhuman",
+        "https://hackerone.com/superhuman/policy_scopes"
+      ],
+      "policy_updated": "2026-07-15",
+      "scope_updated": "2026-08-17",
+      "bounty_updated": "2026-09-10",
+      "review_status": "reviewed_manual_validation_required",
+      "availability": "Public HackerOne bounty program active with open scope across Superhuman, Grammarly and Coda products.",
+      "in_scope_assets": [
+        "Superhuman Mail Desktop App",
+        "Superhuman Mail Chrome Extension",
+        "mail.superhuman.com",
+        "io.coda.codaapp (Android)",
+        "io.coda (iOS)",
+        "docs.superhuman.com",
+        "com.superhuman.mail (iOS)",
+        "com.superhuman.mail (Android)",
+        "codahosted.io",
+        "codacontent.io",
+        "coda.io",
+        "coda.grammarly.com",
+        "*.coda.io",
+        "Coda Chrome Extension",
+        "Superhuman Mail",
+        "superhuman.com",
+        "Superhuman Go",
+        "settings.superhuman.com",
+        "id.superhuman.com",
+        "gateway.superhuman.com",
+        "*.superhuman.com",
+        "Grammarly Desktop for Windows",
+        "Grammarly Desktop for macOS",
+        "Grammarly Browser Extensions",
+        "com.grammarly.keyboard (iOS)",
+        "com.grammarly.android.keyboard (Android)",
+        "*.grammarlyaws.com",
+        "*.grammarly.io",
+        "*.grammarly.com",
+        "Capture the Flag"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "Third-party SaaS domains reached through Superhuman wildcards are excluded.",
+        "The same Grammarly extension vulnerability across browsers is treated as one report.",
+        "Capture the Flag is governed by its own challenge instructions.",
+        "Real customer accounts must not be used; doing so may reduce an otherwise eligible bounty."
+      ],
+      "automation": "Automated scanner output without manual validation is out of scope. Crash dumps or tool output alone are insufficient. The policy does not establish permission for unattended ScopeGuard checks.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found in the official policy or scope table read. Null means unknown, not unlimited.",
+      "accounts": "Owned test accounts are required. Coda permits up to five free-plan accounts using a HackerOne alias or hackeronetester identifier. Grammarly and Superhuman require a HackerOne-style testing identity; Superhuman Mail requires an owned Google or Outlook workspace. No account or paid upgrade was created.",
+      "exclusions": [
+        "Denial of service, stress testing and disruption",
+        "Automated scanner output without manual validation",
+        "Missing headers, open ports, banners and versions without demonstrated impact",
+        "Third-party SaaS, packs, agents and integrations not operated by the program",
+        "AI prompt injection or jailbreaks without a security boundary impact",
+        "Trial, referral or billing abuse",
+        "Account enumeration and rate-limit-only reports without demonstrated impact"
+      ],
+      "unresolved": [
+        "No permission for the proposed autonomous header checks was established.",
+        "No numerical request limit was published in the pages reviewed.",
+        "Product-specific test identity and account setup remain prerequisites for any future manual work."
+      ],
+      "note": "Active public program with exact scope, but owned test accounts and manual validation are required. No target activated.",
+      "checked_at": "2026-09-26T02:00:47Z",
+      "evidence_method": "Official public HackerOne policy and rendered scope table",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    },
+    {
+      "program": "Coinbase",
+      "policy_url": "https://hackerone.com/coinbase",
+      "sources": [
+        "https://hackerone.com/coinbase",
+        "https://hackerone.com/coinbase/policy_scopes"
+      ],
+      "policy_updated": "2026-07-31",
+      "scope_updated": "2026-08-08",
+      "review_status": "reviewed_permission_unverified",
+      "availability": "Public HackerOne Web2 bounty program active; Web3 issues are directed to a separate Cantina program.",
+      "in_scope_assets": [
+        "org.toshi.distribution (Base iOS)",
+        "org.toshi (Base Android)",
+        "https://github.com/coinbase/cb-mpc-go (bounty-ineligible)",
+        "https://github.com/coinbase/cb-mpc",
+        "https://github.com/coinbase/*",
+        "https://github.com/base/*",
+        "Coinbase Wallet Chrome extension (hnfanknocfeofbddgcijnmhnfnkdnaad)",
+        "com.vilcsak.bitcoin2 (Coinbase iOS)",
+        "com.coinbase.android",
+        "54.175.255.192/27",
+        "*.coinbase.com",
+        "*.coinbase-corp.com",
+        "*.cbhq.net",
+        "*.base.org",
+        "*.base.app",
+        "Other Coinbase-operated applications missed by the standard scope (bounty-ineligible; reviewed individually)"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "Only High and Critical Web2 findings are bounty-eligible; Low and Medium findings receive no bounty.",
+        "The special Extreme category applies to compromise of hot/cold-wallet funds or private keys.",
+        "cb-mpc-go and the catch-all Other row are explicitly bounty-ineligible.",
+        "Demo, testnet and staging environments are excluded."
+      ],
+      "automation": "No explicit permission for automated or unattended testing was found in the official pages reviewed. Directory inclusion and wildcard scope do not provide that permission.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found in the official policy or scope table read. Null means unknown, not unlimited.",
+      "accounts": "No explicit public test-account or testing-identity instructions were found in the pages reviewed. Account requirements therefore remain unresolved, not approved.",
+      "excluded_assets": [
+        "status.coinbase.com",
+        "status.*.coinbase.com",
+        "N/A - assets not owned or operated by Coinbase"
+      ],
+      "exclusions": [
+        "Low and Medium severity findings",
+        "Social engineering, physical attacks and username enumeration",
+        "Non-critical rate limiting",
+        "Deprecated libraries without demonstrated exploitability",
+        "Third-party applications that integrate with Coinbase",
+        "ACH, chargeback or other banking-system abuse",
+        "Rotated or invalid leaked credentials",
+        "Demo, testnet and staging assets"
+      ],
+      "unresolved": [
+        "No permission for the proposed autonomous header checks was established.",
+        "No public test-account procedure or numerical request limit was found.",
+        "Basic header checks cannot establish the High, Critical or Extreme impact required for an eligible report."
+      ],
+      "note": "Active Web2 program, but automation permission and test-account requirements remain unverified and low-impact observations are ineligible. No target activated.",
+      "checked_at": "2026-09-26T02:00:47Z",
+      "evidence_method": "Official public HackerOne policy and rendered scope table",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    }
+  ]
+}

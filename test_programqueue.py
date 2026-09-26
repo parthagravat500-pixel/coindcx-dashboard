@@ -107,6 +107,21 @@ class ProgramQueueTests(unittest.TestCase):
             self.assertEqual(state['targets'],[])
             with patch('app.observe') as request:app.tick();request.assert_not_called()
 
+    def test_policy_review_counts_do_not_imply_queue_permission(self):
+        workflow.sync(app.db,'hackerone',[{'name':'PayPal','url':'https://hackerone.com/paypal',
+            'offers_bounties':True,'submission_state':'open'},
+            {'name':'Unknown','url':'https://hackerone.com/unknown',
+             'offers_bounties':True,'submission_state':'open'}],self.now)
+        state=app.snapshot();summary=state['workflow']['policy_review_summary']
+        self.assertEqual(summary['listed_programs'],2)
+        self.assertEqual(summary['matched_listings'],1)
+        self.assertEqual(summary['unreviewed_listings'],1)
+        self.assertEqual(summary['authorizing'],0)
+        self.assertEqual(summary['non_authorizing'],1)
+        self.assertGreaterEqual(summary['records_total'],1)
+        self.assertEqual(state['targets'],[])
+        with patch('app.observe') as request:app.tick();request.assert_not_called()
+
     def test_rotates_programs_and_persists_position(self):
         self.add('a1','https://example.com/program-a');self.add('a2','https://example.com/program-a')
         self.add('b1','https://example.com/program-b')
