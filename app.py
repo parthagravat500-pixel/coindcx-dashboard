@@ -31,6 +31,8 @@ import uberconnect
 import autoresearch
 import autopilot
 import leadwork
+import programapi
+import programresearch
 
 ROOT = Path(__file__).parent
 DATA = Path(os.environ.get('DATA_DIR', str(ROOT / 'data')))
@@ -84,6 +86,7 @@ def init():
         autoresearch.init(c)
         autopilot.init(c)
         leadwork.init(c)
+        programresearch.init(c)
         # Initial install is paused. Explicit operator state survives restarts;
         # expired target authorizations remain blocked independently.
 
@@ -211,6 +214,21 @@ def discovery_worker():
         WAKE.wait(30)
 
 
+def program_research_worker():
+    next_receipt=0
+    while True:
+        try:
+            programresearch.tick(db,DATA,LOCK)
+            if time.time()>=next_receipt:
+                with db() as c:
+                    print(json.dumps(programresearch.receipt(c,DATA,os.environ.get('RENDER_GIT_COMMIT',''))),flush=True)
+                next_receipt=time.time()+300
+        except Exception:
+            # No external error text or credentials enter events or host logs.
+            with db() as c:log(c,'Program research could not advance; saved evidence retained.')
+        WAKE.wait(15)
+
+
 def supervisor_worker():
     while True:
         try:
@@ -332,6 +350,7 @@ def snapshot():
                 'automatic_research': autoresearch.snapshot(c),
                 'autopilot': autopilot.snapshot(c),
                 'lead_inbox': leadwork.snapshot(c),
+                'program_research': programresearch.snapshot(c,DATA),
                 'source_watch': sourcewatch.snapshot(c),
                 'research': research.snapshot(c),
                 'dependency_projects': dependencies.snapshot(c),
@@ -344,6 +363,11 @@ def snapshot():
 
 
 def mutate(path, data):
+    if path in ('/api/program-api/connect','/api/program-api/disconnect'):
+        with LOCK:
+            if path.endswith('/connect'):programapi.connect(DATA,data)
+            else:programapi.save(DATA,data.get('provider'),{'enabled':False})
+        return
     if path in ('/api/reporting/connect', '/api/reporting/disconnect'):
         with LOCK:
             if path.endswith('/connect'):
@@ -510,6 +534,14 @@ class Handler(BaseHTTPRequestHandler):
                                                'Set-Cookie': uberconnect.cookie(clear=True)})
         if self.path == '/api/state':
             return self.reply(200, json.dumps(snapshot()))
+        if self.path.startswith('/api/program-research?'):
+            from urllib.parse import parse_qs
+            try:
+                identity=parse_qs(self.path.split('?',1)[1]).get('id',[''])[0]
+                if len(identity)!=24:raise ValueError()
+                with db() as c:result=programresearch.detail(c,identity)
+                return self.reply(200,json.dumps(result))
+            except ValueError:return self.reply(404,'{"error":"Program research record not found"}')
         assets = {'/': ('index.html', 'text/html'), '/ui.js': ('ui.js', 'text/javascript'), '/style.css': ('style.css', 'text/css')}
         if self.path in assets:
             filename, mime = assets[self.path]
@@ -597,6 +629,7 @@ if __name__ == '__main__':
     threading.Thread(target=source_watch_worker, daemon=True).start()
     threading.Thread(target=supervisor_worker, daemon=True).start()
     threading.Thread(target=discovery_worker, daemon=True).start()
+    threading.Thread(target=program_research_worker, daemon=True).start()
     threading.Thread(target=reporting_worker, daemon=True).start()
     server = ThreadingHTTPServer((os.environ.get('BIND', '127.0.0.1'), int(os.environ.get('PORT', '8080'))), Handler)
     threading.Thread(target=autonomous_worker, args=(server.server_address[1],), daemon=True).start()

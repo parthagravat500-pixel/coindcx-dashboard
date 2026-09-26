@@ -1,5 +1,39 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, persistent research for every listed program
+
+Baseline f469c56879229f1a51dd3b4f4380ce4e92973bc9 and all 87 tracked blobs
+were verified before editing. The directory had no program-by-program official
+document worker. Added programapi.py and programresearch.py, using documented
+HackerOne and Intigriti researcher APIs. Official API documentation and Intigriti's
+linked OpenAPI schema were read on 26 September. No third-party target was tested.
+
+The new worker tracks every listing, uses authorized read-only API requests,
+collects policy/scope/exclusions, preserves incomplete pagination, detects changes,
+and continues past per-program access refusals. It stops an invalid provider
+connection, respects Retry-After, and retains its request budget across restarts.
+It does not infer permission, alter target activation, renew permissions, create
+accounts, run exploits or send reports. Credentials stay in an owner-only file;
+reading program rules never enables report delivery. No new paid resources.
+
+A simple home-screen research panel and searchable complete program list expose
+what was collected and what is missing. Exact API evidence is private behind the
+existing authentication. Existing manually researched policy batches stay intact.
+Rules collected, rules interpreted, configured tests and actual bugs are separate.
+Intigriti tiers and automatedTooling values are not interpreted without verified
+semantics; linked rules, attachments and eligibility may still need review.
+
+Synthetic validation covers both API formats, multiple scope pages, all 304
+synthetic listings with no credentials and zero completed reviews, restart,
+deduplication, document changes, pause, stale directories, access denial,
+provider authentication failures, backoff, bounded storage, credential redaction,
+Mozilla restrictions and prompt-shaped policy text. A real authenticated loopback
+HTTP test exercises connection -> worker -> private saved evidence without target
+activation or submission. Dashboard checks cover text-only evidence rendering,
+connection forms and stale asynchronous responses. All 289 local Python tests and
+the dashboard DOM smoke test passed. Publication,
+live connection availability and deployed worker progress are verified separately.
+
 ## 2026-09-26, hosting compatibility correction
 
 The first deployment of a8c4a7038d639722bd67adea7095d722c52dfd40 was blocked

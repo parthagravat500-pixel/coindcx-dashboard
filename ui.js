@@ -401,6 +401,7 @@ function homeHistory(){
  return rows.sort((a,b)=>b.at-a.at);
 }
 function renderHome(){
+ renderProgramResearch();
  for(const id of ['openHomeResults','openHomeBlockers','openHomeActivity'])$(id).disabled=false;
  const a=state.autopilot,mode=a?.state||'unavailable',enabled=state.workflow?.enabled||!state.paused;
  const labels={paused:['Research is paused','Saved progress is kept. Resume continues only tests that already have valid permission.','Paused'],unavailable:['Current worker status is unavailable','Saved results are below. A recent worker check-in is needed before we can confirm activity.','Needs attention'],running:['An approved test is running','ScopeGuard will save the result and move to the next permitted task.','Working'],ready:['The next test is ready','The worker will pick up the next saved, permitted test.','Ready'],waiting:['Your next check is scheduled','ScopeGuard waits between tests to respect the saved limits. Results appear when a check finishes.','Scheduled']};
@@ -436,6 +437,7 @@ function renderHome(){
  if(!history.length)$('homeHistory').append(el('p','No completed work is recorded in this recent history yet.','muted'));
 }
 function renderHomeOffline(){
+ $('homeProgramResearchBadge').textContent='Not connected';$('homeProgramResearchNext').textContent='Program research status may be out of date.';$('openProgramResearch').disabled=true;$('openProgramConnections').disabled=true;
  $('status').textContent='● Connection needs attention';$('homeTitle').textContent='The dashboard is not connected';
  $('homeDescription').textContent='Live progress could not be refreshed. The saved figures below may be out of date.';
  $('homeWorkerBadge').textContent='Not connected';$('homeWorkerBadge').dataset.tone='offline';
@@ -468,6 +470,64 @@ function openHomeActivity(){
  for(const r of history)root.append(homeRow(r.title,r.detail+' '+date(r.at)));
 }
 $('openHomeResults').onclick=openHomeResults;$('openHomeBlockers').onclick=openHomeBlockers;$('openHomeActivity').onclick=openHomeActivity;
+
+function renderProgramResearch(){
+ const r=state.program_research;
+ $('openProgramResearch').disabled=!r;$('openProgramConnections').disabled=!r;
+ $('homeProgramResearchBadge').textContent=!r?'Unavailable':r.paused?'Paused':!r.healthy?'Needs attention':r.providers.some(p=>p.connected&&!p.blocked)?'Automatic':'Connection needed';
+ $('homeProgramResearchSummary').textContent=!r?'Current program research is unavailable.':r.listed+' listed programs · '+r.documents_collected+' with current official documents · '+r.attempted+' with a document request attempted.';
+ const missing=(r?.providers||[]).filter(p=>!p.connected).map(p=>p.provider==='hackerone'?'HackerOne':'Intigriti');
+ $('homeProgramResearchNext').textContent=!r?'Waiting for a fresh dashboard update.':r.paused?'Program research is paused.':missing.length?'Connect '+missing.join(' and ')+' once for automatic rule collection. Connected platforms can continue.':r.providers.some(p=>p.blocked)?'A platform refused access or returned an unsupported response. Other connected platforms can continue.':'The worker reads official rules, saves scope and exclusions, and moves to the next program. Documents refresh daily.';
+}
+function openProgramResearch(){
+ const r=state.program_research,root=modal('Research across all listed programs');
+ if(!r){root.append(el('p','Current research status is unavailable.'));return;}
+ root.append(el('p',r.coverage),el('p','Official documents collected: '+r.documents_collected+' of '+r.listed+'. No new testing permissions have been granted.'),button('Research connections',openProgramConnections));
+ const label=el('label','Find a program'),search=el('input');search.type='search';search.placeholder='Program name';label.append(search);
+ const list=el('div'),more=button('Show more',()=>{limit+=40;draw();});let limit=40;
+ const draw=()=>{const rows=r.rows.filter(x=>x.name.toLowerCase().includes(search.value.toLowerCase()));list.replaceChildren();for(const row of rows.slice(0,limit)){
+   const card=el('article',undefined,'item');card.append(el('strong',row.name),el('p',row.label),el('small',row.requests+' document requests · Last completed collection: '+date(row.checked)),el('small',row.scope_assets+' scope rows saved · '+row.changes+' changes detected'));
+   if(row.checked&&!row.fresh)card.append(el('p','Saved documents are out of date.','muted'));
+   card.append(button('Read collected evidence',()=>openProgramEvidence(row)),safeLink('Official program page ↗',row.policy));list.append(card);
+  }more.hidden=rows.length<=limit;};search.oninput=()=>{limit=40;draw();};root.append(label,list,more);draw();
+}
+async function openProgramEvidence(row){
+ const root=modal(row.name+' · official documents'),heading=root.children[0];root.append(el('p','Loading saved evidence…'));
+ const response=await fetch('/api/program-research?id='+encodeURIComponent(row.id)),data=await response.json();
+ if(!response.ok)throw Error(data.error||'Evidence could not be loaded');
+ if(root.children[0]!==heading||!$('detail').open)return;
+ root.replaceChildren(el('h2',row.name+' · collected evidence'));const e=data.evidence||{};
+ root.append(el('p','Collected: '+date(data.checked)+'. Testing permission is unverified. No target was activated.'),el('p','Program status reported by platform: '+(e.program_status||'Not collected')));
+ if(!data.checked){root.append(el('p',row.label+'. No completed official document collection is saved.'));return;}
+ facts(root,[['Scope complete',e.scope_complete?'Yes':'No'],['Document collection complete',e.documents_complete?'Yes':'No'],['Automation permission',e.automation_permission||'Unverified']]);
+ for(const note of e.unresolved||[])root.append(el('p',note,'muted'));
+ for(const [kind,lines] of Object.entries(e.rule_passages||{})){const box=el('details');box.append(el('summary',kind+' · candidate rule passages'));for(const line of lines)box.append(el('p',line));if(!lines.length)box.append(el('p','No passage identified; this does not imply permission.'));root.append(box);}
+ for(const note of e.method_candidates||[])root.append(el('p',note));
+ const scope=el('details');scope.append(el('summary','Exact scope rows ('+(e.scope||[]).length+')'));for(const asset of e.scope||[])scope.append(homeRow(asset.asset,asset.type+' · '+(asset.tier||('Submission eligible: '+String(asset.eligible_for_submission)))+' · '+asset.instructions));root.append(scope);
+ const excluded=el('details');excluded.append(el('summary','Published exclusions'));for(const x of e.exclusions||[])excluded.append(homeRow(x.category,x.details));root.append(excluded);
+ const text=el('details');text.append(el('summary','Full collected policy text'),el('pre',e.policy_text||'Not available.'));root.append(text);
+ if(Object.keys(e.requirements||{}).length){const requirements=el('details');requirements.append(el('summary','Structured platform requirements'),el('pre',JSON.stringify(e.requirements,null,2)));root.append(requirements);}
+ for(const url of e.sources||[])root.append(safeLink('Official evidence source ↗',url),el('br'));
+}
+function openProgramConnections(){
+ const root=modal('Connect automatic program research');
+ root.append(el('p','This connection reads program rules and scope. It does not create test accounts, authorize scans or send reports. Keys stay privately on your ScopeGuard server.'));
+ for(const p of state.program_research?.providers||[]){const name=p.provider==='hackerone'?'HackerOne':'Intigriti',box=el('section');box.append(el('h3',name),el('p',p.connected?(p.blocked?'Connection needs attention':p.uses_existing_connection?'Using your existing connection':'Connected for reading rules'):'Not connected'));
+  if(p.connected)box.append(button('Disconnect '+name+' research',async()=>{await change('/api/program-api/disconnect',{provider:p.provider});openProgramConnections();}));
+  box.append(button(p.connected?'Replace '+name+' connection':'Connect '+name,()=>programConnectionForm(p.provider)));root.append(box);
+ }
+}
+function programConnectionForm(provider){
+ const name=provider==='hackerone'?'HackerOne':'Intigriti',root=modal('Connect '+name+' research');
+ root.append(el('p','Use an API token from your own '+name+' account. A website login does not provide this server with API access.'),safeLink('Open official connection instructions ↗',provider==='hackerone'?'https://api.hackerone.com/getting-started-hacker-api/':'https://kb.intigriti.com/en/articles/8529303-intigriti-researcher-api'));
+ const form=el('form');form.autocomplete='off';const username=el('input');username.maxLength=150;username.autocomplete='off';
+ if(provider==='hackerone'){const label=el('label','API token identifier');username.required=true;label.append(username);form.append(label);}
+ const tokenLabel=el('label','Private API token'),token=el('input');token.type='password';token.required=true;token.maxLength=2000;token.autocomplete='new-password';tokenLabel.append(token);
+ const label=el('label',undefined,'check'),permission=el('input');permission.type='checkbox';permission.required=true;label.append(permission,document.createTextNode('Allow ScopeGuard to read the program rules and scope available to this account.'));
+ const submit=el('button','Connect and start research'),status=el('p');submit.type='submit';status.setAttribute('role','status');form.append(tokenLabel,label,submit,status);root.append(form);
+ form.onsubmit=async event=>{event.preventDefault();submit.disabled=true;const secret=token.value.trim();token.value='';try{await change('/api/program-api/connect',{provider,username:username.value.trim(),token:secret,authorize_read:permission.checked});openProgramConnections();}catch(error){status.textContent=error.message;submit.disabled=false;}};
+}
+$('openProgramResearch').onclick=openProgramResearch;$('openProgramConnections').onclick=openProgramConnections;
 function openHomeLeads(){
  const root=modal('Possible leads and tested evidence'),inbox=state.lead_inbox;
  if(!inbox){root.append(el('p','Lead evidence is unavailable from this server.'));return;}

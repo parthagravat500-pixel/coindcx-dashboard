@@ -1,3 +1,45 @@
+## Automatic program research
+
+Every directory listing receives a persistent research entry. The home screen's
+**View all programs** list shows pending work, actual document requests, current
+collections, changes and access blockers separately from security tests.
+
+With authorized platform API connections, ScopeGuard reads official HackerOne
+policies, paginated structured scope and reward exclusions, plus Intigriti
+program rules, domains and structured requirements. It uses only documented GET
+endpoints, at most one worker request per 15 seconds globally. Progress, backoff
+and partial pagination survive restarts. Completed documents refresh daily;
+forbidden programs do not hold up other programs. Platform authentication errors
+stop that provider until the connection changes. Missing tokens cause zero API
+requests and zero claimed reviews. Existing HackerOne reporting credentials can
+be reused for reads; a separate research connection never enables reporting.
+
+The authenticated research connection screen accepts private API credentials,
+with explicit read consent, independently of report delivery. Tokens stay in a
+server file restricted to its owner and never enter snapshots, logs or commits.
+Research disconnection remains in force across restarts even if reporting is
+connected. Program evidence is served only behind the existing dashboard login.
+
+Collection is not policy interpretation or testing approval. Rule passages are
+search aids; linked conditions and unknown limits remain unresolved. Intigriti
+tier and automatedTooling fields are retained without guessing their meaning.
+Attachments are not fetched, and their presence prevents a complete-document
+claim. Mozilla production automation remains restricted. No source repository,
+target, account, permission renewal, exploit or report is created by this worker.
+Supported methods and missing prerequisites are shown with each collection.
+
+Evidence is bounded to 512 KB per document snapshot and 64 MB in total (including
+partial working copies), with at most 2,000
+scope rows. Unsupported or oversized responses stay incomplete; none are silently
+counted as complete. Third-party directory rows are used only to identify the
+official programs. Unlisted private API programs are not imported.
+
+Official API documentation checked 26 September 2026:
+- https://api.hackerone.com/getting-started-hacker-api/
+- https://api.hackerone.com/hacker-resources/
+- https://kb.intigriti.com/en/articles/8529303-intigriti-researcher-api
+- https://api.intigriti.com/external/researcher/swagger/v1.0/swagger.json
+
 ## Automatic lead investigations
 
 Source reviews now feed a persistent, ranked lead inbox alongside repeated runtime
