@@ -136,7 +136,7 @@ function openProgramQueue(){
  const q=state.program_queue,root=modal('Scheduled checks and program readiness');if(!q){root.append(el('p','Queue status unavailable.'));return;}
  facts(root,[['Programs with configured checks',state.workflow?.readiness_summary?.configured||0],['Programs with active checks',state.workflow?.readiness_summary?.active||0],['GitLab private-project check',gitlabActive()?state.gitlab.status:'Not active'],['Private JSON comparison profiles',(state.access_checks||[]).filter(p=>p.enabled&&p.expires*1000>Date.now()).length]]);
  root.append(el('h3','Website header-check queue'));
- facts(root,[['Listed HackerOne programs',q.listed_h1],['Programs with active saved permissions',q.approved_programs],['Targets due',q.due_targets],['Next target',q.next_target||'None due'],['Completed limited checks',q.completed],['Last worker check-in',date(q.heartbeat)],['Confirmed payable findings',q.confirmed_payable],['Automatic report submission','Not performed by this queue']]);
+ facts(root,[['Listed HackerOne programs',q.listed_h1],['Programs with active saved permissions',q.approved_programs],['Saved URLs',q.saved_targets??'Unknown'],['Disabled URLs',q.disabled_targets??'Unknown'],['Expired permissions',q.expired_targets??'Unknown'],['Blocked by directory status',q.directory_blocked_targets??'Unknown'],['Waiting for schedule',q.waiting_targets??'Unknown'],['Next eligible due time',q.next_due==null?'None':date(q.next_due)],['Targets due',q.due_targets],['Next target',q.next_target||'None due'],['Completed limited checks',q.completed],['Last worker check-in',date(q.heartbeat)],['Confirmed payable findings',q.confirmed_payable],['Automatic report submission','Not performed by this queue']]);
  root.append(el('p',q.coverage),el('p','Programs without current saved scope and automation permission are skipped. Unknown HackerOne reward amounts are not guessed. The queue rotates between due programs and preserves each target’s rate limit.','muted'));
  root.append(el('h3','Recent checks'));
  const outcomes={running:'Running',observations:'Observations recorded · impact unverified',no_observation:'No issue detected in these limited checks',stopped:'Stopped · review permission or server response',error:'Request failed · coverage incomplete',interrupted:'Interrupted · coverage incomplete',inconclusive:'Inconclusive · expected coverage not completed'};
@@ -144,7 +144,7 @@ function openProgramQueue(){
  for(const run of q.attempts){const row=el('article',undefined,'item');row.append(el('strong',run.name||'Saved target'),el('small',outcomes[run.outcome]||'Unknown outcome'),el('small',date(run.started)+' · '+run.observations+' observations'));root.append(row);}
  root.append(el('h3','HackerOne header-check eligibility'),el('p','The table below covers header targets only. Private-data connectors and their coverage are listed above.','muted'));
  if(!q.rows.length)root.append(el('p','No HackerOne directory entries available.'));
- for(const p of q.rows){const row=el('article',undefined,'item');row.append(el('strong',p.name),el('small',p.status),safeLink('Program policy ↗',p.policy));root.append(row);}
+ for(const p of q.rows){const row=el('article',undefined,'item');row.append(el('strong',p.name),el('small',p.status),el('small',p.next_due==null?'No eligible saved URL':'Next due: '+date(p.next_due)),safeLink('Program policy ↗',p.policy));root.append(row);}
  if(q.rows_total>q.rows.length)root.append(el('p','Showing '+q.rows.length+' of '+q.rows_total+' programs. Use Found websites to search the complete cached directory.','muted'));
 }
 $('openProgramQueue').onclick=openProgramQueue;
@@ -195,7 +195,7 @@ $('openPrivateAI').onclick=openPrivateAI;
 function renderSimpleStatus(){
  renderResearchStatus();
  const queue=state.program_queue;
- if(queue){const ready=state.workflow?.readiness_summary;$('programQueueStatus').textContent=(queue.paused?'Paused':!queue.healthy?'Worker status unavailable':ready?.active?'Scheduling configured checks':'Waiting for permitted test setup')+' · '+(ready?.active||0)+' programs with active configured checks · '+queue.completed+' header checks completed';$('programQueueCoverage').textContent='Header queue: '+queue.coverage+' '+queue.permission_needed+' listed H1 programs have no active header target. Private-data tests are shown separately.';}
+ if(queue){const ready=state.workflow?.readiness_summary;$('programQueueStatus').textContent=(queue.paused?'Paused':!queue.healthy?'Worker status unavailable':queue.queue_state==='waiting_schedule'?'Waiting for next scheduled header check':queue.due_targets?'Header checks due':'No eligible header checks due')+' · '+(ready?.active||0)+' programs with active configured checks · '+queue.completed+' header checks completed';$('programQueueCoverage').textContent='Header queue: '+queue.coverage+' '+queue.permission_needed+' listed H1 programs have no active header target. Private-data tests are shown separately.';}
  const sourceWatch=state.source_watch;
  if(sourceWatch){const active=sourceWatch.watches.filter(w=>w.enabled&&w.expires*1000>Date.now());
  $('sourceWatchSummary').textContent=(state.paused?'Paused · ':active.length?'Monitoring · ':'Not monitoring · ')+active.length+' approved repositories · '+sourceWatch.watches.reduce((n,w)=>n+w.reviews,0)+' commit reviews completed';

@@ -32,6 +32,63 @@ class ProgramQueueTests(unittest.TestCase):
         self.assertEqual(q['listed_h1'],1);self.assertEqual(q['permission_needed'],1)
         self.assertEqual(app.snapshot()['targets'],[]);self.assertEqual(q['completed'],0)
 
+    def test_waiting_schedule_is_not_reported_as_queued_work(self):
+        self.sync_h1();self.add('one','https://hackerone.com/fixture')
+        with app.db() as c:
+            programqueue.heartbeat(c,self.now)
+            c.execute('UPDATE targets SET due=?',(self.now+7200,))
+        q=app.snapshot()['program_queue']
+        self.assertEqual(q['queue_state'],'waiting_schedule')
+        self.assertEqual(q['waiting_targets'],1)
+        self.assertEqual(q['due_targets'],0)
+        self.assertEqual(q['next_due'],self.now+7200)
+        self.assertEqual(q['rows'][0]['status'],'Waiting for scheduled check')
+        self.assertEqual(q['rows'][0]['due_urls'],0)
+        self.assertIsNone(q['next_target'])
+        with patch('app.observe') as request:app.tick();request.assert_not_called()
+
+    def test_blocker_counts_partition_saved_targets_without_granting_access(self):
+        for name in ('disabled','expired','directory','waiting','due'):
+            self.add(name,'https://hackerone.com/missing' if name=='directory' else 'https://example.com/policy')
+        with app.db() as c:
+            programqueue.heartbeat(c,self.now)
+            c.execute("UPDATE targets SET enabled=0,expires=0 WHERE name='disabled'")
+            c.execute("UPDATE targets SET expires=0 WHERE name='expired'")
+            c.execute("UPDATE targets SET due=? WHERE name='waiting'",(self.now+3600,))
+        q=app.snapshot()['program_queue']
+        self.assertEqual(q['saved_targets'],5)
+        for key in ('disabled_targets','expired_targets','directory_blocked_targets','waiting_targets','due_targets'):
+            self.assertEqual(q[key],1,key)
+        self.assertEqual(q['queue_state'],'ready')
+        self.assertEqual(q['next_target'],'due')
+        self.assertEqual(q['completed'],0)
+
+    def test_worker_health_and_pause_are_separate_from_ready_work(self):
+        self.add('one','https://example.com/policy')
+        self.assertEqual(app.snapshot()['program_queue']['queue_state'],'worker_unavailable')
+        with app.db() as c:programqueue.heartbeat(c,self.now+3600)
+        self.assertFalse(app.snapshot()['program_queue']['healthy'])
+        app.mutate('/api/pause',{'paused':True})
+        self.assertEqual(app.snapshot()['program_queue']['queue_state'],'paused')
+
+    def test_local_sorting_does_not_claim_official_policy_review(self):
+        self.sync_h1()
+        with patch('workflow.ai_enabled',return_value=False):
+            flow=app.snapshot()['workflow']
+        self.assertNotIn('all listed programs reviewed',flow['ai_status'])
+        self.assertIsNone(flow['programs'][0]['policy_review'])
+        self.assertFalse(flow['programs'][0]['scan_authorized'])
+
+    def test_advisory_policy_record_never_activates_a_target(self):
+        self.sync_h1()
+        note={'note':'Synthetic policy evidence only','grants_permission':False,'review_status':'reviewed_restricted'}
+        with patch.dict(workflow.POLICY_REVIEWS,{'https://hackerone.com/fixture':note}):
+            state=app.snapshot()
+            self.assertEqual(state['workflow']['programs'][0]['policy_review'],note)
+            self.assertFalse(state['workflow']['programs'][0]['scan_authorized'])
+            self.assertEqual(state['targets'],[])
+            with patch('app.observe') as request:app.tick();request.assert_not_called()
+
     def test_rotates_programs_and_persists_position(self):
         self.add('a1','https://example.com/program-a');self.add('a2','https://example.com/program-a')
         self.add('b1','https://example.com/program-b')

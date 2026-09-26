@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "records": [
+    {
+      "program": "Mozilla",
+      "policy_url": "https://hackerone.com/mozilla",
+      "sources": [
+        "https://hackerone.com/mozilla",
+        "https://hackerone.com/mozilla/policy_scopes?type=team",
+        "https://www.mozilla.org/en-US/security/bug-bounty/faq-webapp/"
+      ],
+      "policy_updated": "2026-09-11",
+      "review_status": "reviewed_restricted",
+      "availability": "Paused for new submissions since 2026-09-11; page announces reopening Q1 2027.",
+      "in_scope_assets": [
+        "www.mozilla.org",
+        "www.firefox.com",
+        "vpn.mozilla.org",
+        "support.mozilla.org",
+        "relay.firefox.com",
+        "monitor.mozilla.org",
+        "developer.mozilla.org"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "www.mozilla.org: use www.allizom.org",
+        "www.firefox.com: use www.springfield.moz.works; website only",
+        "support.mozilla.org: staging support.allizom.org only",
+        "relay.firefox.com: staging https://relay.allizom.org/ only; X-HackerOne-Research header required",
+        "developer.mozilla.org: use https://developer.allizom.org for intrusive or content-changing tests"
+      ],
+      "automation": "Do not use automated tools on production; prefer owned local instances. No staging automation approval inferred.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found in pages read.",
+      "accounts": "Use owned or test accounts; account need depends on chosen feature.",
+      "exclusions": [
+        "DoS/rate-limiting reports",
+        "Missing headers without an existing attack",
+        "Intentionally public source/data",
+        "Client Firefox and VPN reports use a separate program",
+        "Privileged injection and expected sandbox script execution"
+      ],
+      "unresolved": [
+        "Program paused: no new bounty work activated",
+        "Confirm staging automation and exact method before any future testing"
+      ],
+      "note": "Paused for new submissions since September 11, 2026. Automated production testing is restricted. Several listed assets require staging. No targets activated.",
+      "checked_at": "2026-09-26T00:15:17Z",
+      "evidence_method": "Official pages read via search and rendered public HackerOne policy/scope tables",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    },
+    {
+      "program": "Shopify",
+      "policy_url": "https://hackerone.com/shopify",
+      "sources": [
+        "https://hackerone.com/shopify",
+        "https://hackerone.com/shopify/policy_scopes"
+      ],
+      "policy_updated": "2026-07-06",
+      "review_status": "reviewed_permission_unverified",
+      "availability": "Public bounty policy and scope readable; no pause banner observed.",
+      "in_scope_assets": [
+        "your-store.myshopify.com",
+        "shopify.plus",
+        "Shopify Mobile Applications",
+        "shop.app",
+        "partners.shopify.com",
+        "Authentication & ATO",
+        "arrive-server.shopifycloud.com",
+        "admin.shopify.com",
+        "accounts.shopify.com",
+        "*.shopifycs.com",
+        "*.pci.shopifyinc.com",
+        "shopifyinbox.com",
+        "Shopify Third Party Store",
+        "Shopify Third Party Apps",
+        "Shopify Developed Apps",
+        "linkpop.com",
+        "https://github.com/Shopify/*",
+        "*.shopifykloud.com",
+        "*.shopifycloud.com",
+        "*.shopify.io",
+        "*.shopify.com"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "your-store.myshopify.com is an owned development-store placeholder, not an approved URL",
+        "Third Party Store and Third Party Apps are in scope but bounty-ineligible",
+        "Developed Apps limited to apps.shopify.com/collections/made-by-shopify",
+        "Wildcards have developer-test and third-party exclusions; exact asset still needs review"
+      ],
+      "automation": "No explicit permission for the proposed autonomous checks found in policy and scope read; remains unverified.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found; API operational limits are not testing permission.",
+      "accounts": "Test only stores created by researcher using the HackerOne @wearehackerone.com alias. No merchant stores.",
+      "exclusions": [
+        "Live merchants and stores not created by researcher",
+        "supplier-portal.shopifycloud.com and listed invoice aliases",
+        "livechat.shopify.com",
+        "investors.shopify.com",
+        "community.shopify.dev",
+        "community.shopify.com",
+        "cdn.shopify.com",
+        "academy.shopify.com",
+        "*.email.shopify.com",
+        "Unlisted assets ineligible for reward; functional security impact required"
+      ],
+      "unresolved": [
+        "Verify planned automation permission",
+        "Create no accounts in this task; owned store setup remains absent",
+        "Resolve exact wildcard asset exceptions"
+      ],
+      "note": "Testing requires researcher-owned stores using a HackerOne alias. Live merchant testing is prohibited. Automation permission and numerical testing limits remain unverified.",
+      "checked_at": "2026-09-26T00:15:17Z",
+      "evidence_method": "Official pages read via search and rendered public HackerOne policy/scope tables",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    },
+    {
+      "program": "Automattic",
+      "policy_url": "https://hackerone.com/automattic",
+      "sources": [
+        "https://automattic.com/security/",
+        "https://hackerone.com/automattic",
+        "https://hackerone.com/automattic/policy_scopes"
+      ],
+      "policy_updated": "2026-09-17",
+      "review_status": "reviewed_permission_unverified",
+      "availability": "Public bounty policy and scope readable; no pause banner observed.",
+      "in_scope_assets": [
+        "www.tumblr.com",
+        "WP Cloud",
+        "wordpress.com",
+        "WordPress VIP",
+        "WordPress Plugins & Themes",
+        "WooCommerce",
+        "t.umblr.com",
+        "secure.tumblr.com",
+        "safe.tumblr.com",
+        "parse.ly",
+        "my.pressable.com",
+        "mailpoet.com",
+        "Jetpack",
+        "embed.tumblr.com",
+        "Crowdsignal",
+        "assets.tumblr.com",
+        "api.tumblr.com",
+        "akismet.com",
+        "*.tumblr.com",
+        "*.srvcs.tumblr.com",
+        "wpscan.com",
+        "Texts",
+        "simplenote.com",
+        "simperium.com",
+        "gravatar.com",
+        "com.tumblr.tumblr",
+        "com.tumblr",
+        "com.clay.ios",
+        "clay.earth",
+        "Beeper",
+        "intensedebate.com"
+      ],
+      "scope_complete": true,
+      "scope_conditions": [
+        "Plugins/themes must be maintained or created by Automattic",
+        "Tumblr blog wildcard excludes XSS and framing behavior intentionally permitted",
+        "Tumblr mobile: iOS 11 minimum / Android API 21 minimum; API keys and certificate pinning excluded",
+        "Product-labelled entries need an exact owned test resource; labels do not authorize every related host"
+      ],
+      "automation": "No explicit permission for the proposed autonomous checks found in policy and scope read; remains unverified.",
+      "explicit_requests_per_second": null,
+      "request_limit_note": "No numerical testing request limit found.",
+      "accounts": "Only owned test accounts; other user data requires account-owner consent.",
+      "exclusions": [
+        "Most privileged-role issues without high/critical escalation",
+        "Best-practice warnings without direct impact",
+        "Tabnabbing; rate-limit/DoS complaints generally ineligible",
+        "Follow-Ups WooCommerce extension",
+        "try.pressable.com",
+        "scrollkit.com,*.scrollkit.com",
+        "polishmywriting.com,*.polishmywriting.com",
+        "learnboost.com,*.learnboost.com",
+        "happy.tools",
+        "atavist.com",
+        "afterthedeadline.com,*.afterthedeadline.com",
+        "*/xmlrpc.php presence alone",
+        "*.txmblr.com",
+        "*.survey.fm",
+        "*.poll.fm",
+        "*.crowdsignal.net"
+      ],
+      "unresolved": [
+        "Verify planned automation permission",
+        "Identify exact owned test resources",
+        "WordPress/BuddyPress/bbPress core use separate WordPress program"
+      ],
+      "note": "Only owned test accounts may be used. Many privileged-role and best-practice reports are ineligible. No explicit automation permission or numerical testing limit was established.",
+      "checked_at": "2026-09-26T00:15:17Z",
+      "evidence_method": "Official pages read via search and rendered public HackerOne policy/scope tables",
+      "live_directory_membership": "Not verified: authenticated ScopeGuard state unavailable",
+      "grants_permission": false,
+      "targets_activated": 0
+    }
+  ]
+}

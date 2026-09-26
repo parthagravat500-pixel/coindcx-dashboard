@@ -82,14 +82,30 @@ def snapshot(c):
         reason = directory_gate(c,p['url'],now)
         if not reason and not approved:
             reason = 'No saved exact URL with current scope and automation permission' if not linked else 'Saved targets are disabled or their permission expired'
+        due = sum(t['due'] <= now for t in approved)
+        next_due = min((t['due'] for t in approved), default=None)
+        status = ('Skipped: '+reason if reason else 'Paused' if paused else
+                  'Queued for limited checks' if due else 'Waiting for scheduled check')
         rows.append({'name':p['name'],'policy':p['url'],'approved_urls':len(approved),
-                     'status':'Skipped: '+reason if reason else 'Paused' if paused else 'Queued for limited checks'})
+                     'due_urls':due,'next_due':next_due,'status':status})
     next_item = next_target(c,now)
-    s.update(paused=paused,healthy=bool(s['heartbeat'] and now-s['heartbeat']<60),
+    healthy = bool(s['heartbeat'] and 0 <= now-s['heartbeat'] < 60)
+    due_count = sum(t['due'] <= now for t in ready)
+    queue_state = ('paused' if paused else 'worker_unavailable' if not healthy else
+                   'no_eligible_targets' if not ready else 'waiting_schedule' if not due_count else 'ready')
+    s.update(paused=paused,healthy=healthy,
              listed_h1=len(rows),permission_needed=sum(not r['approved_urls'] for r in rows),
-             approved_programs=len({policy_key(t['policy']) for t in ready}),due_targets=sum(t['due']<=now for t in ready),
+             approved_programs=len({policy_key(t['policy']) for t in ready}),due_targets=due_count,
              next_target=next_item['name'] if next_item else None,coverage=COVERAGE,
              rows=rows[:200],rows_total=len(rows),
              attempts=[dict(r) for r in c.execute('SELECT a.*,t.name,t.url FROM program_attempts a LEFT JOIN targets t ON t.id=a.target ORDER BY a.id DESC LIMIT 30')],
              confirmed_payable=0,automatic_submission=False)
+    s.update(queue_state=queue_state,
+             saved_targets=len(targets),eligible_targets=len(ready),
+             disabled_targets=sum(not t['enabled'] for t in targets),
+             expired_targets=sum(bool(t['enabled']) and t['expires']<=now for t in targets),
+             directory_blocked_targets=sum(bool(t['enabled']) and t['expires']>now and
+                                           bool(directory_gate(c,t['policy'],now)) for t in targets),
+             waiting_targets=len(ready)-due_count,
+             next_due=min((t['due'] for t in ready),default=None))
     return s
