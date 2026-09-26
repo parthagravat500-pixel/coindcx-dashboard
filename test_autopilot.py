@@ -242,12 +242,16 @@ class AutopilotTests(unittest.TestCase):
         self.assertEqual(state['autopilot']['cases'],[])
 
     def test_diagnostics_contain_no_account_or_target_details(self):
-        self.add('/private-sensitive-resource')
+        key=self.add('/private-sensitive-resource')
+        with app.db() as c:c.execute('UPDATE targets SET expires=0 WHERE id=?',(key,))
         with app.db() as c:
             receipt=autopilot.diagnostic(c,'a'*40)
         raw=json.dumps(receipt)
         for forbidden in (AUTH,MARKER,'fixture.example','private-sensitive-resource',app.TOKEN,app.CSRF): self.assertNotIn(forbidden,raw)
         self.assertEqual(receipt['revision'],'a'*40)
+        self.assertEqual(receipt['blocker_counts'],{'Testing permission expired':2})
+        self.assertEqual(receipt['eligible_kinds'],{'owned_validation':1})
+        self.assertEqual(receipt['next_due'],0)
 
     def test_duplicate_workers_do_not_dispatch_twice(self):
         self.add('/protected'); self.resume()

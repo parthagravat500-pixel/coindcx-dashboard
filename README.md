@@ -34,7 +34,8 @@ enter the report-sending queue. Impact, intended sharing, program eligibility an
 duplicate status remain unverified.
 
 A five-minute receipt in private host logs exposes only the deployed revision,
-worker state, aggregate task counts and last outcome. It contains no target URL,
+worker state, aggregate task kinds, fixed blocker-reason counts, next due time and
+last outcome. It contains no target URL,
 account, credential or finding. This permits operational health verification
 without introducing an unauthenticated diagnostics endpoint.
 

@@ -297,8 +297,18 @@ def snapshot(c):
 def diagnostic(c,revision):
     """Minimal host-log health receipt. No target names, URLs, cases or credentials."""
     s = snapshot(c)
+    reasons = {}
+    kinds = {}
+    for job in s['jobs']:
+        reason = job['blocker']
+        if reason:
+            # Reasons are fixed local gate labels, never external response text.
+            reasons[reason] = reasons.get(reason,0)+1
+        else:
+            kinds[job['kind']] = kinds.get(job['kind'],0)+1
     return {'kind':'scopeguard_autopilot_health','revision':revision if re.fullmatch('[0-9a-f]{40}',revision or '') else 'unknown',
             'state':s['state'],'healthy':s['healthy'],'ready_jobs':s['ready'],
-            'eligible_jobs':s['eligible'],'blocked_jobs':s['blocked'],
+            'eligible_jobs':s['eligible'],'eligible_kinds':kinds,'blocked_jobs':s['blocked'],
+            'blocker_counts':reasons,'next_due':s['next_due'],
             'running_kind':s['running']['kind'] if s['running'] else None,
             'last_outcome':s['recent_runs'][0]['outcome'] if s['recent_runs'] else None}

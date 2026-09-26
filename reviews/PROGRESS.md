@@ -1,5 +1,22 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, live automatic-workflow receipt
+
+Commit 11d923add56f303b52b7c57aac12d9444b94153a passed isolated GitHub run
+36234151750 and was deployed to the existing service, deployment
+dep-darpccvpn0mc73dggnv0, live at 09:55:03 UTC. Render's build also ran all
+251 tests. Its startup receipt identified that exact revision and a healthy
+scheduler. Task counts and permission state remain in private host logs.
+This verifies startup, not a completed post-deployment security test or a finding.
+
+The initial receipt did not explain blocked tasks or the next due time.
+Added aggregate fixed gate-reason counts, eligible task kinds and next due time
+to the same private host-log receipt. No URLs, account identities, rule text,
+credentials or case details are included. The existing redaction test now also
+checks expired-target reason counts and eligible-kind counts. This change makes
+the real scheduling blockers diagnosable through authorized hosting access;
+it introduces no unauthenticated endpoint and changes no target permissions.
+
 ## 2026-09-26, automatic runtime orchestration and private cases
 
 Baseline: scopeguard-app 8006a69f5c4b323cb6726854d98dd5e30b623afa, tree
