@@ -1,5 +1,35 @@
 # ScopeGuard permission review progress
 
+## 2026-09-26, verified wider-discovery release at 13:52 UTC
+
+Runtime 6b48fdd72f6fbe82db35cfa9a123b9884c9288ec became live on the existing
+service at 13:47:07 UTC (dep-darsp4npn0mc73dt5h5g). All 97 branch blobs matched
+the intended source. Exact-commit isolated-test workflow 36246236215 succeeded;
+the hosted build passed all 331 tests in 32.600 seconds. Dashboard DOM, source
+filter, text-only rendering and JavaScript syntax checks passed locally. No
+authenticated private-browser inspection is claimed.
+
+The 13:52:03 UTC live discovery receipt confirmed healthy, unpaused intake and
+933 saved listings: HackerOne 227, Intigriti 77, Bugcrowd 282, YesWeHack 59 and
+independent companies 288. All five sources had successful fetch timestamps,
+zero fetch failures and no access blocks. The new feeds added 629 distinct policy
+links, not necessarily 629 distinct companies or currently active programs.
+The independent feed rejected nine invalid records and merged three repeated
+policy URLs. Discovery activated zero targets.
+
+The 13:52:05 UTC policy receipt confirmed 625 new listings need official policy
+review, while the earlier 225 complete document collections and research briefs
+were retained. Seventy still need the Intigriti connection, ten are unavailable
+(including four new entries), and three have unsupported addresses. No new
+official policy collection, permission approval or bounty finding is implied by
+the larger directory. Official-document collection for the new sources remains
+unimplemented; the deployed feature is automatic discovery and source visibility.
+
+A local 933-listing snapshot check took 0.071 seconds, with zero external requests
+or targets. New-instance host samples at 13:49-13:50 UTC showed CPU below 0.017
+core and memory below 69 MB. No host plan, resource, deployment setting, paid
+service or extra spending was added. Changes were confined to scopeguard-app.
+
 ## 2026-09-26, wider automatic program discovery
 
 Baseline fdb8df466a9b592c8db40f75cd9aaf03d9ea4a02 and all 95 tracked blobs were
