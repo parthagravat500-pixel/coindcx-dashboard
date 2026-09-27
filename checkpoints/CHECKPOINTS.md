@@ -27,7 +27,7 @@ References are background reading at category level, not exact requirement mappi
 
 ## Automatic and AI support
 
-The results engine has 35 implemented adapters. The other 9,965 entries have no executable adapter. All 9,000 added scenario variants require independent review and are not marked tested by a parent result.
+The results engine has 50 implemented evidence adapters. The other 9,950 entries have no executable adapter. All 9,000 added scenario variants require independent review and are not marked tested by a parent result.
 
 Eleven entries have partial automatic evidence support: four policy metadata checks (SG-0001, SG-0002, SG-0006, SG-0008) and seven existing Python pattern checks (SG-0781 through SG-0787). Evidence support is not whole-control validation.
 

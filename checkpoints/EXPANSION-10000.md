@@ -41,7 +41,8 @@ and refreshed from saved evidence by the existing worker.
 
 ## Execution remains evidence-based
 
-The results engine still has 35 adapters; 9,965 entries have no executable
+At the initial catalog expansion the results engine had 35 adapters. Execution
+release 2026.09.27.4 has 50 evidence adapters; 9,950 entries have no executable
 adapter. The catalog adds no target requests, accounts, report submissions,
 testing permissions, automatic findings, or spending. Every listed program
 receives all entries as coverage decisions, not as executed tests.

@@ -23,7 +23,7 @@ Eleven checkpoints have partial automatic evidence support:
 | SG-0001, SG-0002, SG-0006, SG-0008 | Saved policy completeness, status, exact inclusion/exclusion conflicts, automation restrictions | Full policy interpretation and permission for any method |
 | SG-0781–SG-0787 | Seven existing Python pattern checks on current owned ScopeGuard file digests | Reachability, runtime impact, complete control validation, external-program applicability |
 
-The catalog evidence view leaves 9,989 entries for contextual review or specialist testing. The separate results engine has 35 implemented adapters and 9,965 entries without an adapter. The 9,000 new variants inherit neither their parent's adapter nor its evidence. A scenario needs its own applicability decision; an absent feature is not an automatic pass. Twelve
+The catalog evidence view leaves 9,989 entries for contextual review or specialist testing. The separate results engine has 50 implemented evidence adapters and 9,950 entries without an adapter. The 9,000 new variants inherit neither their parent's adapter nor its evidence. A scenario needs its own applicability decision; an absent feature is not an automatic pass. Twelve
 entries are also provided as guidance to the existing experimental private AI
 review (six per fixed owned-code excerpt); this does not make them implemented
 detectors. The model's existing output budget, isolation and private delivery

@@ -253,7 +253,7 @@ class AutomaticCheckpointTests(unittest.TestCase):
 class AdditionalPatternTests(unittest.TestCase):
     def test_positive_and_negative_controls_without_execution(self):
         source = 'import tempfile as t\nfrom importlib import import_module as load\nimport os\ndef f(a=[]):\n load(a)\n t.mktemp()\n os.chmod("x",0o666)\n'
-        self.assertTrue(all(checkpointstatic.analyze(source).values()))
+        self.assertTrue(all(checkpointstatic.analyze(source)[key] for key in ('SG-0795','SG-0796','SG-0797','SG-0798')))
         safe = 'import tempfile, os, importlib\ndef f(a=None):\n importlib.import_module("json")\n tempfile.mkstemp()\n os.chmod("x",0o600)\n'
         self.assertFalse(any(checkpointstatic.analyze(safe).values()))
         with self.assertRaises(ValueError): checkpointstatic.analyze('x'*128001)

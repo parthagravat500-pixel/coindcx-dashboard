@@ -10,6 +10,11 @@ import time
 
 INTERVAL = 3600
 MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+EXPECTED_STATUSES = {'control':200,'anonymous-state':401,'wrong-password':401,'anonymous-report':401,
+                     'anonymous-write':401,'missing-csrf':403,'wrong-csrf':403,
+                     'password-prefix':401,'password-suffix':401,'empty-password':401,
+                     'control-catalog':200,'anonymous-catalog':401,'control-results':200,
+                     'anonymous-results':401,'control-coverage':200,'anonymous-coverage':401}
 
 
 def init(c):
@@ -37,7 +42,7 @@ def run(port,token,allowed=lambda:True):
     if not isinstance(port,int) or not 1<=port<=65535 or len(token)<24:raise ValueError('Validation server configuration missing')
     auth={'Authorization':'Basic '+base64.b64encode(('admin:'+token).encode()).decode()}
     checks=[]
-    def check(key,title,method,path,expected,headers=None,body=None,private=False):
+    def check(key,title,method,path,expected,headers=None,body=None,private=False,required_keys=()):
         if not allowed():raise InterruptedError('Validation paused')
         status,raw=request(port,method,path,headers,body)
         exposed=False
@@ -46,8 +51,13 @@ def run(port,token,allowed=lambda:True):
                 data=json.loads(raw)
                 exposed=isinstance(data,dict) and all(k in data for k in ('targets','findings','csrf','reporting'))
             except (ValueError,UnicodeError):pass
+        shape=True
+        if required_keys:
+            try:
+                parsed=json.loads(raw);shape=isinstance(parsed,dict) and all(k in parsed for k in required_keys)
+            except (ValueError,UnicodeError):shape=False
         checks.append({'id':key,'title':title,'method':method,'path':path,'expected_status':expected,
-                       'actual_status':status,'passed':status==expected,'private_state_exposed':exposed,
+                       'actual_status':status,'passed':status==expected and shape,'private_state_exposed':exposed,
                        'response_bytes':len(raw),'response_sha256':hashlib.sha256(raw).hexdigest()})
         return status,raw
     # Positive control avoids calling a dead server or universally broken login "secure".
@@ -63,6 +73,15 @@ def run(port,token,allowed=lambda:True):
     # An empty object cannot change settings even if the CSRF check regresses.
     check('missing-csrf','Logged-in requests without CSRF token are rejected','POST','/api/all-pause',403,{**auth,'Content-Type':'application/json'},b'{}')
     check('wrong-csrf','Logged-in requests with a wrong CSRF token are rejected','POST','/api/all-pause',403,{**auth,'Content-Type':'application/json','X-CSRF-Token':'scopeguard-invalid-csrf'},b'{}')
+    for key,value in (('password-prefix',token[:-1]),('password-suffix',token+'-invalid-suffix'),('empty-password','')):
+        negative={'Authorization':'Basic '+base64.b64encode(('admin:'+value).encode()).decode()}
+        check(key,'Reject '+key+' on the owned login boundary','GET','/api/state',401,negative)
+    for key,path,required in (
+            ('catalog','/api/checkpoints?limit=1',('total','items')),
+            ('results','/api/checkpoint-results?limit=1',('total','items')),
+            ('coverage','/api/checkpoint-coverage',('total_programs','programs'))):
+        check('control-'+key,'Authenticated control for the owned '+key+' API','GET',path,200,auth,required_keys=required)
+        check('anonymous-'+key,'Reject anonymous access to the owned '+key+' API','GET',path,401)
     failures=[x for x in checks if not x['passed']]
     repeated=[]
     for failure in failures:
@@ -74,7 +93,7 @@ def run(port,token,allowed=lambda:True):
             'checks':checks,'confirmed_issue':bool(repeated),'confirmed_checks':repeated,'submission_ready':False,
             'scope':'Owned ScopeGuard application, local HTTP listener only. External hosting and other sites are not tested.',
             'impact':'Private dashboard state was returned without valid credentials in two requests.' if repeated else 'No private-state exposure demonstrated by these checks.',
-            'limitation':'Covers selected login and CSRF boundaries only. Does not assess all vulnerability classes. This owned-app test is not a third-party bounty report.'}
+            'limitation':'Covers selected login, password-prefix/suffix/empty-input, private API and CSRF boundaries only. Does not assess every route or vulnerability class. This owned-app test is not a third-party bounty report.'}
 
 
 def tick(db,log,port,token):

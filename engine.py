@@ -46,7 +46,7 @@ def observe(url, origin=None):
         names = {'strict-transport-security', 'content-security-policy', 'x-frame-options',
                  'x-content-type-options', 'access-control-allow-origin', 'access-control-allow-credentials',
                  'referrer-policy', 'permissions-policy', 'cross-origin-opener-policy',
-                 'cross-origin-embedder-policy', 'cross-origin-resource-policy', 'cache-control'}
+                 'cross-origin-embedder-policy', 'cross-origin-resource-policy', 'cache-control', 'vary'}
         selected = {k.lower(): v[:2000] for k, v in pairs if k.lower() in names}
         cookies = []
         for key, value in pairs:

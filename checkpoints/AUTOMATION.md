@@ -1,7 +1,7 @@
 # Automatic checklist execution
 
 Current catalog release 2026.09.27.3 contains 10,000 entries: 1,000 core prompts
-and 9,000 scenario variants. There are still 35 implemented adapters and 9,965
+and 9,000 scenario variants. Execution release 2026.09.27.4 has 50 implemented evidence adapters and 9,950
 entries without an adapter. See [EXPANSION-10000.md](EXPANSION-10000.md) for the
 composition, applicability and evidence rules. The sections below describe
 earlier releases and their historical counts.

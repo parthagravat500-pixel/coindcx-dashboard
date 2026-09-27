@@ -7,6 +7,7 @@ function renderCheckpointSummary(){
  $('openCheckpoints').disabled=!c;$('openCheckpointEvidence').disabled=!c;
  const a=state.checkpoint_automation;
  $('homeChecklistAutomation').textContent=a?(a.paused?'Checklist worker paused. ':!a.healthy?'Checklist worker awaiting a fresh update. ':'Checklist worker running. ')+a.current_contexts+' of '+a.contexts_total+' contexts evaluated recently. '+a.implemented_adapters+' checkpoints have automated adapters; '+a.remaining_adapters+' need implementation or contextual review.':'Automatic results are unavailable from this server version.';
+ if(a?.adapter_types){const t=a.adapter_types;$('homeChecklistAutomation').textContent+=' Evidence adapters: '+(t.policy||0)+' policy, '+(t.source||0)+' source patterns, '+(t.headers||0)+' response observations, '+((t.owned_validation||0)+(t.access||0)+(t.workflow||0))+' scoped runtime checks. Availability does not mean a test ran.';}
  const p=a?.program_coverage;
  $('homeProgramCheckpointSummary').textContent=p?p.programs_with_runtime_results+' of '+p.total_programs+' listed programs have current runtime checkpoint results. '+p.runtime_checkpoint_results+' scoped checkpoint results recorded. '+p.awaiting_evaluation+' programs await a fresh coverage evaluation.':'Waiting for current program test coverage.';
  $('openCheckpointResults').disabled=$('openCheckpointCoverage').disabled=!a;

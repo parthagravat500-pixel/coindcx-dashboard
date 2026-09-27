@@ -20,13 +20,13 @@ class ValidationTests(unittest.TestCase):
         self.port=self.server.server_address[1]
     def test_real_http_checks_are_read_only_and_redacted(self):
         before=app.snapshot()['paused'];result=validation.run(self.port,self.token)
-        self.assertEqual(result['status'],'All covered checks passed');self.assertEqual(len(result['checks']),7)
+        self.assertEqual(result['status'],'All covered checks passed');self.assertEqual(len(result['checks']),16)
         self.assertTrue(all(x['passed'] for x in result['checks']));self.assertEqual(app.snapshot()['paused'],before)
         self.assertNotIn(self.token,json.dumps(result));self.assertNotIn(app.CSRF,json.dumps(result));self.assertFalse(result['submission_ready'])
     def test_broken_auth_is_reproduced_and_not_bounty_eligible(self):
         with patch.object(app.Handler,'authenticate',return_value=True):result=validation.run(self.port,self.token)
         self.assertTrue(result['confirmed_issue']);self.assertEqual(len(result['confirmed_checks']),2)
-        self.assertFalse(result['submission_ready']);self.assertEqual(len(result['checks']),9)
+        self.assertFalse(result['submission_ready']);self.assertEqual(len(result['checks']),18)
     def test_wrong_control_cannot_pass(self):
         result=validation.run(self.port,'wrong-control-password-123456789')
         self.assertIn('Inconclusive',result['status']);self.assertFalse(result['confirmed_issue']);self.assertEqual(len(result['checks']),1)

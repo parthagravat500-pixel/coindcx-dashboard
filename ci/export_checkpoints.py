@@ -1,12 +1,16 @@
 """Generate the readable checkpoint list from the reviewed catalog; no network."""
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:sys.path.insert(0,str(ROOT))
 
 
 def render(data):
+    from checkpointengine import ADAPTERS
     total=sum(len(g['checks']) for g in data['categories'])
+    implemented=len(ADAPTERS)
     lines=[f'# ScopeGuard: {total:,} research checkpoints','',
            'Version: '+data['version']+' · Authored: '+data['authored_on'],'',
            data['provenance'],'',data['limits'],'',data['expansion']['method'],'',
@@ -23,7 +27,7 @@ def render(data):
     lines+=['','References are background reading at category level, not exact requirement mappings. '
             'Checkpoint wording and identifiers belong to this catalog.','']
     lines+=['## Automatic and AI support','',
-            'The results engine has 35 implemented adapters. The other 9,965 entries have no executable adapter. '
+            f'The results engine has {implemented:,} implemented evidence adapters. The other {total-implemented:,} entries have no executable adapter. '
             'All 9,000 added scenario variants require independent review and are not marked tested by a parent result.','',
             'Eleven entries have partial automatic evidence support: four policy metadata checks '
             '(SG-0001, SG-0002, SG-0006, SG-0008) and seven existing Python pattern checks '

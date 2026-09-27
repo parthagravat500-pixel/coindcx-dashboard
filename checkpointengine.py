@@ -21,7 +21,7 @@ import sourceaudit
 import boundarysuite
 import huntops
 
-VERSION = '2026.09.27.3'
+VERSION = '2026.09.27.4'
 INTERVAL = 5
 REFRESH = 900
 BATCH = 16
@@ -38,11 +38,15 @@ HEAD_RULES = {
 }
 COOKIE_RULES = {'SG-0148': 'secure', 'SG-0149': 'httponly', 'SG-0150': 'samesite'}
 OWNED_RULES = {'SG-0166': ('anonymous-state', 'anonymous-write'),
-               'SG-0263': ('missing-csrf',), 'SG-0264': ('wrong-csrf',)}
+               'SG-0263': ('missing-csrf',), 'SG-0264': ('wrong-csrf',),
+               'SG-0084': ('password-prefix','password-suffix'), 'SG-0085': ('empty-password',),
+               'SG-0461': ('anonymous-catalog','anonymous-results','anonymous-coverage')}
+CORS_RULES = ('SG-0283', 'SG-0291')
 ADAPTERS = {**{k: 'policy' for k in catalog.POLICY_RULES},
             **{k: 'source' for k in catalog.SOURCE_RULES},
             **{k: 'source' for k in checkpointstatic.IDS},
             **{k: 'headers' for k in HEAD_RULES}, **{k: 'headers' for k in COOKIE_RULES},
+            **{k: 'headers' for k in CORS_RULES},
             **{k: 'owned_validation' for k in OWNED_RULES}, 'SG-0161': 'access'}
 ADAPTERS.update({k:'workflow' for k in boundarysuite.CHECKPOINTS.values() if k not in ADAPTERS})
 LIMITATION = ('Every catalog entry receives a coverage decision. Scenario variants need their own evidence. Only implemented adapters with current '
@@ -119,6 +123,23 @@ def record_head(c, target, response, cors=None):
             str(present) + ' of ' + str(len(cookies)) + ' observed cookies include ' + attribute +
             '. Cookie purpose and authentication relevance are unverified; zero cookies is not a passed test.',
             now, bool(cookies), adapter='headers')
+    # Consume only the already-approved fixed-Origin comparison, never dispatch it here.
+    if target['cors'] and cors and 200<=cors.get('status',0)<300:
+        ch=cors.get('headers',{});origin='https://scopeguard.invalid'
+        reflected=ch.get('access-control-allow-origin')==origin
+        varied=ch.get('access-control-allow-origin')!=headers.get('access-control-allow-origin')
+        vary={v.strip().lower() for v in ch.get('vary','').split(',')}
+        rows['SG-0283']=observation('observed',
+            ('The fixed test Origin was reflected.' if reflected else 'The fixed test Origin was not reflected.')+
+            ' One anonymous HEAD comparison only; authenticated data, browser behavior and other origins are untested.',
+            now,True,adapter='headers',origin_reflected=reflected,
+            credential_header=ch.get('access-control-allow-credentials')=='true')
+        rows['SG-0291']=observation('observed',
+            ('Allowed-origin output changed between the two HEAD responses.' if varied else 'No allowed-origin variation observed in this pair.')+
+            (' Vary includes Origin or *.' if vary.intersection({'origin','*'}) else 'Vary does not include Origin or *.')+
+            ' Actual cache behavior, sensitive content and exploitability are untested.',
+            now,True,adapter='headers',origin_output_changed=varied,
+            varies_on_origin=bool(vary.intersection({'origin','*'})))
     for context in target_contexts(c, target):
         save(c, context, job['key'], 'headers', job['stamp'], now, rows)
 
@@ -139,7 +160,13 @@ def record_runtime(c, job, outcome, evidence, finished):
             valid = (control.get('actual_status') == 200 and control.get('passed') is True and
                      'response_sha256' in control and bool(required) and
                      all(k in checks and 'response_sha256' in checks[k] and type(checks[k].get('actual_status')) is int for k in required))
-            expected = {'anonymous-state': 401, 'anonymous-write': 401, 'missing-csrf': 403, 'wrong-csrf': 403}
+            expected = {'anonymous-state': 401, 'anonymous-write': 401, 'missing-csrf': 403, 'wrong-csrf': 403,
+                        'password-prefix':401,'password-suffix':401,'empty-password':401,
+                        'anonymous-catalog':401,'anonymous-results':401,'anonymous-coverage':401}
+            if key=='SG-0461':
+                valid=valid and all(checks.get(k,{}).get('actual_status')==200 and
+                    checks[k].get('passed') is True and 'response_sha256' in checks[k]
+                    for k in ('control-catalog','control-results','control-coverage'))
             passed = valid and all(checks[k].get('passed') is True and checks[k]['actual_status'] == expected[k] for k in required)
         else: passed = outcome == 'boundary_held'
         state = ('runtime_passed' if passed else 'runtime_failed') if valid else 'inconclusive'
@@ -255,9 +282,9 @@ def tick(db, root=catalog.ROOT):
                 if item['id'] == 'owned':
                     sourceaudit.installed(c, root)
                     audit = checkpointstatic.inspect(root, sourceaudit.FILES)
-                    rows = {key: observation('needs_evidence' if not audit['files'] else 'signal_recorded' if signals else 'no_signal_in_saved_files',
+                    rows = {key: observation('signal_recorded' if signals else 'needs_evidence' if not audit['files'] or audit['skipped'] else 'no_signal_in_saved_files',
                         str(signals) + ' pattern signals in ' + str(audit['files']) + ' owned Python files; ' +
-                        str(audit['skipped']) + ' files could not be analyzed. Patterns require contextual review; no finding does not prove security.',
+                        str(audit['skipped']) + ' files could not be analyzed. Patterns require contextual review; no finding does not prove security. '+checkpointstatic.LIMITS.get(key,''),
                         now, bool(audit['files']), adapter='source', files=audit['files'], signals=signals)
                         for key, signals in audit['signals'].items()}
                     save(c, 'owned', 'source:extra', 'source', audit['digest'], now, rows)
@@ -283,6 +310,7 @@ def summary(c):
     owned = next((json.loads(r['counts']) for r in current if r['context'] == 'owned'), None)
     return {**state, 'version': VERSION, 'total': catalog.inventory()['total'],
             'implemented_adapters': len(ADAPTERS), 'remaining_adapters': catalog.inventory()['total'] - len(ADAPTERS),
+            'adapter_types':dict(Counter(ADAPTERS.values())),
             'paused': bool(c.execute('SELECT paused FROM settings').fetchone()[0]),
             'healthy': bool(not state['error'] and 0 < state['heartbeat'] <= now and now - state['heartbeat'] < 90),
             'contexts_evaluated': len(receipts), 'current_contexts': len(current),
@@ -365,5 +393,5 @@ def receipt(c):
     data = summary(c)
     return {'kind': 'scopeguard_checkpoint_automation_health', 'revision': revision(),
             **{k: data[k] for k in ('version', 'healthy', 'paused', 'total', 'implemented_adapters',
-                'remaining_adapters', 'contexts_evaluated', 'current_contexts', 'contexts_total', 'owned',
+                'remaining_adapters', 'adapter_types', 'contexts_evaluated', 'current_contexts', 'contexts_total', 'owned',
                 'program_coverage', 'error')}}
