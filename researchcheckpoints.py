@@ -29,7 +29,7 @@ LIMITATION = ('Suggested checkpoints are preparation, not tested controls or per
 @lru_cache(maxsize=1)
 def _catalog():
     path=ROOT/'checkpoints/catalog.json'
-    if path.stat().st_size>1000000:raise ValueError('Checkpoint catalog is too large')
+    if path.stat().st_size>8000000:raise ValueError('Checkpoint catalog is too large')
     data=json.loads(path.read_text())
     seen=set();titles=set();groups=set()
     for group in data['categories']:
@@ -44,11 +44,32 @@ def _catalog():
             raise ValueError('Unknown checkpoint reference')
         for row in group['checks']:
             title=' '.join(row['title'].casefold().split())
-            if not re.fullmatch(r'SG-\d{4}',row['id']) or row['id'] in seen or title in titles or len(title)<20:
+            if not re.fullmatch(r'SG-(?:\d{4}|10000)',row['id']) or row['id'] in seen or title in titles or len(title)<20:
                 raise ValueError('Duplicate or invalid checkpoint')
             seen.add(row['id']);titles.add(title)
-    if len(seen)<1000 or not (set(SOURCE_RULES)|POLICY_RULES)<=seen:
+    if data.get('expected_total') != 10000 or seen != {'SG-'+str(i).zfill(4) for i in range(1,10001)}:
         raise ValueError('Checkpoint catalog is incomplete')
+    original=[];variants=0
+    for group in data['categories']:
+        parents={r['id']:r for r in group['checks'] if not r.get('parent_id')}
+        original.extend(parents.values())
+        if len(parents)!=20 or len(group['checks'])!=200:
+            raise ValueError('Invalid core/scenario distribution')
+        for parent in parents:
+            children=[r for r in group['checks'] if r.get('parent_id')==parent]
+            if {r.get('scenario_id') for r in children}!={group['id']+'-variant-'+str(i) for i in range(1,10)}:
+                raise ValueError('Incomplete scenario matrix')
+            if len(children)!=9:raise ValueError('Duplicate scenario variation')
+            for row in children:
+                condition=row.get('condition','')
+                if len(condition)<12 or row['title']!=parents[parent]['title'].rstrip('.')+' — '+condition+'.':
+                    raise ValueError('Invalid scenario guidance')
+            variants+=len(children)
+    digest=hashlib.sha256(json.dumps(original,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    expansion=data.get('expansion',{})
+    if (expansion.get('core_prompts')!=len(original) or expansion.get('scenario_variants')!=variants
+            or expansion.get('original_sha256')!=digest or not expansion.get('method')):
+        raise ValueError('Invalid expansion provenance')
     for filename,ids in data.get('ai_context',{}).items():
         if filename not in ('app.py','ci_identity.py') or len(ids)!=6 or len(set(ids))!=6 or not set(ids)<=seen:
             raise ValueError('Invalid bounded AI checkpoint context')
@@ -58,11 +79,26 @@ def _catalog():
 def inventory():
     data=_catalog();total=sum(len(g['checks']) for g in data['categories'])
     return {'version':data['version'],'total':total,'categories':len(data['categories']),
+            'core_prompts':data['expansion']['core_prompts'],
+            'scenario_variants':data['expansion']['scenario_variants'],
+            'catalog_method':data['expansion']['method'],
             'automatic_evidence_support':len(SOURCE_RULES)+len(POLICY_RULES),
             'contextual_review':total-len(SOURCE_RULES)-len(POLICY_RULES),
             'ai_guidance':len({key for ids in data.get('ai_context',{}).values() for key in ids}),
             'execution_enabled':False,'confirmed_bugs_from_catalog':0,
             'limitation':LIMITATION}
+
+
+def guidance(group, entry):
+    """Scenario applicability and evidence must be evaluated independently."""
+    prerequisites=group['prerequisites'];evidence=group['evidence']
+    if entry.get('parent_id'):
+        prerequisites+=' Confirm that this control and the scenario ('+entry['condition']+') exist in the permitted asset. '
+        prerequisites+='If absent or unknown, record the reason; do not force the scenario or count it as passed. '
+        prerequisites+='Use isolated synthetic fixtures for state changes, concurrency, payments and resource-limit review.'
+        evidence+=' For this variation, record the baseline, expected decision, observed decision, exact configuration and a negative control. '
+        evidence+='Evidence for '+entry['parent_id']+' alone does not validate this scenario.'
+    return {'prerequisites':prerequisites,'evidence_needed':evidence}
 
 
 def plan_summary(evidence,*,fresh=False,status=''):
@@ -210,7 +246,7 @@ def browse(c,query='',root=ROOT):
     for group,entry,automatic in rows[p['offset']:p['offset']+p['limit']]:
         tool='Saved owned Python pattern analysis' if entry['id'] in SOURCE_RULES else 'Saved official policy metadata review' if entry['id'] in POLICY_RULES else 'Contextual review; no automatic implementation'
         items.append({**entry,'category':group['title'],'category_id':group['id'],
-                      'method':group['method'],'prerequisites':group['prerequisites'],'evidence_needed':group['evidence'],
+                      'method':group['method'],**guidance(group,entry),
                       'references':[dict(data['references'][r]) for r in group['references']],
                       'automatic_evidence_support':automatic,'support':tool,
                       'ai_guidance':entry['id'] in ai_ids,

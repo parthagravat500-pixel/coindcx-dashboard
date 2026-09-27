@@ -1,5 +1,11 @@
 # Automatic checklist execution
 
+Current catalog release 2026.09.27.3 contains 10,000 entries: 1,000 core prompts
+and 9,000 scenario variants. There are still 35 implemented adapters and 9,965
+entries without an adapter. See [EXPANSION-10000.md](EXPANSION-10000.md) for the
+composition, applicability and evidence rules. The sections below describe
+earlier releases and their historical counts.
+
 The 2026.09.26.3 focused-research update adds five more mapped checkpoint IDs,
 bringing the total to 35 implemented adapters and 965 needing implementation or
 context. See [FOCUSED-RESEARCH.md](FOCUSED-RESEARCH.md) for the seven upgrade areas,

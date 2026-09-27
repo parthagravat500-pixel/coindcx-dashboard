@@ -630,7 +630,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(400, json.dumps({'error': str(exc)}))
         if self.path == '/research-checkpoints.md':
             return self.reply(200,(ROOT/'checkpoints/CHECKPOINTS.md').read_text(),'text/plain',
-                              headers={'Content-Disposition':'attachment; filename="ScopeGuard-1000-checkpoints.md"'})
+                              headers={'Content-Disposition':'attachment; filename="ScopeGuard-10000-checkpoints.md"'})
         if self.path.startswith('/api/program-research?'):
             from urllib.parse import parse_qs
             try:

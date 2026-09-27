@@ -51,10 +51,10 @@ class AutomaticCheckpointTests(unittest.TestCase):
         self.resume(); engine.tick(app.db)
         with app.db() as c:
             result = engine.build(c, 'owned'); state = engine.summary(c)
-        self.assertEqual(result['total'], 1000)
-        self.assertEqual(sum(result['counts'].values()), 1000)
-        self.assertEqual(len({r['id'] for r in result['items']}), 1000)
-        self.assertEqual(result['counts']['needs_implementation'], 1000-len(engine.ADAPTERS))
+        self.assertEqual(result['total'], 10000)
+        self.assertEqual(sum(result['counts'].values()), 10000)
+        self.assertEqual(len({r['id'] for r in result['items']}), 10000)
+        self.assertEqual(result['counts']['needs_implementation'], 10000-len(engine.ADAPTERS))
         self.assertEqual(result['runtime_tested'], 0)
         self.assertGreaterEqual(result['executed'], 11)
         self.assertTrue(all(not r['observation']['control_validated'] for r in result['items']))
@@ -68,12 +68,27 @@ class AutomaticCheckpointTests(unittest.TestCase):
                 result=engine.export(c,'context='+context)
                 self.assertEqual(c.total_changes,before)
                 self.assertEqual(result['runtime_tested'],0)
-                self.assertEqual(len(result['items']),1000)
-                self.assertEqual(len({r['id'] for r in result['items']}),1000)
+                self.assertEqual(len(result['items']),10000)
+                self.assertEqual(len({r['id'] for r in result['items']}),10000)
                 self.assertTrue(all(r['prerequisites'] and r['evidence_needed'] for r in result['items']))
                 self.assertTrue(all(not r['observation']['tested'] for r in result['items']))
                 for query in ('context=owned&context=owned','context=owned&state=runtime_passed','context=missing'):
                     with self.assertRaises(ValueError):engine.export(c,query)
+
+    def test_scenario_variants_never_inherit_current_parent_evidence(self):
+        context=self.program(evidence={'documents_complete':True,'scope_complete':True,
+            'program_status':'open','scope':[]})
+        with app.db() as c:
+            result=engine.build(c,context)
+        parent=next(r for r in result['items'] if r['id']=='SG-0001')
+        self.assertEqual(parent['observation']['state'],'evidence_recorded')
+        variants=[r for r in result['items'] if r.get('parent_id')=='SG-0001']
+        self.assertEqual(len(variants),9)
+        for row in variants:
+            self.assertIsNone(row['adapter'])
+            self.assertEqual(row['observation']['state'],'needs_implementation')
+            self.assertFalse(row['observation']['tested'])
+            self.assertFalse(row['observation']['executed'])
 
     def test_program_coverage_excludes_owned_and_stale_results(self):
         context=self.program();self.resume();engine.tick(app.db)
@@ -103,7 +118,7 @@ class AutomaticCheckpointTests(unittest.TestCase):
             response=client.getresponse();data=json.loads(response.read())
             self.assertEqual(response.status,200)
             self.assertIn('attachment',response.getheader('Content-Disposition'))
-            self.assertEqual(len(data['items']),1000)
+            self.assertEqual(len(data['items']),10000)
             self.assertNotIn(app.TOKEN,json.dumps(data));self.assertNotIn(app.CSRF,json.dumps(data))
         finally:client.close();server.shutdown();server.server_close();thread.join()
 
@@ -203,7 +218,7 @@ class AutomaticCheckpointTests(unittest.TestCase):
             data = engine.summary(c)
             self.assertEqual(data['contexts_evaluated'], data['contexts_total'])
             self.assertEqual(c.execute('SELECT COUNT(*) FROM targets WHERE enabled=1').fetchone()[0], 0)
-            self.assertTrue(all(json.loads(r['counts'])['evaluated']==1000 for r in c.execute('SELECT counts FROM checkpoint_evaluations')))
+            self.assertTrue(all(json.loads(r['counts'])['evaluated']==10000 for r in c.execute('SELECT counts FROM checkpoint_evaluations')))
 
     def test_source_changes_invalidate_saved_extra_patterns(self):
         root = Path(self.tmp.name) / 'source'; root.mkdir(); (root/'app.py').write_text('def f(x=[]): return x\n')
@@ -225,13 +240,13 @@ class AutomaticCheckpointTests(unittest.TestCase):
             client.request('GET', '/api/checkpoint-results'); response=client.getresponse(); response.read(); self.assertEqual(response.status,401)
             client.request('GET', '/api/checkpoint-results?q=SG-1000', headers=auth)
             response=client.getresponse(); data=json.loads(response.read()); self.assertEqual(response.status,200)
-            self.assertEqual(data['items'][0]['id'],'SG-1000'); self.assertEqual(data['total'],1000)
+            self.assertEqual(data['items'][0]['id'],'SG-1000'); self.assertEqual(data['total'],10000)
             with app.db() as c:
                 for query in ('context=../../x','limit=0','limit=101','offset=-1','context=owned&context=owned','activate=true'):
                     with self.subTest(query=query), self.assertRaises(ValueError): engine.browse(c,query)
                 ids=[]
-                for offset in range(0,1000,100): ids += [r['id'] for r in engine.browse(c,'limit=100&offset='+str(offset))['items']]
-                self.assertEqual(len(set(ids)),1000)
+                for offset in range(0,10000,100): ids += [r['id'] for r in engine.browse(c,'limit=100&offset='+str(offset))['items']]
+                self.assertEqual(len(set(ids)),10000)
         finally: client.close(); server.shutdown(); server.server_close(); thread.join()
 
 

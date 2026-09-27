@@ -2,7 +2,7 @@
 function renderCheckpointSummary(){
  const c=state.research_checkpoints;
  $('homeCheckpointsBadge').textContent=c?c.total.toLocaleString()+' checkpoints':'Unavailable';
- $('homeCheckpointsSummary').textContent=c?c.total.toLocaleString()+' research checkpoints in '+c.categories+' areas. A checklist entry is not a completed test.':'Waiting for the research catalog.';
+ $('homeCheckpointsSummary').textContent=c?c.total.toLocaleString()+' research checkpoints in '+c.categories+' areas. '+(c.core_prompts?.toLocaleString()||'Unknown')+' core prompts + '+(c.scenario_variants?.toLocaleString()||'unknown')+' scenario variations. A checklist entry is not a completed test.':'Waiting for the research catalog.';
  $('homeCheckpointsEvidence').textContent=c?c.current_owned_files+' current ScopeGuard Python files have saved pattern reviews. These cover '+c.source_evidence_checks+' checklist items partially. '+(c.stale_owned_files+c.missing_owned_files)+' files await a current review.':'Evidence is unavailable.';
  $('openCheckpoints').disabled=!c;$('openCheckpointEvidence').disabled=!c;
  const a=state.checkpoint_automation;
@@ -19,7 +19,7 @@ async function openCheckpointResults(initial='owned'){
  for(const [value,label] of [['','All results'],['runtime_passed','Scoped runtime checks passed'],['runtime_failed','Runtime failures'],['observed','Response observations'],['signal_recorded','Source signals'],['blocked','Blocked or stale'],['needs_input','Inputs needed'],['needs_implementation','Adapter needed'],['needs_context','Applicability unknown']]){const option=el('option',label);option.value=value;filter.append(option);}
  let selected=initial,offset=0,next=null,version=0,controller,timer;
  const previous=button('Previous',()=>{offset=Math.max(0,offset-40);return draw();}),more=button('Next',()=>{if(next!==null){offset=next;return draw();}});
- const download=el('a','Download all 1,000 results for this program');download.download='ScopeGuard-checkpoint-results.json';
+ const download=el('a','Download all checkpoint results for this context');download.download='ScopeGuard-checkpoint-results.json';
  root.append(status,scopeLabel,download,filterLabel,searchLabel,count,list,previous,more);
  const alive=()=>root.children[0]===heading&&$('detail').open;
  async function draw(){
@@ -30,11 +30,13 @@ async function openCheckpointResults(initial='owned'){
    const response=await fetch('/api/checkpoint-results?'+query.toString(),{signal:current.signal,cache:'no-store'});
    if(!response.ok)throw Error('Automatic results could not be loaded. Refresh and sign in.');
    const data=await response.json();if(!alive()||local!==version)return;
+   download.textContent='Download all '+data.total.toLocaleString()+' results for this context';
    download.href='/checkpoint-results.json?'+new URLSearchParams({context:selected}).toString();
    if(!scope.children.length){for(const item of data.contexts){const option=el('option',item.name);option.value=item.id;scope.append(option);}scope.value=selected;}
    status.textContent=(data.paused?'Worker paused. ':'')+data.total+' checkpoints assessed for coverage. '+data.executed+' have current automatic evidence; '+data.runtime_tested+' have scoped runtime test results. Last scheduled evaluation: '+date(data.last_evaluated)+'. '+data.limitation;
    count.textContent=data.matched?'Showing '+(offset+1)+'–'+Math.min(offset+data.items.length,data.matched)+' of '+data.matched:'No checkpoints match this filter.';
    list.replaceChildren();for(const item of data.items){const card=el('article',undefined,'item');card.append(el('span',automaticCheckpointState(item.observation.state),'tag'),el('strong',item.id+' · '+item.title),el('small',item.category),el('p',item.observation.note));
+    if(item.parent_id)card.append(el('small','Scenario variation of '+item.parent_id+' · requires independent evidence'));
     if(item.observation.checked)card.append(el('small','Evidence time: '+date(item.observation.checked)));
     if(item.observation.job)card.append(el('small','Saved test: '+item.observation.job));
     list.append(card);}
@@ -55,7 +57,7 @@ async function openCheckpointCoverage(){
   root.append(el('p',data.note));
   const search=el('input'),label=el('label','Find a program'),list=el('div');search.type='search';search.maxLength=120;label.append(search);root.append(label,list);
   const draw=()=>{list.replaceChildren();for(const p of data.programs.filter(p=>p.name.toLowerCase().includes(search.value.toLowerCase()))){
-   const row=el('article',undefined,'item');row.append(el('strong',p.name),el('p',p.current?p.runtime_tested+' scoped runtime results · '+p.executed+' checkpoints have automatic evidence':'Awaiting a fresh coverage evaluation'),button('View all 1,000 checkpoint results',()=>openCheckpointResults(p.id)));list.append(row);
+   const row=el('article',undefined,'item');row.append(el('strong',p.name),el('p',p.current?p.runtime_tested+' scoped runtime results · '+p.executed+' checkpoints have automatic evidence':'Awaiting a fresh coverage evaluation'),button('View all '+data.checkpoints_per_program.toLocaleString()+' checkpoint results',()=>openCheckpointResults(p.id)));list.append(row);
   }};search.oninput=draw;draw();
  }catch(error){if(root.children[0]===heading)status.textContent=error.message;}
 }
@@ -67,7 +69,7 @@ async function openCheckpoints(options={}){
  const areaLabel=el('label','Research area'),area=el('select');areaLabel.append(area);
  const modeLabel=el('label','Evidence support'),mode=el('select');for(const [value,label] of [['all','All checkpoints'],['automatic','Automatic evidence support'],['contextual','Contextual or specialist review'],['ai','Used in experimental AI guidance']]){const o=el('option',label);o.value=value;mode.append(o);}mode.value=options.context==='owned'?'automatic':'all';modeLabel.append(mode);
  const controls=el('div',undefined,'filters');controls.append(searchLabel,areaLabel,modeLabel);
- const download=el('a','Download the complete 1,000-item list');download.href='/research-checkpoints.md';download.download='ScopeGuard-1000-checkpoints.md';
+ const download=el('a','Download the complete checkpoint list');download.href='/research-checkpoints.md';download.download='ScopeGuard-checkpoints.md';
  let offset=0,next=null,version=0,timer,controller;
  const previous=button('Previous',()=>{offset=Math.max(0,offset-40);return draw();}),more=button('Next',()=>{if(next!==null){offset=next;return draw();}});
  const pager=el('div',undefined,'controls');pager.append(previous,more);
@@ -83,13 +85,15 @@ async function openCheckpoints(options={}){
    if(!response.ok){const error=await response.json().catch(()=>({}));throw Error(error.error||'The checklist could not be loaded. Refresh and sign in.');}
    const data=await response.json();
    if(!alive()||requested!==version)return;
-   intro.textContent=data.total+' catalog entries. '+data.limitation;
+   intro.textContent=data.total.toLocaleString()+' catalog entries. '+(data.catalog_method||'')+' '+data.limitation;
+   download.textContent='Download the complete '+data.total.toLocaleString()+'-item list';download.download='ScopeGuard-'+data.total+'-checkpoints.md';
    if(!area.children.length){const all=el('option','All suggested areas');all.value='';area.append(all);for(const item of data.areas){const o=el('option',item.title+' ('+item.count+')');o.value=item.id;area.append(o);}}
    plan.replaceChildren();if(data.plan){plan.append(el('p',data.plan.suggested+' checkpoints suggested from saved scope. None are counted as tested by this plan.'),el('p',data.plan.basis,'muted'));for(const reason of data.plan.blockers)plan.append(el('p',reason));}
    else if(options.context==='owned')plan.append(el('p','These are saved results from ScopeGuard’s own Python files. They are never attributed to another company. Four policy items need a program context; seven source items can show owned-code evidence.'));
    count.textContent=data.matched?'Showing '+(data.offset+1)+'–'+Math.min(data.offset+data.items.length,data.matched)+' of '+data.matched+' matching checkpoints.':'No checkpoints match these filters.';
    list.replaceChildren();for(const item of data.items){const card=el('article',undefined,'item');card.append(el('span',checkpointState(item.observation.state),'tag'),el('strong',item.id+' · '+item.title),el('small',item.category),el('p',item.observation.note));
     const details=el('details');details.append(el('summary','How to review this checkpoint'),el('p','Method: '+item.method.replaceAll('_',' ')),el('p','Evidence support: '+item.support),el('p','Before review: '+item.prerequisites),el('p','Evidence needed: '+item.evidence_needed));
+    if(item.parent_id)details.append(el('p','Scenario variation of '+item.parent_id+'. Applicability and evidence are evaluated separately.'));
     if(item.observation.checked)details.append(el('small','Evidence timestamp: '+date(item.observation.checked)));
     if(item.ai_guidance)details.append(el('p','Also included in the existing experimental AI review of fixed ScopeGuard code excerpts. This is guidance, not evidence that the checkpoint ran or passed.'));
     for(const reference of item.references)details.append(safeLink(reference.title+' ↗',reference.url),el('br'));

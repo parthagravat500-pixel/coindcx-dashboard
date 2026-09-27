@@ -2,7 +2,7 @@
 
 This module makes no network requests and never enables a target. Runtime evidence
 comes only from existing permission-checking runners. Unsupported items remain
-explicitly untested. Compact receipts avoid storing 1,000 duplicate descriptions
+explicitly untested. Compact receipts avoid storing full catalog descriptions
 for each program on the persistent disk.
 """
 from collections import Counter
@@ -21,7 +21,7 @@ import sourceaudit
 import boundarysuite
 import huntops
 
-VERSION = '2026.09.27.2'
+VERSION = '2026.09.27.3'
 INTERVAL = 5
 REFRESH = 900
 BATCH = 16
@@ -45,7 +45,7 @@ ADAPTERS = {**{k: 'policy' for k in catalog.POLICY_RULES},
             **{k: 'headers' for k in HEAD_RULES}, **{k: 'headers' for k in COOKIE_RULES},
             **{k: 'owned_validation' for k in OWNED_RULES}, 'SG-0161': 'access'}
 ADAPTERS.update({k:'workflow' for k in boundarysuite.CHECKPOINTS.values() if k not in ADAPTERS})
-LIMITATION = ('All 1,000 checkpoints receive a coverage decision. Only implemented adapters with current '
+LIMITATION = ('Every catalog entry receives a coverage decision. Scenario variants need their own evidence. Only implemented adapters with current '
               'evidence count as executed. Response observations and source patterns do not validate a '
               'whole security control. Runtime results apply only to the recorded resource and method. '
               'No result here is an accepted report or paid bounty.')
@@ -229,7 +229,7 @@ def build(c, context, root=catalog.ROOT, now=None):
                 }[adapter]
                 result = observation(state, note)
             rows.append({**entry, 'category': group['title'], 'category_id': group['id'],
-                         'prerequisites': group['prerequisites'], 'evidence_needed': group['evidence'],
+                         **catalog.guidance(group, entry),
                          'adapter': adapter, 'observation': result})
     counts = dict(Counter(r['observation']['state'] for r in rows))
     return {'context': context, 'total': len(rows), 'evaluated': len(rows), 'counts': counts,
@@ -332,6 +332,7 @@ def export(c, query='', root=catalog.ROOT):
     result = build(c, context, root)
     return {'schema': 'scopeguard-checkpoint-results-v1', 'exported_at': int(time.time()),
             'revision': revision(), 'catalog_version': catalog.inventory()['version'],
+            'catalog_composition': catalog._catalog()['expansion'],
             'all_checkpoints_included': True, **result}
 
 

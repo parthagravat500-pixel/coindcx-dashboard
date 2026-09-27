@@ -43,13 +43,15 @@ setImmediate(async()=>{
  assert(descendants(nodes.get('detailContent')).some(n=>n.href==='/workflow-report/'+'b'.repeat(24)));
  state.focused_research=savedHunt;vm.runInContext('renderHunt()',context);
  assert.equal(nodes.get('message').textContent,'');
- assert.match(nodes.get('homeCheckpointsSummary').textContent,/1,000 research checkpoints in 50 areas/);
+ assert.match(nodes.get('homeCheckpointsSummary').textContent,/10,000 research checkpoints in 50 areas/);
+ assert.match(nodes.get('homeCheckpointsSummary').textContent,/1,000 core prompts \+ 9,000 scenario variations/);
  assert.match(nodes.get('homeCheckpointsSummary').textContent,/A checklist entry is not a completed test/);
  const beforeCheckpointFetch=context.fetch;
  const checkpointRequests=[];
  const checkpointPage={total:1000,limitation:'Catalog entries are not completed tests.',matched:80,offset:0,next_offset:40,areas:[{id:'area-01',title:'Permission',count:20}],items:[{id:'SG-0001',title:'<script>Fixture checkpoint</script>',category:'Permission',method:'document_review',prerequisites:'Current permission',evidence_needed:'Official source',support:'Saved policy metadata',references:[{title:'Reference',url:'https://example.test/reference'}],observation:{state:'needs_evidence',note:'<img src=x> Unverified'}}]};
  context.fetch=async(path,options={})=>{checkpointRequests.push({path,method:options.method||'GET'});return {ok:true,json:async()=>checkpointPage};};
  await vm.runInContext('openCheckpoints()',context);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='Download the complete 1,000-item list'));
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='SG-0001 · <script>Fixture checkpoint</script>'));
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<img src=x> Unverified'));
  assert(!descendants(nodes.get('detailContent')).some(n=>n.tagName==='form'));
@@ -71,6 +73,10 @@ setImmediate(async()=>{
  await vm.runInContext('openCheckpoints()',context);
  assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='The checklist could not be loaded. Refresh and sign in.'));
  assert(checkpointRequests.every(x=>x.method==='GET'));
+ const variantPage={...checkpointPage,items:[{...checkpointPage.items[0],id:'SG-1001',parent_id:'SG-0001'}]};
+ context.fetch=async()=>({ok:true,json:async()=>variantPage});
+ await vm.runInContext('openCheckpoints()',context);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='Scenario variation of SG-0001. Applicability and evidence are evaluated separately.'));
  const automaticPage={total:1000,evaluated:1000,executed:3,runtime_tested:1,last_evaluated:1,paused:false,limitation:'Scoped results only.',matched:1000,offset:0,next_offset:40,contexts:[{id:'owned',name:'ScopeGuard'},{id:'program:'+'a'.repeat(24),name:'<script>Program</script>'}],items:[{id:'SG-0166',title:'<script>Authorization</script>',category:'Access',observation:{state:'runtime_passed',note:'<img src=x> Scoped evidence',checked:1,job:'owned_validation:1'}}]};
  context.fetch=async(path,options={})=>{checkpointRequests.push({path,method:options.method||'GET'});return {ok:true,json:async()=>automaticPage};};
  await vm.runInContext('openCheckpointResults()',context);

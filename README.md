@@ -1,10 +1,10 @@
-## Research checklist: 1,000 checkpoints
+## Research checklist: 10,000 entries
 
 The home-screen **Research checklist** opens a searchable, paginated catalog of
-1,000 individually authored investigation prompts in 50 areas. The complete list
+1,000 preserved core prompts and 9,000 explicitly labeled scenario variations in 50 areas (200 entries per area). The complete list
 is in [checkpoints/CHECKPOINTS.md](checkpoints/CHECKPOINTS.md); reviewed source data
 is [checkpoints/catalog.json](checkpoints/catalog.json). Regenerate the readable
-copy with `python ci/export_checkpoints.py`. Background references are linked at
+copy with `python ci/export_checkpoints.py`. Rebuild the deterministic scenario catalog with `python ci/expand_checkpoints.py` using [the category-specific matrix](checkpoints/scenario-matrix.json). Background references are linked at
 category level; this is not an official standard, certification, exhaustive test
 suite, or a claim that every researcher uses the same list.
 
@@ -23,7 +23,7 @@ Eleven checkpoints have partial automatic evidence support:
 | SG-0001, SG-0002, SG-0006, SG-0008 | Saved policy completeness, status, exact inclusion/exclusion conflicts, automation restrictions | Full policy interpretation and permission for any method |
 | SG-0781–SG-0787 | Seven existing Python pattern checks on current owned ScopeGuard file digests | Reachability, runtime impact, complete control validation, external-program applicability |
 
-The other 989 entries require contextual review or specialist testing. Twelve
+The catalog evidence view leaves 9,989 entries for contextual review or specialist testing. The separate results engine has 35 implemented adapters and 9,965 entries without an adapter. The 9,000 new variants inherit neither their parent's adapter nor its evidence. A scenario needs its own applicability decision; an absent feature is not an automatic pass. Twelve
 entries are also provided as guidance to the existing experimental private AI
 review (six per fixed owned-code excerpt); this does not make them implemented
 detectors. The model's existing output budget, isolation and private delivery

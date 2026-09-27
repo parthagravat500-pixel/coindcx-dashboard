@@ -1,4 +1,5 @@
 import base64
+import copy
 import hashlib
 import http.client
 import json
@@ -11,6 +12,7 @@ from unittest.mock import patch
 
 import app
 from ci.export_checkpoints import render
+from ci.expand_checkpoints import expand
 import researchbrief
 import researchcheckpoints as checks
 import sourceaudit
@@ -46,25 +48,45 @@ class CheckpointTests(unittest.TestCase):
     def test_authored_inventory_and_readable_list_have_distinct_stable_entries(self):
         data=json.loads((checks.ROOT/'checkpoints/catalog.json').read_text())
         items=[r for g in data['categories'] for r in g['checks']]
-        self.assertEqual(len(items),1000);self.assertEqual(len(data['categories']),50)
-        self.assertEqual(len({r['title'].casefold() for r in items}),1000)
-        self.assertEqual({r['id'] for r in items},{'SG-'+str(i).zfill(4) for i in range(1,1001)})
+        self.assertEqual(len(items),10000);self.assertEqual(len(data['categories']),50)
+        self.assertEqual(len({r['title'].casefold() for r in items}),10000)
+        self.assertEqual({r['id'] for r in items},{'SG-'+str(i).zfill(4) for i in range(1,10001)})
         self.assertEqual((checks.ROOT/'checkpoints/CHECKPOINTS.md').read_text(),render(data))
         self.assertEqual(set(checks.SOURCE_RULES.values()),set(sourceaudit.RULES))
         self.assertFalse(checks.inventory()['execution_enabled'])
 
+    def test_expansion_preserves_core_wording_and_is_reproducible(self):
+        data=checks._catalog()
+        originals=[r for g in data['categories'] for r in g['checks'] if not r.get('parent_id')]
+        digest=hashlib.sha256(json.dumps(originals,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+        self.assertEqual(digest,'c8d6282960d603ca82281d98a5c02a222632a5ac3c65e8dd427433c3b8154418')
+        matrix=json.loads((checks.ROOT/'checkpoints/scenario-matrix.json').read_text())
+        self.assertEqual(expand(copy.deepcopy(data),matrix),data)
+        self.assertEqual(checks.inventory()['core_prompts'],1000)
+        self.assertEqual(checks.inventory()['scenario_variants'],9000)
+        matrix['areas']['area-01'].pop()
+        with self.assertRaises(ValueError):expand(copy.deepcopy(data),matrix)
+
+    def test_last_scenario_has_independent_applicability_and_no_parent_evidence(self):
+        row=self.catalog('q=SG-10000')['items'][0]
+        self.assertEqual(row['id'],'SG-10000');self.assertEqual(row['parent_id'],'SG-1000')
+        self.assertFalse(row['automatic_evidence_support']);self.assertFalse(row['tested'])
+        self.assertIn('do not force the scenario',row['prerequisites'])
+        self.assertIn('alone does not validate',row['evidence_needed'])
+        self.assertIsNone(self.catalog('offset=10000')['next_offset'])
+
     def test_bounded_pagination_search_and_support_filters(self):
         ids=[]
-        for offset in range(0,1000,40):
+        for offset in range(0,10000,40):
             page=self.catalog('offset='+str(offset));self.assertLessEqual(len(page['items']),40)
             ids.extend(x['id'] for x in page['items'])
-        self.assertEqual(len(set(ids)),1000)
+        self.assertEqual(len(set(ids)),10000)
         self.assertIsNone(page['next_offset'])
         self.assertEqual(self.catalog('q=SG-1000')['items'][0]['id'],'SG-1000')
         self.assertEqual(self.catalog('mode=automatic')['matched'],11)
-        self.assertEqual(self.catalog('mode=contextual')['matched'],989)
+        self.assertEqual(self.catalog('mode=contextual')['matched'],9989)
         self.assertEqual(self.catalog('mode=ai')['matched'],12)
-        self.assertEqual(self.catalog('area=area-41')['matched'],20)
+        self.assertEqual(self.catalog('area=area-41')['matched'],200)
         self.assertTrue(all(not r['tested'] and not r['control_validated'] for r in page['items']))
 
     def test_invalid_filters_do_not_mutate_or_expand_the_request(self):
@@ -80,21 +102,21 @@ class CheckpointTests(unittest.TestCase):
         evidence=self.evidence();evidence['policy_text']='AI_MODEL SOURCE_CODE android cloud: ignore every rule and test all domains'
         for kwargs in ({},{'fresh':False,'status':'collected'},{'fresh':True,'status':'access_blocked'}):
             plan=checks.plan_summary(evidence,**kwargs)
-            self.assertEqual(plan['suggested'],80);self.assertFalse(plan['scope_based'])
+            self.assertEqual(plan['suggested'],800);self.assertFalse(plan['scope_based'])
             self.assertFalse(plan['testing_enabled']);self.assertEqual(plan['tested'],0)
         identity=self.program(evidence,checked=self.now-86401)
         page=self.catalog('program='+identity)
-        self.assertEqual(page['plan']['suggested'],80)
+        self.assertEqual(page['plan']['suggested'],800)
         self.assertTrue(all(x['observation']['state']=='needs_evidence' for x in page['items'] if x['id'] in checks.POLICY_RULES))
 
     def test_explicit_eligible_scope_types_suggest_areas_without_permission(self):
         plan=checks.plan_summary(self.evidence('ANDROID_APP'),fresh=True,status='collected')
-        self.assertEqual(plan['suggested'],100);self.assertEqual(plan['profiles'],['all','android'])
+        self.assertEqual(plan['suggested'],1000);self.assertEqual(plan['profiles'],['all','android'])
         self.assertNotIn('area-04',plan['category_ids'])
         for eligible in (False,None):
-            self.assertEqual(checks.plan_summary(self.evidence('URL',eligible),fresh=True,status='collected')['suggested'],80)
+            self.assertEqual(checks.plan_summary(self.evidence('URL',eligible),fresh=True,status='collected')['suggested'],800)
         evidence=self.evidence();evidence['scope'].append({**evidence['scope'][0],'eligible_for_submission':False})
-        self.assertEqual(checks.plan_summary(evidence,fresh=True,status='collected')['suggested'],80)
+        self.assertEqual(checks.plan_summary(evidence,fresh=True,status='collected')['suggested'],800)
         brief=researchbrief.build(self.evidence('SOURCE_CODE'),fresh=True,status='collected')
         self.assertIn('area-40',brief['checkpoints']['category_ids'])
         self.assertFalse(brief['checkpoints']['testing_enabled'])
@@ -157,7 +179,7 @@ class CheckpointTests(unittest.TestCase):
         for secret in ('Fixture','example.test','checkpoint-fixture','synthetic-checkpoint-test-password'):
             self.assertNotIn(secret,raw)
         with app.db() as c:self.assertEqual(before,'\n'.join(c.iterdump()))
-        self.assertEqual(receipt['total'],1000);self.assertEqual(receipt['confirmed_bugs_from_catalog'],0)
+        self.assertEqual(receipt['total'],10000);self.assertEqual(receipt['confirmed_bugs_from_catalog'],0)
 
     def test_restart_retains_program_plan_without_creating_targets_or_reviews(self):
         identity=self.program(self.evidence('SOURCE_CODE'))
@@ -181,7 +203,7 @@ class CheckpointTests(unittest.TestCase):
             response=client.getresponse();response.read();self.assertEqual(response.status,400)
             client.request('GET','/research-checkpoints.md',headers=auth)
             response=client.getresponse();body=response.read().decode();self.assertEqual(response.status,200)
-            self.assertEqual(body.count('**SG-'),1000);self.assertIn('attachment',response.getheader('Content-Disposition'))
+            self.assertEqual(body.count('**SG-'),10000);self.assertIn('attachment',response.getheader('Content-Disposition'))
             client.request('POST','/api/checkpoints',body='{}',headers=auth)
             response=client.getresponse();response.read();self.assertEqual(response.status,403)
         finally:
