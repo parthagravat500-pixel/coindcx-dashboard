@@ -44,7 +44,7 @@ setImmediate(async()=>{
  state.focused_research=savedHunt;vm.runInContext('renderHunt()',context);
  assert.equal(nodes.get('message').textContent,'');
  assert.match(nodes.get('homeCheckpointsSummary').textContent,/1,000 research checkpoints in 50 areas/);
- assert.match(nodes.get('homeCheckpointsSummary').textContent,/11 have automatic evidence support; 989 need contextual review/);
+ assert.match(nodes.get('homeCheckpointsSummary').textContent,/A checklist entry is not a completed test/);
  const beforeCheckpointFetch=context.fetch;
  const checkpointRequests=[];
  const checkpointPage={total:1000,limitation:'Catalog entries are not completed tests.',matched:80,offset:0,next_offset:40,areas:[{id:'area-01',title:'Permission',count:20}],items:[{id:'SG-0001',title:'<script>Fixture checkpoint</script>',category:'Permission',method:'document_review',prerequisites:'Current permission',evidence_needed:'Official source',support:'Saved policy metadata',references:[{title:'Reference',url:'https://example.test/reference'}],observation:{state:'needs_evidence',note:'<img src=x> Unverified'}}]};
@@ -81,11 +81,17 @@ setImmediate(async()=>{
  const automaticScope=descendants(nodes.get('detailContent')).find(n=>n.tagName==='select');
  automaticScope.value='program:'+'a'.repeat(24);await automaticScope.onchange();
  assert(checkpointRequests.at(-1).path.includes('context=program%3A'+'a'.repeat(24)));
+ assert(descendants(nodes.get('detailContent')).some(n=>n.href==='/checkpoint-results.json?context=program%3A'+'a'.repeat(24)));
  const nextAutomatic=descendants(nodes.get('detailContent')).find(n=>n.textContent==='Next');await nextAutomatic.onclick();
  assert(checkpointRequests.at(-1).path.includes('offset=40'));
  const automaticFilter=descendants(nodes.get('detailContent')).filter(n=>n.tagName==='select')[1];
  automaticFilter.value='needs_implementation';await automaticFilter.onchange();
  assert(checkpointRequests.at(-1).path.includes('state=needs_implementation'));assert(checkpointRequests.at(-1).path.includes('offset=0'));
+ assert(checkpointRequests.every(x=>x.method==='GET'));
+ context.fetch=async(path,options={})=>{checkpointRequests.push({path,method:options.method||'GET'});return {ok:true,json:async()=>({programs_with_runtime_results:0,total_programs:1,current_programs:1,unimplemented_checkpoints:965,checkpoints_per_program:1000,note:'Coverage is not testing.',programs:[{id:'program:'+'a'.repeat(24),name:'<script>Coverage fixture</script>',current:true,runtime_tested:0,executed:4}]})};};
+ await vm.runInContext('openCheckpointCoverage()',context);
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='<script>Coverage fixture</script>'));
+ assert(descendants(nodes.get('detailContent')).some(n=>n.textContent==='0 scoped runtime results · 4 checkpoints have automatic evidence'));
  assert(checkpointRequests.every(x=>x.method==='GET'));
  context.fetch=beforeCheckpointFetch;
  const originalDiscovery=state.workflow;

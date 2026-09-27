@@ -44,3 +44,16 @@ class ValidationTests(unittest.TestCase):
         with patch.object(validation,'request',side_effect=TimeoutError):validation.tick(app.db,app.log,self.port,self.token)
         v=app.snapshot()['validation'];self.assertEqual(v['completed'],0);self.assertIn('could not finish',v['status'])
         with self.assertRaises(InterruptedError):validation.run(self.port,self.token,lambda:False)
+
+    def test_large_real_dashboard_control_is_checked_without_saving_body(self):
+        state=app.snapshot();state['large_fixture']='private-fixture-'*80000
+        with patch.object(app,'snapshot',return_value=state):result=validation.run(self.port,self.token)
+        self.assertEqual(result['status'],'All covered checks passed')
+        self.assertGreater(result['checks'][0]['response_bytes'],1000000)
+        self.assertNotIn('private-fixture-',json.dumps(result))
+        self.assertNotIn(self.token,json.dumps(result))
+
+    def test_response_limit_still_fails_closed(self):
+        with patch.object(validation,'MAX_RESPONSE_BYTES',20):
+            with self.assertRaisesRegex(ValueError,'Response exceeded validation limit'):
+                validation.run(self.port,self.token)

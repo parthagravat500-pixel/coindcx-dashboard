@@ -21,7 +21,7 @@ import sourceaudit
 import boundarysuite
 import huntops
 
-VERSION = '2026.09.26.3'
+VERSION = '2026.09.27.2'
 INTERVAL = 5
 REFRESH = 900
 BATCH = 16
@@ -229,6 +229,7 @@ def build(c, context, root=catalog.ROOT, now=None):
                 }[adapter]
                 result = observation(state, note)
             rows.append({**entry, 'category': group['title'], 'category_id': group['id'],
+                         'prerequisites': group['prerequisites'], 'evidence_needed': group['evidence'],
                          'adapter': adapter, 'observation': result})
     counts = dict(Counter(r['observation']['state'] for r in rows))
     return {'context': context, 'total': len(rows), 'evaluated': len(rows), 'counts': counts,
@@ -286,7 +287,52 @@ def summary(c):
             'healthy': bool(not state['error'] and 0 < state['heartbeat'] <= now and now - state['heartbeat'] < 90),
             'contexts_evaluated': len(receipts), 'current_contexts': len(current),
             'contexts_total': 1 + c.execute('SELECT COUNT(*) FROM programs').fetchone()[0] + c.execute('SELECT COUNT(*) FROM targets').fetchone()[0],
-            'owned': owned, 'limitation': LIMITATION, 'confirmed_bounty_bugs': 0}
+            'owned': owned, 'program_coverage': coverage(c, include_rows=False),
+            'limitation': LIMITATION, 'confirmed_bounty_bugs': 0}
+
+
+def coverage(c, include_rows=True):
+    """Summarize current saved decisions; never run a target or infer a pass."""
+    now = int(time.time())
+    saved = {r['context']: dict(r) for r in c.execute('SELECT * FROM checkpoint_evaluations')}
+    rows = []
+    for item in contexts(c):
+        if not item['id'].startswith('program:'): continue
+        receipt = saved.get(item['id'])
+        current = bool(receipt and receipt['version'] == VERSION and receipt['revision'] == revision()
+                       and 0 <= now - receipt['checked'] < REFRESH + 60)
+        counts = json.loads(receipt['counts']) if current else {}
+        rows.append({**item, 'current': current, 'checked': receipt['checked'] if receipt else 0,
+                     'executed': counts.get('executed'), 'runtime_tested': counts.get('runtime_tested'),
+                     'counts': counts.get('counts', {})})
+    current = [r for r in rows if r['current']]
+    result = {'total_programs': len(rows), 'current_programs': len(current),
+              'awaiting_evaluation': len(rows)-len(current),
+              'programs_with_runtime_results': sum(bool(r['runtime_tested']) for r in current),
+              'runtime_checkpoint_results': sum(r['runtime_tested'] or 0 for r in current),
+              'checkpoints_with_automatic_evidence': sum(r['executed'] or 0 for r in current),
+              'checkpoints_per_program': catalog.inventory()['total'],
+              'implemented_checkpoints': len(ADAPTERS),
+              'unimplemented_checkpoints': catalog.inventory()['total'] - len(ADAPTERS),
+              'note': 'Coverage decisions, policy documents and source observations are not runtime tests. '
+                      'Counts include current evidence only. No full-program security assessment is claimed.'}
+    if include_rows: result['programs'] = rows
+    return result
+
+
+def export(c, query='', root=catalog.ROOT):
+    """Export every checkpoint in one selected context, including untested rows."""
+    if len(query) > 160: raise ValueError('Invalid export query')
+    values = parse_qs(query, keep_blank_values=True, max_num_fields=1)
+    if set(values) - {'context'} or any(len(v) != 1 for v in values.values()):
+        raise ValueError('Export accepts one context only')
+    context = values.get('context', ['owned'])[0]
+    if not re.fullmatch(r'owned|program:[0-9a-f]{24}|target:[1-9][0-9]{0,9}', context):
+        raise ValueError('Invalid context')
+    result = build(c, context, root)
+    return {'schema': 'scopeguard-checkpoint-results-v1', 'exported_at': int(time.time()),
+            'revision': revision(), 'catalog_version': catalog.inventory()['version'],
+            'all_checkpoints_included': True, **result}
 
 
 def browse(c, query='', root=catalog.ROOT):
@@ -318,4 +364,5 @@ def receipt(c):
     data = summary(c)
     return {'kind': 'scopeguard_checkpoint_automation_health', 'revision': revision(),
             **{k: data[k] for k in ('version', 'healthy', 'paused', 'total', 'implemented_adapters',
-                'remaining_adapters', 'contexts_evaluated', 'current_contexts', 'contexts_total', 'owned', 'error')}}
+                'remaining_adapters', 'contexts_evaluated', 'current_contexts', 'contexts_total', 'owned',
+                'program_coverage', 'error')}}

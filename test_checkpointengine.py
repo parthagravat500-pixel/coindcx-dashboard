@@ -60,6 +60,53 @@ class AutomaticCheckpointTests(unittest.TestCase):
         self.assertTrue(all(not r['observation']['control_validated'] for r in result['items']))
         self.assertTrue(state['healthy']); self.assertEqual(state['current_contexts'], 1)
 
+    def test_export_includes_every_untested_checkpoint_without_network(self):
+        context=self.program();self.resume();engine.tick(app.db)
+        with patch('socket.create_connection',side_effect=AssertionError('No network')):
+            with app.db() as c:
+                before=c.total_changes
+                result=engine.export(c,'context='+context)
+                self.assertEqual(c.total_changes,before)
+                self.assertEqual(result['runtime_tested'],0)
+                self.assertEqual(len(result['items']),1000)
+                self.assertEqual(len({r['id'] for r in result['items']}),1000)
+                self.assertTrue(all(r['prerequisites'] and r['evidence_needed'] for r in result['items']))
+                self.assertTrue(all(not r['observation']['tested'] for r in result['items']))
+                for query in ('context=owned&context=owned','context=owned&state=runtime_passed','context=missing'):
+                    with self.assertRaises(ValueError):engine.export(c,query)
+
+    def test_program_coverage_excludes_owned_and_stale_results(self):
+        context=self.program();self.resume();engine.tick(app.db)
+        with app.db() as c:
+            data=engine.coverage(c)
+            self.assertEqual(data['total_programs'],1)
+            self.assertEqual(data['current_programs'],1)
+            self.assertEqual(data['programs_with_runtime_results'],0)
+            self.assertEqual(data['runtime_checkpoint_results'],0)
+            self.assertEqual(data['checkpoints_with_automatic_evidence'],0)
+            c.execute('UPDATE checkpoint_evaluations SET checked=0 WHERE context=?',(context,))
+            data=engine.coverage(c)
+            self.assertEqual(data['awaiting_evaluation'],1)
+            self.assertIsNone(data['programs'][0]['runtime_tested'])
+            self.assertNotIn('programs',engine.summary(c)['program_coverage'])
+
+    def test_coverage_and_full_export_require_authentication(self):
+        server=app.ThreadingHTTPServer(('127.0.0.1',0),app.Handler)
+        thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+        client=http.client.HTTPConnection('127.0.0.1',server.server_address[1])
+        auth={'Authorization':'Basic '+base64.b64encode(('admin:'+app.TOKEN).encode()).decode()}
+        try:
+            for path in ('/api/checkpoint-coverage','/checkpoint-results.json?context=owned'):
+                client.request('GET',path);response=client.getresponse();response.read()
+                self.assertEqual(response.status,401)
+            client.request('GET','/checkpoint-results.json?context=owned',headers=auth)
+            response=client.getresponse();data=json.loads(response.read())
+            self.assertEqual(response.status,200)
+            self.assertIn('attachment',response.getheader('Content-Disposition'))
+            self.assertEqual(len(data['items']),1000)
+            self.assertNotIn(app.TOKEN,json.dumps(data));self.assertNotIn(app.CSRF,json.dumps(data))
+        finally:client.close();server.shutdown();server.server_close();thread.join()
+
     def test_paused_worker_and_readonly_browse_make_no_requests_or_changes(self):
         target = self.target()
         with patch('socket.create_connection', side_effect=AssertionError('No network')):

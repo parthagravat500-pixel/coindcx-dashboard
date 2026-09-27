@@ -618,6 +618,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, json.dumps(result))
             except ValueError as exc:
                 return self.reply(400, json.dumps({'error': str(exc)}))
+        if self.path == '/api/checkpoint-coverage':
+            with db() as c: result = checkpointengine.coverage(c)
+            return self.reply(200, json.dumps(result))
+        if self.path == '/checkpoint-results.json' or self.path.startswith('/checkpoint-results.json?'):
+            try:
+                with db() as c: result = checkpointengine.export(c, self.path.partition('?')[2], ROOT)
+                return self.reply(200, json.dumps(result, indent=2), headers={
+                    'Content-Disposition': 'attachment; filename="ScopeGuard-checkpoint-results.json"'})
+            except ValueError as exc:
+                return self.reply(400, json.dumps({'error': str(exc)}))
         if self.path == '/research-checkpoints.md':
             return self.reply(200,(ROOT/'checkpoints/CHECKPOINTS.md').read_text(),'text/plain',
                               headers={'Content-Disposition':'attachment; filename="ScopeGuard-1000-checkpoints.md"'})

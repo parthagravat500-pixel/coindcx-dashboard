@@ -2,12 +2,14 @@
 function renderCheckpointSummary(){
  const c=state.research_checkpoints;
  $('homeCheckpointsBadge').textContent=c?c.total.toLocaleString()+' checkpoints':'Unavailable';
- $('homeCheckpointsSummary').textContent=c?c.total.toLocaleString()+' research checkpoints in '+c.categories+' areas. '+c.automatic_evidence_support+' have automatic evidence support; '+c.contextual_review+' need contextual review or specialist testing.':'Waiting for the research catalog.';
+ $('homeCheckpointsSummary').textContent=c?c.total.toLocaleString()+' research checkpoints in '+c.categories+' areas. A checklist entry is not a completed test.':'Waiting for the research catalog.';
  $('homeCheckpointsEvidence').textContent=c?c.current_owned_files+' current ScopeGuard Python files have saved pattern reviews. These cover '+c.source_evidence_checks+' checklist items partially. '+(c.stale_owned_files+c.missing_owned_files)+' files await a current review.':'Evidence is unavailable.';
  $('openCheckpoints').disabled=!c;$('openCheckpointEvidence').disabled=!c;
  const a=state.checkpoint_automation;
  $('homeChecklistAutomation').textContent=a?(a.paused?'Checklist worker paused. ':!a.healthy?'Checklist worker awaiting a fresh update. ':'Checklist worker running. ')+a.current_contexts+' of '+a.contexts_total+' contexts evaluated recently. '+a.implemented_adapters+' checkpoints have automated adapters; '+a.remaining_adapters+' need implementation or contextual review.':'Automatic results are unavailable from this server version.';
- $('openCheckpointResults').disabled=!a;
+ const p=a?.program_coverage;
+ $('homeProgramCheckpointSummary').textContent=p?p.programs_with_runtime_results+' of '+p.total_programs+' listed programs have current runtime checkpoint results. '+p.runtime_checkpoint_results+' scoped checkpoint results recorded. '+p.awaiting_evaluation+' programs await a fresh coverage evaluation.':'Waiting for current program test coverage.';
+ $('openCheckpointResults').disabled=$('openCheckpointCoverage').disabled=!a;
 }
 function automaticCheckpointState(value){return ({runtime_passed:'Tested · scoped check passed',runtime_failed:'Tested · investigate failure',observed:'Response observed · impact unproven',needs_implementation:'Not tested · adapter needed',needs_context:'Not tested · applicability unknown',needs_input:'Not tested · inputs needed',inconclusive:'Test incomplete'})[value]||checkpointState(value);}
 async function openCheckpointResults(initial='owned'){
@@ -17,7 +19,8 @@ async function openCheckpointResults(initial='owned'){
  for(const [value,label] of [['','All results'],['runtime_passed','Scoped runtime checks passed'],['runtime_failed','Runtime failures'],['observed','Response observations'],['signal_recorded','Source signals'],['blocked','Blocked or stale'],['needs_input','Inputs needed'],['needs_implementation','Adapter needed'],['needs_context','Applicability unknown']]){const option=el('option',label);option.value=value;filter.append(option);}
  let selected=initial,offset=0,next=null,version=0,controller,timer;
  const previous=button('Previous',()=>{offset=Math.max(0,offset-40);return draw();}),more=button('Next',()=>{if(next!==null){offset=next;return draw();}});
- root.append(status,scopeLabel,filterLabel,searchLabel,count,list,previous,more);
+ const download=el('a','Download all 1,000 results for this program');download.download='ScopeGuard-checkpoint-results.json';
+ root.append(status,scopeLabel,download,filterLabel,searchLabel,count,list,previous,more);
  const alive=()=>root.children[0]===heading&&$('detail').open;
  async function draw(){
   const local=++version;controller?.abort();controller=new AbortController();const current=controller;
@@ -27,6 +30,7 @@ async function openCheckpointResults(initial='owned'){
    const response=await fetch('/api/checkpoint-results?'+query.toString(),{signal:current.signal,cache:'no-store'});
    if(!response.ok)throw Error('Automatic results could not be loaded. Refresh and sign in.');
    const data=await response.json();if(!alive()||local!==version)return;
+   download.href='/checkpoint-results.json?'+new URLSearchParams({context:selected}).toString();
    if(!scope.children.length){for(const item of data.contexts){const option=el('option',item.name);option.value=item.id;scope.append(option);}scope.value=selected;}
    status.textContent=(data.paused?'Worker paused. ':'')+data.total+' checkpoints assessed for coverage. '+data.executed+' have current automatic evidence; '+data.runtime_tested+' have scoped runtime test results. Last scheduled evaluation: '+date(data.last_evaluated)+'. '+data.limitation;
    count.textContent=data.matched?'Showing '+(offset+1)+'–'+Math.min(offset+data.items.length,data.matched)+' of '+data.matched:'No checkpoints match this filter.';
@@ -41,6 +45,19 @@ async function openCheckpointResults(initial='owned'){
  scope.onchange=()=>{selected=scope.value;offset=0;return draw();};filter.onchange=()=>{offset=0;return draw();};
  search.oninput=()=>{clearTimeout(timer);timer=setTimeout(()=>{if(alive()){offset=0;draw();}},250);};
  await draw();
+}
+async function openCheckpointCoverage(){
+ const root=modal('Coverage across all programs'),heading=root.children[0],status=el('p','Loading program coverage…');root.append(status);
+ try{
+  const response=await fetch('/api/checkpoint-coverage',{cache:'no-store'});if(!response.ok)throw Error('Program coverage could not be loaded.');
+  const data=await response.json();if(root.children[0]!==heading||!$('detail').open)return;
+  status.textContent=data.programs_with_runtime_results+' of '+data.total_programs+' programs have current runtime checkpoint results. '+data.current_programs+' have fresh coverage decisions. '+data.unimplemented_checkpoints+' of the '+data.checkpoints_per_program+' checkpoint tests are not implemented.';
+  root.append(el('p',data.note));
+  const search=el('input'),label=el('label','Find a program'),list=el('div');search.type='search';search.maxLength=120;label.append(search);root.append(label,list);
+  const draw=()=>{list.replaceChildren();for(const p of data.programs.filter(p=>p.name.toLowerCase().includes(search.value.toLowerCase()))){
+   const row=el('article',undefined,'item');row.append(el('strong',p.name),el('p',p.current?p.runtime_tested+' scoped runtime results · '+p.executed+' checkpoints have automatic evidence':'Awaiting a fresh coverage evaluation'),button('View all 1,000 checkpoint results',()=>openCheckpointResults(p.id)));list.append(row);
+  }};search.oninput=draw;draw();
+ }catch(error){if(root.children[0]===heading)status.textContent=error.message;}
 }
 function checkpointState(value){return ({not_tested:'Not tested',needs_evidence:'Evidence needed',evidence_recorded:'Evidence saved · review needed',needs_review:'Needs review',blocked:'On hold',signal_recorded:'Code signal · impact unproven',no_signal_in_saved_files:'No pattern found · control unvalidated'})[value]||'Unverified';}
 async function openCheckpoints(options={}){
@@ -145,6 +162,7 @@ $('pause').onclick=()=>{if(state)change('/api/pause',{paused:!state.paused}).cat
 $('openCheckpoints').onclick=()=>openCheckpoints();
 $('openCheckpointEvidence').onclick=()=>openCheckpoints({context:'owned'});
 $('openCheckpointResults').onclick=()=>openCheckpointResults();
+$('openCheckpointCoverage').onclick=()=>openCheckpointCoverage();
 $('targetForm').onsubmit=async e=>{e.preventDefault();const form=e.target;const f=new FormData(form);const b=form.querySelector('button');b.disabled=true;try{await change('/api/targets',{name:f.get('name'),url:f.get('url'),policy:f.get('policy'),rules:f.get('rules'),interval:Number(f.get('hours'))*3600,expires:Math.floor(Date.now()/1000)+Number(f.get('days'))*86400-5,authorized:f.has('authorized'),automation_allowed:f.has('automation_allowed'),cors:f.has('cors')});form.reset();}catch(err){$('message').textContent=err.message;}finally{b.disabled=false;}};
 refresh().catch(e=>$('message').textContent=e.message);
 

@@ -116,7 +116,7 @@ def jobs(c, now=None):
             'https://hackerone.com/gitlab', 'Owned GitLab '+('two-account comparison' if kind=='gitlab_pair' else 'anonymous comparison'),block,
             stop_detail(row,now) if not row['enabled'] else '')
     validation = c.execute('SELECT * FROM validation_schedule WHERE id=1').fetchone()
-    add('owned_validation',1,validation['due'],['owned-loopback-validation-v1'],
+    add('owned_validation',1,validation['due'],['owned-loopback-validation-v2'],
         'owned-scopeguard', 'ScopeGuard login and request protection')
     rotations = {r['job']:dict(r) for r in c.execute('SELECT * FROM autonomous_rotation')}
     programs = {r['program']:r['next_allowed'] for r in c.execute('SELECT * FROM autonomous_programs')}
@@ -151,7 +151,8 @@ def evidence(result):
         for key in ('step','id'):
             if isinstance(raw.get(key),str): row[key] = raw[key][:100]
         for key in ('status','actual_status','expected_status','bytes','response_bytes'):
-            if type(raw.get(key)) is int and 0 <= raw[key] <= 1000001: row[key] = raw[key]
+            limit = 8 * 1024 * 1024 if key in ('bytes','response_bytes') else 1000001
+            if type(raw.get(key)) is int and 0 <= raw[key] <= limit: row[key] = raw[key]
         for key in ('json','marker_present','passed','private_state_exposed','private','owner'):
             if type(raw.get(key)) is bool: row[key] = raw[key]
         for key in ('sha256','response_sha256'):

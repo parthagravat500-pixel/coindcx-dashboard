@@ -9,6 +9,7 @@ import json
 import time
 
 INTERVAL = 3600
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
 
 def init(c):
@@ -26,8 +27,8 @@ def request(port,method,path,headers=None,body=None):
     conn=http.client.HTTPConnection('127.0.0.1',port,timeout=5)
     try:
         conn.request(method,path,body=body,headers=headers or {})
-        response=conn.getresponse();raw=response.read(1000001)
-        if len(raw)>1000000:raise ValueError('Response exceeded validation limit')
+        response=conn.getresponse();raw=response.read(MAX_RESPONSE_BYTES + 1)
+        if len(raw)>MAX_RESPONSE_BYTES:raise ValueError('Response exceeded validation limit')
         return response.status,raw
     finally:conn.close()
 
